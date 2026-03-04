@@ -92,6 +92,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _isLoading = true;
       _errorMessage = '';
     });
+    //test
 
     try {
       print('🔌 Getting Supabase client...');
