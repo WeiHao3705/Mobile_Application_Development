@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
-//tets
+//test
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
