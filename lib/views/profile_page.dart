@@ -1,11 +1,46 @@
 import 'package:flutter/material.dart';
 
+import '../controllers/auth_controller.dart';
+import '../models/auth_user.dart';
+import 'login_page.dart';
+
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
-//testiing2
+  const ProfilePage({super.key, required this.authController});
+
+  final AuthController authController;
+
+  String _displayName(LoginUser? user) {
+    return user?.fullName ?? user?.username ?? 'User';
+  }
+
+  String _displayEmail(LoginUser? user) {
+    return user?.email ?? 'No email available';
+  }
+
+  String _displayMetric(num? value, String unit) {
+    if (value == null) {
+      return '--';
+    }
+    return '${value.toString()} $unit';
+  }
+
+  String _displayBmi(LoginUser? user) {
+    final heightCm = user?.height;
+    final weightKg = user?.currentWeight;
+
+    if (heightCm == null || weightKg == null || heightCm == 0) {
+      return '--';
+    }
+
+    final heightM = heightCm / 100;
+    final bmi = weightKg / (heightM * heightM);
+    return bmi.toStringAsFixed(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final user = authController.currentUser;
 
     return Scaffold(
       appBar: AppBar(
@@ -43,9 +78,9 @@ class ProfilePage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'John Doe',
-                    style: TextStyle(
+                  Text(
+                    _displayName(user),
+                    style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.black,
@@ -53,7 +88,7 @@ class ProfilePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'john.doe@example.com',
+                    _displayEmail(user),
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.black.withOpacity(0.7),
@@ -89,21 +124,21 @@ class ProfilePage extends StatelessWidget {
                         children: [
                           _ProfileStat(
                             label: 'Weight',
-                            value: '70 kg',
+                            value: _displayMetric(user?.currentWeight, 'kg'),
                             icon: Icons.monitor_weight,
-                            color: theme.colorScheme.primary,
+                            color: theme.colorScheme.tertiary,
                           ),
                           _ProfileStat(
                             label: 'Height',
-                            value: '175 cm',
+                            value: _displayMetric(user?.height, 'cm'),
                             icon: Icons.height,
                             color: theme.colorScheme.secondary,
                           ),
                           _ProfileStat(
                             label: 'BMI',
-                            value: '22.9',
+                            value: _displayBmi(user),
                             icon: Icons.analytics,
-                            color: theme.colorScheme.primary,
+                            color: theme.colorScheme.tertiary,
                           ),
                         ],
                       ),
@@ -130,12 +165,12 @@ class ProfilePage extends StatelessWidget {
                     title: 'Daily Steps Goal',
                     value: '10,000 steps',
                     icon: Icons.directions_walk,
-                    iconColor: theme.colorScheme.primary,
+                    iconColor: theme.colorScheme.tertiary,
                   ),
                   const SizedBox(height: 8),
                   _GoalItem(
-                    title: 'Weekly Workout',
-                    value: '5 days',
+                    title: 'Target Weight',
+                    value: _displayMetric(user?.targetWeight, 'kg'),
                     icon: Icons.fitness_center,
                     iconColor: theme.colorScheme.secondary,
                   ),
@@ -172,7 +207,14 @@ class ProfilePage extends StatelessWidget {
                   _OptionItem(
                     title: 'Logout',
                     icon: Icons.logout,
-                    onTap: () {},
+                    onTap: () {
+                      authController.logout();
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        LoginPage.routeName,
+                        (route) => false,
+                      );
+                    },
                     isDestructive: true,
                   ),
                 ],

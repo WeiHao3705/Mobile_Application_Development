@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+
+import '../controllers/auth_controller.dart';
 import 'home_page.dart';
 import 'profile_page.dart';
 
 class MainNavigation extends StatefulWidget {
-  const MainNavigation({super.key});
+  static const routeName = '/main';
+
+  const MainNavigation({super.key, required this.authController});
+
+  final AuthController authController;
 
   @override
   State<MainNavigation> createState() => _MainNavigationState();
@@ -12,12 +18,11 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
 
-  // Placeholder widgets for Exercise and Diet pages
-  final List<Widget> _pages = [
+  late final List<Widget> _pages = [
     const HomePage(),
     const _PlaceholderPage(title: 'Exercise'),
     const _PlaceholderPage(title: 'Diet'),
-    const ProfilePage(),
+    ProfilePage(authController: widget.authController),
   ];
 
   void _onItemTapped(int index) {
@@ -58,26 +63,26 @@ class _MainNavigationState extends State<MainNavigation> {
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 0 ? Icons.home : Icons.home_outlined),
               label: 'Home',
-              backgroundColor: theme.colorScheme.tertiary,
+              backgroundColor: theme.colorScheme.primary,
             ),
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 1
                   ? Icons.fitness_center
                   : Icons.fitness_center_outlined),
               label: 'Exercise',
-              backgroundColor: theme.colorScheme.tertiary,
+              backgroundColor: theme.colorScheme.primary,
             ),
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 2
                   ? Icons.restaurant
                   : Icons.restaurant_outlined),
               label: 'Diet',
-              backgroundColor: theme.colorScheme.tertiary,
+              backgroundColor: theme.colorScheme.primary,
             ),
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 3 ? Icons.person : Icons.person_outlined),
               label: 'Profile',
-              backgroundColor: theme.colorScheme.tertiary,
+              backgroundColor: theme.colorScheme.primary,
             ),
           ],
         ),
@@ -101,7 +106,7 @@ class _PlaceholderPage extends StatelessWidget {
         title: Text(title),
         centerTitle: true,
         backgroundColor: theme.colorScheme.primary,
-        foregroundColor: Colors.black,
+        foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
       ),
       body: Center(
@@ -133,4 +138,3 @@ class _PlaceholderPage extends StatelessWidget {
     );
   }
 }
-
