@@ -68,7 +68,7 @@ class HomePage extends StatelessWidget {
                             icon: Icons.directions_walk,
                             label: 'Steps',
                             value: '6,543',
-                            color: theme.colorScheme.primary,
+                            color: theme.colorScheme.tertiary,
                           ),
                           _StatItem(
                             icon: Icons.fitness_center,
@@ -98,7 +98,7 @@ class HomePage extends StatelessWidget {
                     child: _ActionCard(
                       icon: Icons.play_circle_filled,
                       label: 'Start Workout',
-                      color: theme.colorScheme.primary,
+                      color: theme.colorScheme.tertiary,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -125,7 +125,7 @@ class HomePage extends StatelessWidget {
                 title: 'Morning Run',
                 subtitle: '30 min • 250 calories',
                 icon: Icons.directions_run,
-                iconColor: theme.colorScheme.primary,
+                iconColor: theme.colorScheme.tertiary,
               ),
               const SizedBox(height: 8),
               _WorkoutItem(
@@ -139,7 +139,7 @@ class HomePage extends StatelessWidget {
                 title: 'Yoga Session',
                 subtitle: '20 min • 90 calories',
                 icon: Icons.self_improvement,
-                iconColor: theme.colorScheme.primary,
+                iconColor: theme.colorScheme.tertiary,
               ),
             ],
           ),
