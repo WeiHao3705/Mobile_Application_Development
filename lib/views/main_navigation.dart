@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
 import 'home_page.dart';
 import 'profile_page.dart';
+import 'exercise_page.dart';
 
 class MainNavigation extends StatefulWidget {
   static const routeName = '/main';
@@ -20,7 +21,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   late final List<Widget> _pages = [
     const HomePage(),
-    const _PlaceholderPage(title: 'Exercise'),
+    const ExercisePage(),
     const _PlaceholderPage(title: 'Diet'),
     ProfilePage(authController: widget.authController),
   ];
