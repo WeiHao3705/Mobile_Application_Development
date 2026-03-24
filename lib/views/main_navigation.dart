@@ -25,6 +25,7 @@ class _MainNavigationState extends State<MainNavigation> {
     const _PlaceholderPage(title: 'Diet'),
     ProfilePage(authController: widget.authController),
   ];
+  //asd
 
   void _onItemTapped(int index) {
     setState(() {
