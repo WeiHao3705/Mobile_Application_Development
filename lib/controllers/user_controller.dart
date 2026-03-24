@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/app_user.dart';
-import '../services/user_repository.dart';
+import '../repository/user_repository.dart';
 
 class UserController extends ChangeNotifier {
   UserController({UserRepository? repository})
