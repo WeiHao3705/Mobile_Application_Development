@@ -22,10 +22,8 @@ class _MainNavigationState extends State<MainNavigation> {
 
   late final List<Widget> _pages = [
     const HomePage(),
-    const _PlaceholderPage(title: 'Exercise'),
-    const NutritionMainPage(),
     const ExercisePage(),
-    const _PlaceholderPage(title: 'Diet'),
+    const NutritionMainPage(),
     ProfilePage(authController: widget.authController),
   ];
 
