@@ -1,11 +1,11 @@
 class Food {
   final int foodId;
   final String foodName;
-  final int caloriesPer100g;
-  final int proteinPer100g;
-  final int fatPer100g;
-  final int carbsPer100g;
-  final int userId;
+  final double caloriesPer100g;
+  final double proteinPer100g;
+  final double fatPer100g;
+  final double carbsPer100g;
+  final double userId;
 
   Food({
     required this.foodId,
