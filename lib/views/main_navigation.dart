@@ -4,6 +4,7 @@ import '../controllers/auth_controller.dart';
 import 'home_page.dart';
 import 'profile_page.dart';
 import 'nutrition_main_page.dart';
+import 'exercise_page.dart';
 
 class MainNavigation extends StatefulWidget {
   static const routeName = '/main';
@@ -23,6 +24,8 @@ class _MainNavigationState extends State<MainNavigation> {
     const HomePage(),
     const _PlaceholderPage(title: 'Exercise'),
     const NutritionMainPage(),
+    const ExercisePage(),
+    const _PlaceholderPage(title: 'Diet'),
     ProfilePage(authController: widget.authController),
   ];
 
