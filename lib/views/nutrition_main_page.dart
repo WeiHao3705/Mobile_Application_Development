@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_application_development/views/add_new_meal.dart';
+import 'package:mobile_application_development/theme/app_colors.dart';
 
 class NutritionMainPage extends StatelessWidget {
   const NutritionMainPage({super.key});
@@ -6,7 +8,7 @@ class NutritionMainPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: _NutritionColors.black,
+      backgroundColor: AppColors.black,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.all(10),
@@ -32,20 +34,6 @@ class NutritionMainPage extends StatelessWidget {
   }
 }
 
-class _NutritionColors {
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color lime = Color(0xFFEBFF45);
-  static const Color purple = Color(0xFF896CFE);
-  static const Color lavender = Color(0xFFB3A0FF);
-  static const Color nearBlack = Color(0xFF070707);
-  static const Color black = Color(0xFF000000);
-
-  // Additional colors
-  static const Color slateGray = Color(0xFF94A3B8);
-  static const Color lightGray = Color(0xFFF1F5F9);
-  static const Color proteinBar = Color(0xFFB0A2FF);
-  static const Color fatBar = Color(0xFF64748B);
-}
 
 class _HeaderSection extends StatelessWidget {
   const _HeaderSection();
@@ -54,12 +42,11 @@ class _HeaderSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(Icons.chevron_left, color: _NutritionColors.lime, size: 20),
         const SizedBox(width: 3),
         const Text(
           'Nutrition',
           style: TextStyle(
-            color: _NutritionColors.lavender,
+            color: AppColors.lavender,
             fontSize: 24,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.3,
@@ -80,11 +67,11 @@ class _HeaderSection extends StatelessWidget {
       width: 24,
       height: 24,
       decoration: BoxDecoration(
-        border: Border.all(color: _NutritionColors.lavender.withOpacity(0.6)),
+        border: Border.all(color: AppColors.lavender.withOpacity(0.6)),
         borderRadius: BorderRadius.circular(12),
       ),
       alignment: Alignment.center,
-      child: Icon(icon, color: _NutritionColors.lavender, size: 14),
+      child: Icon(icon, color: AppColors.lavender, size: 14),
     );
   }
 }
@@ -100,14 +87,14 @@ class _TabSection extends StatelessWidget {
           child: Container(
             height: 34,
             decoration: BoxDecoration(
-              color: _NutritionColors.lime,
+              color: AppColors.lime,
               borderRadius: BorderRadius.circular(17),
             ),
             alignment: Alignment.center,
             child: const Text(
               'My Meals',
               style: TextStyle(
-                color: _NutritionColors.nearBlack,
+                color: AppColors.nearBlack,
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
               ),
@@ -119,14 +106,14 @@ class _TabSection extends StatelessWidget {
           child: Container(
             height: 34,
             decoration: BoxDecoration(
-              color: _NutritionColors.white,
+              color: AppColors.white,
               borderRadius: BorderRadius.circular(17),
             ),
             alignment: Alignment.center,
             child: const Text(
               'Meal Log',
               style: TextStyle(
-                color: _NutritionColors.lavender,
+                color: AppColors.lavender,
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
               ),
@@ -148,7 +135,7 @@ class _AnalyticsCard extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 150),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _NutritionColors.lavender,
+        color: AppColors.lavender,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Stack(
@@ -160,7 +147,7 @@ class _AnalyticsCard extends StatelessWidget {
             child: Text(
               'ANALYTICS',
               style: TextStyle(
-                color: _NutritionColors.lime,
+                color: AppColors.lime,
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.0,
@@ -177,7 +164,7 @@ class _AnalyticsCard extends StatelessWidget {
                   width: 110,
                   height: 110,
                   decoration: BoxDecoration(
-                    color: _NutritionColors.nearBlack,
+                    color: AppColors.nearBlack,
                     borderRadius: BorderRadius.circular(55),
                   ),
                   alignment: Alignment.center,
@@ -187,7 +174,7 @@ class _AnalyticsCard extends StatelessWidget {
                       Text(
                         '1,250',
                         style: TextStyle(
-                          color: _NutritionColors.lightGray,
+                          color: AppColors.lightGray,
                           fontSize: 26,
                           fontWeight: FontWeight.w800,
                           height: 0.95,
@@ -197,7 +184,7 @@ class _AnalyticsCard extends StatelessWidget {
                       Text(
                         '/ 2,000 KCAL',
                         style: TextStyle(
-                          color: _NutritionColors.slateGray,
+                          color: AppColors.slateGray,
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.2,
@@ -214,7 +201,7 @@ class _AnalyticsCard extends StatelessWidget {
                     Text(
                       'Daily Goal',
                       style: TextStyle(
-                        color: _NutritionColors.lightGray,
+                        color: AppColors.lightGray,
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
                         height: 0.95,
@@ -224,7 +211,7 @@ class _AnalyticsCard extends StatelessWidget {
                     Text(
                       '⚡ 750 kcal left',
                       style: TextStyle(
-                        color: _NutritionColors.lime,
+                        color: AppColors.lime,
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         height: 1.0,
@@ -251,11 +238,11 @@ class _MacrosSection extends StatelessWidget {
       children: const [
         _SectionTitle(title: 'Macros'),
         SizedBox(height: 8),
-        _MacroItem(name: 'Protein', consumed: '85g', total: '120g', progress: 0.71, barColor: _NutritionColors.proteinBar),
+        _MacroItem(name: 'Protein', consumed: '85g', total: '120g', progress: 0.71, barColor: AppColors.proteinBar),
         SizedBox(height: 8),
         _MacroItem(name: 'Carbs', consumed: '140g', total: '250g', progress: 0.56),
         SizedBox(height: 8),
-        _MacroItem(name: 'Fat', consumed: '42g', total: '65g', progress: 0.65, barColor: _NutritionColors.fatBar),
+        _MacroItem(name: 'Fat', consumed: '42g', total: '65g', progress: 0.65, barColor: AppColors.fatBar),
       ],
     );
   }
@@ -267,7 +254,7 @@ class _MacroItem extends StatelessWidget {
     required this.consumed,
     required this.total,
     required this.progress,
-    this.barColor = _NutritionColors.lime,
+    this.barColor = AppColors.lime,
   });
 
   final String name;
@@ -282,7 +269,7 @@ class _MacroItem extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
       decoration: BoxDecoration(
-        border: Border.all(color: _NutritionColors.lavender),
+        border: Border.all(color: AppColors.lavender),
         borderRadius: BorderRadius.circular(9),
       ),
       child: Column(
@@ -293,7 +280,7 @@ class _MacroItem extends StatelessWidget {
               Text(
                 name,
                 style: const TextStyle(
-                  color: _NutritionColors.white,
+                  color: AppColors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -302,7 +289,7 @@ class _MacroItem extends StatelessWidget {
               Text(
                 '$consumed / $total',
                 style: const TextStyle(
-                  color: _NutritionColors.white,
+                  color: AppColors.white,
                   fontSize: 12,
                   fontWeight: FontWeight.w400,
                 ),
@@ -315,7 +302,7 @@ class _MacroItem extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 5,
-              backgroundColor: _NutritionColors.white.withOpacity(0.15),
+              backgroundColor: AppColors.white.withOpacity(0.15),
               valueColor: AlwaysStoppedAnimation<Color>(barColor),
             ),
           ),
@@ -335,11 +322,18 @@ class _AddMealButton extends StatelessWidget {
       height: 48,
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
-          backgroundColor: _NutritionColors.lime,
-          foregroundColor: _NutritionColors.nearBlack,
+          backgroundColor: AppColors.lime,
+          foregroundColor: AppColors.nearBlack,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AddNewMealPage(),
+            )
+          );
+        },
         icon: const Icon(Icons.add_circle_outline, size: 18),
         label: const Text(
           'Add New Meal',
@@ -375,7 +369,7 @@ class _MealTile extends StatelessWidget {
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _NutritionColors.lavender.withOpacity(0.7)),
+        border: Border.all(color: AppColors.lavender.withOpacity(0.7)),
       ),
       child: Row(
         children: [
@@ -383,7 +377,7 @@ class _MealTile extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: _NutritionColors.white,
+              color: AppColors.white,
               borderRadius: BorderRadius.circular(7),
             ),
             alignment: Alignment.center,
@@ -397,7 +391,7 @@ class _MealTile extends StatelessWidget {
                 Text(
                   'Oatmeal with\nBlueberries',
                   style: TextStyle(
-                    color: _NutritionColors.white,
+                    color: AppColors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     height: 1.05,
@@ -407,7 +401,7 @@ class _MealTile extends StatelessWidget {
                 Text(
                   'Breakfast - 08:30 AM',
                   style: TextStyle(
-                    color: _NutritionColors.white,
+                    color: AppColors.white,
                     fontSize: 11,
                     fontWeight: FontWeight.w400,
                   ),
@@ -418,7 +412,7 @@ class _MealTile extends StatelessWidget {
           const Text(
             '320 kcal',
             style: TextStyle(
-              color: _NutritionColors.white,
+              color: AppColors.white,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -441,7 +435,7 @@ class _SectionTitle extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            color: _NutritionColors.white,
+            color: AppColors.white,
             fontSize: 28,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.2,
@@ -451,7 +445,7 @@ class _SectionTitle extends StatelessWidget {
         const Text(
           'See all',
           style: TextStyle(
-            color: _NutritionColors.lime,
+            color: AppColors.lime,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
