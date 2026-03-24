@@ -24,3 +24,48 @@ class AppUser {
   }
 }
 
+class SignUpProfileData {
+  const SignUpProfileData({
+    required this.gender,
+    required this.dateOfBirth,
+    required this.height,
+    required this.currentWeight,
+    required this.targetWeight,
+    required this.username,
+    required this.password,
+    required this.email,
+    required this.fullName,
+    required this.phoneNumber,
+  });
+
+  final String gender;
+  final DateTime dateOfBirth;
+  final double height;
+  final double currentWeight;
+  final double targetWeight;
+  final String username;
+  final String password;
+  final String email;
+  final String fullName;
+  final String phoneNumber;
+
+  Map<String, dynamic> toInsertMap({bool includePhoneNumber = true}) {
+    final payload = <String, dynamic>{
+      'gender': gender,
+      'date_of_birth': dateOfBirth.toIso8601String().split('T').first,
+      'height': height,
+      'current_weight': currentWeight,
+      'target_weight': targetWeight,
+      'username': username,
+      'password': password,
+      'email': email,
+      'full_name': fullName,
+    };
+
+    if (includePhoneNumber && phoneNumber.isNotEmpty) {
+      payload['phone_number'] = phoneNumber;
+    }
+
+    return payload;
+  }
+}

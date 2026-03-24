@@ -7,6 +7,7 @@ import 'theme/app_theme.dart';
 import 'views/landing_page.dart';
 import 'views/login_page.dart';
 import 'views/main_navigation.dart';
+import 'views/sign_up_pages.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,6 +60,11 @@ class _MyAppState extends State<MyApp> {
           case MainNavigation.routeName:
             return MaterialPageRoute<void>(
               builder: (_) => MainNavigation(authController: _authController),
+              settings: settings,
+            );
+          case SignUpPages.routeName:
+            return MaterialPageRoute<void>(
+              builder: (_) => SignUpPages(authController: _authController),
               settings: settings,
             );
           default:

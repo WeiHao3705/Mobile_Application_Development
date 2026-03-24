@@ -1,14 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/app_user.dart';
 import '../models/auth_user.dart';
-import '../services/auth_repository.dart';
+import '../repository/auth_repository.dart';
+import '../repository/user_repository.dart';
 
 class AuthController extends ChangeNotifier {
-  AuthController({AuthRepository? repository})
-      : _repository = repository ?? AuthRepository();
+  AuthController({AuthRepository? repository, UserRepository? userRepository})
+      : _repository = repository ?? AuthRepository(),
+        _userRepository = userRepository ?? UserRepository();
 
   final AuthRepository _repository;
+  final UserRepository _userRepository;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -54,9 +58,49 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  Future<bool> signUp({required SignUpProfileData profile}) async {
+    _isLoading = true;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      await _userRepository.createUserProfile(profile);
+      _currentUser = LoginUser(
+        id: null,
+        username: profile.username,
+        fullName: profile.fullName,
+        email: profile.email,
+        height: profile.height,
+        currentWeight: profile.currentWeight,
+        targetWeight: profile.targetWeight,
+      );
+      return true;
+    } on PostgrestException catch (e) {
+      if (_isRlsInsertError(e)) {
+        _errorMessage =
+            'Sign up is blocked by Supabase Row Level Security policy. Please update INSERT policy for table "User".';
+      } else {
+        _errorMessage = 'Sign up failed: ${e.message}';
+      }
+      return false;
+    } catch (_) {
+      _errorMessage = 'Unable to sign up right now. Please retry.';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   void logout() {
     _currentUser = null;
     _errorMessage = '';
     notifyListeners();
+  }
+
+  bool _isRlsInsertError(PostgrestException error) {
+    final message = error.message.toLowerCase();
+    return message.contains('row-level security') ||
+        message.contains('violates row-level security');
   }
 }

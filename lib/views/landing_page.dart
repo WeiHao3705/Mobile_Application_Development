@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_application_development/views/login_page.dart';
+import 'package:mobile_application_development/views/sign_up_pages.dart';
 
 class LandingPage extends StatelessWidget {
   static const routeName = '/';
@@ -47,9 +48,10 @@ class LandingPage extends StatelessWidget {
               const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Sign up will be added soon.')),
-                  );
+                  // ScaffoldMessenger.of(context).showSnackBar(
+                  //   const SnackBar(content: Text('Sign up will be added soon.')),
+                  // );
+                  Navigator.pushNamed(context, SignUpPages.routeName);
                 },
                 child: const Text('Sign Up'),
               ),
