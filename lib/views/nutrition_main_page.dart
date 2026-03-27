@@ -1,31 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_application_development/views/add_new_meal.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
+import '../controllers/auth_controller.dart';
 
 class NutritionMainPage extends StatelessWidget {
-  const NutritionMainPage({super.key});
+  final AuthController authController;
+
+  const NutritionMainPage({
+    super.key,
+    required this.authController,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.black,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(10),
+          padding: const EdgeInsets.all(10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _HeaderSection(),
-              SizedBox(height: 10),
-              _TabSection(),
-              SizedBox(height: 10),
-              _AnalyticsCard(),
-              SizedBox(height: 12),
-              _MacrosSection(),
-              SizedBox(height: 12),
-              _AddMealButton(),
-              SizedBox(height: 14),
-              _RecentMealsSection(),
+              const _HeaderSection(),
+              const SizedBox(height: 10),
+              const _TabSection(),
+              const SizedBox(height: 10),
+              const _AnalyticsCard(),
+              const SizedBox(height: 12),
+              const _MacrosSection(),
+              const SizedBox(height: 12),
+              _AddMealButton(authController: authController),
+              const SizedBox(height: 14),
+              const _RecentMealsSection(),
             ],
           ),
         ),
@@ -313,7 +319,9 @@ class _MacroItem extends StatelessWidget {
 }
 
 class _AddMealButton extends StatelessWidget {
-  const _AddMealButton();
+  final AuthController authController;
+
+  const _AddMealButton({required this.authController});
 
   @override
   Widget build(BuildContext context) {
@@ -330,7 +338,9 @@ class _AddMealButton extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const AddNewMealPage(),
+              builder: (context) => AddNewMealPage(
+                authController: authController,
+              ),
             )
           );
         },
