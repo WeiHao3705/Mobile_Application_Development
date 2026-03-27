@@ -12,8 +12,12 @@ class AppColors {
   // Secondary Colors
   static const slateGray = Color(0xFF94A3B8);
   static const lightGray = Color(0xFFF1F5F9);
+  static const yellow = Color(0xFFFFD700);
   static const proteinBar = Color(0xFFB0A2FF);
+  static const proteinColor = Color(0xFFB0A2FF);
   static const fatBar = Color(0xFF64748B);
+  static const fatColor = Color(0xFF64748B);
+  static const carbsColor = Color(0xFFFFD700);
 
   // Background Colors
   static const cardBg = Color(0xFF0D0D1A);

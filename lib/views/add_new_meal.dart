@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
+import '../controllers/auth_controller.dart';
+import 'add_new_food.dart';
 
 // ─── Data Model ────────────────────────────────────────────────────────────────
 
@@ -53,7 +55,12 @@ const List<String> _mealTypes  = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 class AddNewMealPage extends StatefulWidget {
-  const AddNewMealPage({super.key});
+  final AuthController authController;
+
+  const AddNewMealPage({
+    super.key,
+    required this.authController,
+  });
 
   @override
   State<AddNewMealPage> createState() => _AddNewMealPageState();
@@ -151,9 +158,9 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     return Row(
       children: [
         GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
+          onTap: () =>Navigator.of(context).pop(),
           child: _iconBtn(
-            child: const Icon(Icons.chevron_left, color: AppColors.lime, size: 18),
+              child: const Icon(Icons.chevron_left, color: AppColors.lime, size: 18),
           ),
         ),
         const SizedBox(width: 8),
@@ -167,7 +174,33 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
           ),
         ),
         const Spacer(),
-        _iconBtn(child: const Icon(Icons.search_rounded, color: AppColors.lavender, size: 14)),
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => AddNewFoodView(
+                  authController: widget.authController,
+                ),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.lime.withOpacity(0.15),
+              border: Border.all(color: AppColors.lime.withOpacity(0.6)),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: const [
+                Icon(Icons.add, color: AppColors.lime, size: 14),
+                SizedBox(width: 4),
+                Text('Add New Food',
+                  style: TextStyle(color: AppColors.lime, fontSize: 12, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          )
+        ),
       ],
     );
   }
