@@ -1,58 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
+import 'package:mobile_application_development/models/food.dart';
+import 'package:provider/provider.dart';
 import '../controllers/auth_controller.dart';
+import '../controllers/food_controller.dart';
 import 'add_new_food.dart';
-
-// ─── Data Model ────────────────────────────────────────────────────────────────
-
-class _FoodItem {
-  const _FoodItem({
-    required this.id,
-    required this.emoji,
-    required this.name,
-    required this.subtitle,
-    required this.kcal,
-    required this.protein,
-    required this.carbs,
-    required this.fat,
-    required this.category,
-  });
-
-  final int id;
-  final String emoji;
-  final String name;
-  final String subtitle;
-  final int kcal;
-  final int protein;
-  final int carbs;
-  final int fat;
-  final String category;
-}
+import 'edit_food.dart';
 
 class _SelectedItem {
   _SelectedItem({required this.food, required this.qty});
-  final _FoodItem food;
+  final Food food;
   int qty;
 }
 
-
-// ─── Sample Data ───────────────────────────────────────────────────────────────
-
-const List<_FoodItem> _allFoods = [
-  _FoodItem(id: 1, emoji: '🥣', name: 'Oatmeal',           subtitle: '1 cup cooked',    kcal: 154, protein: 5,  carbs: 27, fat: 3,  category: 'Grains'),
-  _FoodItem(id: 2, emoji: '🍳', name: 'Scrambled Eggs',    subtitle: '2 large eggs',    kcal: 182, protein: 12, carbs: 1,  fat: 14, category: 'Protein'),
-  _FoodItem(id: 3, emoji: '🍌', name: 'Banana',            subtitle: '1 medium',        kcal: 105, protein: 1,  carbs: 27, fat: 0,  category: 'Fruits'),
-  _FoodItem(id: 4, emoji: '🥛', name: 'Greek Yogurt',      subtitle: '150g, low-fat',   kcal: 90,  protein: 15, carbs: 8,  fat: 1,  category: 'Dairy'),
-  _FoodItem(id: 5, emoji: '🍞', name: 'Whole Wheat Toast', subtitle: '2 slices',        kcal: 140, protein: 6,  carbs: 26, fat: 2,  category: 'Grains'),
-  _FoodItem(id: 6, emoji: '🥑', name: 'Avocado',           subtitle: '½ medium',        kcal: 120, protein: 2,  carbs: 6,  fat: 11, category: 'Veggies'),
-  _FoodItem(id: 7, emoji: '🍗', name: 'Grilled Chicken',   subtitle: '100g breast',     kcal: 165, protein: 31, carbs: 0,  fat: 4,  category: 'Protein'),
-  _FoodItem(id: 8, emoji: '🥦', name: 'Steamed Broccoli',  subtitle: '1 cup',           kcal: 55,  protein: 4,  carbs: 11, fat: 1,  category: 'Veggies'),
-];
-
-const List<String> _categories = ['All', 'Grains', 'Protein', 'Dairy', 'Fruits', 'Veggies'];
 const List<String> _mealTypes  = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
-// ─── Page ──────────────────────────────────────────────────────────────────────
 
 class AddNewMealPage extends StatefulWidget {
   final AuthController authController;
@@ -75,6 +37,149 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   final TextEditingController _noteCtrl   = TextEditingController();
   bool _showToast = false;
 
+  // Batch deletion state
+  bool _isBatchDeleteMode = false;
+  final Set<int> _selectedForDeletion = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Load all foods via controller
+    Future.microtask(() {
+      context.read<FoodController>().fetchAllFoods();
+    });
+  }
+
+  Future<void> _navigateToAddFood() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AddNewFoodView(
+          authController: widget.authController,
+        ),
+      ),
+    );
+
+    // If a new food was added, refresh the list
+    if (result == true) {
+      if (mounted) {
+        context.read<FoodController>().fetchAllFoods();
+      }
+    }
+  }
+
+  Future<void> _navigateToEditFood(Food food) async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => EditFoodView(
+          food: food,
+          authController: widget.authController,
+        ),
+      ),
+    );
+
+    // If food was edited, refresh the list
+    if (result == true && mounted) {
+      await context.read<FoodController>().fetchAllFoods();
+    }
+  }
+
+  void _toggleBatchDeleteMode() {
+    setState(() {
+      _isBatchDeleteMode = !_isBatchDeleteMode;
+      if (!_isBatchDeleteMode) {
+        _selectedForDeletion.clear();
+      }
+    });
+  }
+
+  void _toggleFoodSelection(int foodId) {
+    setState(() {
+      if (_selectedForDeletion.contains(foodId)) {
+        _selectedForDeletion.remove(foodId);
+      } else {
+        _selectedForDeletion.add(foodId);
+      }
+    });
+  }
+
+  Future<void> _deleteBatchFoods() async {
+    if (_selectedForDeletion.isEmpty) return;
+
+    final count = _selectedForDeletion.length;
+
+    // Show confirmation dialog
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        title: const Text(
+          'Delete Multiple Foods?',
+          style: TextStyle(color: AppColors.white),
+        ),
+        content: Text(
+          'Are you sure you want to delete $count selected food(s)? This action cannot be undone.',
+          style: const TextStyle(color: AppColors.lavender),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.lime)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete All', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!shouldDelete) return;
+
+    // Delete foods
+    final foodController = context.read<FoodController>();
+    int successCount = 0;
+    int failureCount = 0;
+
+    for (final foodId in _selectedForDeletion) {
+      try {
+        final success = await foodController.deleteFood(foodId);
+        if (success) {
+          successCount++;
+        } else {
+          failureCount++;
+        }
+      } catch (e) {
+        failureCount++;
+      }
+    }
+
+    if (context.mounted) {
+      _selectedForDeletion.clear();
+      _isBatchDeleteMode = false;
+
+      // Refresh the food list
+      await foodController.fetchAllFoods();
+
+      // Show result message
+      String message = '';
+      if (failureCount == 0) {
+        message = '✓ $successCount food(s) deleted successfully!';
+      } else {
+        message = '⚠️ Deleted $successCount, failed $failureCount';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 2),
+          backgroundColor: failureCount == 0 ? Colors.green : Colors.orange,
+        ),
+      );
+
+      setState(() {});
+    }
+  }
+
   @override
   void dispose() {
     _searchCtrl.dispose();
@@ -82,21 +187,23 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     super.dispose();
   }
 
-  List<_FoodItem> get _filtered => _allFoods.where((f) {
+  List<Food> get _allFoods => context.read<FoodController>().userFoods;
+
+  List<Food> get _filtered => _allFoods.where((f) {
     final matchCat = _activeCategory == 'All' || f.category == _activeCategory;
-    final matchQ   = _searchQuery.isEmpty || f.name.toLowerCase().contains(_searchQuery.toLowerCase());
+    final matchQ   = _searchQuery.isEmpty || f.foodName.toLowerCase().contains(_searchQuery.toLowerCase());
     return matchCat && matchQ;
   }).toList();
 
-  int get _totalKcal    => _selected.values.fold(0, (s, i) => s + i.food.kcal    * i.qty);
-  int get _totalProtein => _selected.values.fold(0, (s, i) => s + i.food.protein * i.qty);
-  int get _totalCarbs   => _selected.values.fold(0, (s, i) => s + i.food.carbs   * i.qty);
-  int get _totalFat     => _selected.values.fold(0, (s, i) => s + i.food.fat     * i.qty);
+  int get _totalKcal    => _selected.values.fold(0, (s, i) => s + (i.food.caloriesPer100g * i.qty).toInt());
+  int get _totalProtein => _selected.values.fold(0, (s, i) => s + (i.food.proteinPer100g * i.qty).toInt());
+  int get _totalCarbs   => _selected.values.fold(0, (s, i) => s + (i.food.carbsPer100g * i.qty).toInt());
+  int get _totalFat     => _selected.values.fold(0, (s, i) => s + (i.food.fatPer100g * i.qty).toInt());
 
   void _changeQty(int id, int delta) {
     setState(() {
       if (!_selected.containsKey(id)) {
-        final food = _allFoods.firstWhere((f) => f.id == id);
+        final food = _allFoods.firstWhere((f) => f.foodId == id);
         _selected[id] = _SelectedItem(food: food, qty: 0);
       }
       _selected[id]!.qty += delta;
@@ -117,36 +224,77 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     return Scaffold(
       backgroundColor: AppColors.black,
       body: SafeArea(
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 28, 18, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context),
-                  const SizedBox(height: 18),
-                  _buildMealTypeTabs(),
-                  const SizedBox(height: 14),
-                  _buildSearchBar(),
-                  const SizedBox(height: 12),
-                  _buildCategoryChips(),
-                  const SizedBox(height: 14),
-                  _buildFoodList(),
-                  if (_selected.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    _buildSelectedSummary(),
-                  ],
-                  const SizedBox(height: 14),
-                  _buildNoteField(),
-                  const SizedBox(height: 16),
-                  _buildLogButton(),
-                  const SizedBox(height: 80),
-                ],
-              ),
-            ),
-            if (_showToast) _buildToast(),
-          ],
+        child: Consumer<FoodController>(
+          builder: (context, foodController, _) {
+            // Get foods from the controller parameter (which is being watched)
+            final allFoods = foodController.userFoods;
+
+            // Compute categories from the foods
+            final categories = {'All'};
+            for (var food in allFoods) {
+              categories.add(food.category);
+            }
+            final categoriesList = categories.toList();
+
+            // Filter foods based on search and category
+            final filtered = allFoods.where((f) {
+              final matchCat = _activeCategory == 'All' || f.category == _activeCategory;
+              final matchQ   = _searchQuery.isEmpty || f.foodName.toLowerCase().contains(_searchQuery.toLowerCase());
+              return matchCat && matchQ;
+            }).toList();
+
+            return Stack(
+              children: [
+                if (foodController.isLoading)
+                  const Center(
+                    child: CircularProgressIndicator(color: AppColors.lime),
+                  )
+                else if (foodController.errorMessage.isNotEmpty)
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(foodController.errorMessage, style: const TextStyle(color: AppColors.slateGray, fontSize: 14)),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => foodController.fetchAllFoods(),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.lime),
+                          child: const Text('Retry', style: TextStyle(color: AppColors.nearBlack)),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(18, 28, 18, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(context),
+                        const SizedBox(height: 18),
+                        _buildMealTypeTabs(),
+                        const SizedBox(height: 14),
+                        _buildSearchBar(),
+                        const SizedBox(height: 12),
+                        _buildCategoryChips(categoriesList),
+                        const SizedBox(height: 14),
+                        _buildFoodList(filtered, allFoods),
+                        if (_selected.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          _buildSelectedSummary(),
+                        ],
+                        const SizedBox(height: 14),
+                        _buildNoteField(),
+                        const SizedBox(height: 16),
+                        _buildLogButton(),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
+                  ),
+                if (_showToast) _buildToast(),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -155,51 +303,112 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   // ── Header ─────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(BuildContext context) {
+    if (_isBatchDeleteMode) {
+      return Row(
+        children: [
+          GestureDetector(
+            onTap: _toggleBatchDeleteMode,
+            child: _iconBtn(
+              child: const Icon(Icons.close, color: AppColors.lime, size: 18),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Delete ${_selectedForDeletion.length} food(s)',
+            style: const TextStyle(
+              color: Colors.red,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const Spacer(),
+          if (_selectedForDeletion.isNotEmpty)
+            GestureDetector(
+              onTap: _deleteBatchFoods,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.2),
+                  border: Border.all(color: Colors.red),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.delete, color: Colors.red, size: 14),
+                    SizedBox(width: 4),
+                    Text('Delete All',
+                      style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         GestureDetector(
-          onTap: () =>Navigator.of(context).pop(),
+          onTap: () => Navigator.of(context).pop(),
           child: _iconBtn(
-              child: const Icon(Icons.chevron_left, color: AppColors.lime, size: 18),
+            child: const Icon(Icons.chevron_left, color: AppColors.lime, size: 18),
           ),
         ),
         const SizedBox(width: 8),
-        const Text(
-          'Add New Meal',
-          style: TextStyle(
-            color: AppColors.lavender,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.3,
+        Expanded(
+          child: Text(
+            'Add New Meal',
+            style: const TextStyle(
+              color: AppColors.lavender,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: 4),
+        // Batch delete mode toggle
         GestureDetector(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => AddNewFoodView(
-                  authController: widget.authController,
-                ),
-              ),
-            );
-          },
+          onTap: _toggleBatchDeleteMode,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.yellow.withOpacity(0.15),
+              border: Border.all(color: AppColors.yellow.withOpacity(0.6)),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.delete_outline, color: AppColors.yellow, size: 13),
+                SizedBox(width: 3),
+                Text('Delete',
+                  style: TextStyle(color: AppColors.yellow, fontSize: 11, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        GestureDetector(
+          onTap: _navigateToAddFood,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
               color: AppColors.lime.withOpacity(0.15),
               border: Border.all(color: AppColors.lime.withOpacity(0.6)),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: const [
-                Icon(Icons.add, color: AppColors.lime, size: 14),
-                SizedBox(width: 4),
+                Icon(Icons.add, color: AppColors.lime, size: 13),
+                SizedBox(width: 3),
                 Text('Add New Food',
-                  style: TextStyle(color: AppColors.lime, fontSize: 12, fontWeight: FontWeight.w700)),
+                  style: TextStyle(color: AppColors.lime, fontSize: 11, fontWeight: FontWeight.w700)),
               ],
             ),
-          )
+          ),
         ),
       ],
     );
@@ -276,11 +485,11 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
 
   // ── Category Chips ─────────────────────────────────────────────────────────
 
-  Widget _buildCategoryChips() {
+  Widget _buildCategoryChips(List<String> categories) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: _categories.map((cat) {
+        children: categories.map((cat) {
           final isActive = _activeCategory == cat;
           return GestureDetector(
             onTap: () => setState(() => _activeCategory = cat),
@@ -312,9 +521,8 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
 
   // ── Food List ──────────────────────────────────────────────────────────────
 
-  Widget _buildFoodList() {
-    final items = _filtered;
-    if (items.isEmpty) {
+  Widget _buildFoodList(List<Food> filtered, List<Food> allFoods) {
+    if (filtered.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
         child: Center(
@@ -323,11 +531,16 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
       );
     }
     return Column(
-      children: items.map((food) => _FoodRow(
+      children: filtered.map((food) => _FoodRow(
         food: food,
-        selected: _selected[food.id],
-        onAdd:    () => _changeQty(food.id, 1),
-        onRemove: () => _changeQty(food.id, -1),
+        selected: _selected[food.foodId],
+        onAdd:    () => _changeQty(food.foodId, 1),
+        onRemove: () => _changeQty(food.foodId, -1),
+        authController: widget.authController,
+        isBatchDeleteMode: _isBatchDeleteMode,
+        isSelectedForDelete: _selectedForDeletion.contains(food.foodId),
+        onSelectForDelete: () => _toggleFoodSelection(food.foodId),
+        onEditFood: () => _navigateToEditFood(food),
       )).toList(),
     );
   }
@@ -440,93 +653,289 @@ class _FoodRow extends StatelessWidget {
     required this.selected,
     required this.onAdd,
     required this.onRemove,
+    required this.authController,
+    required this.isBatchDeleteMode,
+    required this.isSelectedForDelete,
+    required this.onSelectForDelete,
+    required this.onEditFood,
   });
 
-  final _FoodItem food;
+  final Food food;
   final _SelectedItem? selected;
   final VoidCallback onAdd;
   final VoidCallback onRemove;
+  final AuthController authController;
+  final bool isBatchDeleteMode;
+  final bool isSelectedForDelete;
+  final VoidCallback onSelectForDelete;
+  final VoidCallback onEditFood;
+
+  void _showFoodOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                food.foodName,
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            // Edit option
+            ListTile(
+              leading: const Icon(Icons.edit, color: AppColors.lime),
+              title: const Text(
+                'Edit Food',
+                style: TextStyle(color: AppColors.white),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToEditFood(context);
+              },
+            ),
+            // Delete option
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text(
+                'Delete Food',
+                style: TextStyle(color: Colors.red),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteConfirmation(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToEditFood(BuildContext context) {
+    onEditFood(); // Call parent's callback to handle navigation and refresh
+  }
+
+  void _showDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        title: const Text(
+          'Delete Food?',
+          style: TextStyle(color: AppColors.white),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${food.foodName}"? This action cannot be undone.',
+          style: const TextStyle(color: AppColors.lavender),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.lime)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteFood(context);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteFood(BuildContext context) async {
+    final foodController = context.read<FoodController>();
+    final success = await foodController.deleteFood(food.foodId);
+
+    if (context.mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✓ ${food.foodName} deleted'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete: ${foodController.errorMessage}'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isSelected = selected != null;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: isSelected ? AppColors.lime.withOpacity(0.05) : Colors.transparent,
-        border: Border.all(
-          color: isSelected ? AppColors.lime : AppColors.lavender.withOpacity(0.35),
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          // Emoji icon
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.iconBg,
-              borderRadius: BorderRadius.circular(10),
+
+    // In batch delete mode, show checkbox instead of +/- buttons
+    if (isBatchDeleteMode) {
+      return GestureDetector(
+        onTap: onSelectForDelete,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: isSelectedForDelete ? Colors.red.withOpacity(0.1) : Colors.transparent,
+            border: Border.all(
+              color: isSelectedForDelete ? Colors.red : AppColors.lavender.withOpacity(0.35),
             ),
-            alignment: Alignment.center,
-            child: Text(food.emoji, style: const TextStyle(fontSize: 20)),
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(width: 10),
-          // Name + subtitle
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Row(
+            children: [
+              // Checkbox
+              Checkbox(
+                value: isSelectedForDelete,
+                onChanged: (_) => onSelectForDelete(),
+                activeColor: Colors.red,
+                checkColor: Colors.white,
+              ),
+              const SizedBox(width: 8),
+              // Icon
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  food.foodName.isNotEmpty ? food.foodName[0] : '🍽️',
+                  style: const TextStyle(fontSize: 20),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Name + category
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(food.name, style: const TextStyle(color: AppColors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-                    if (isSelected) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.lime,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${selected!.qty}x',
-                          style: const TextStyle(color: AppColors.nearBlack, fontSize: 11, fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                    ],
+                    Text(food.foodName, style: const TextStyle(color: AppColors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(food.category, style: const TextStyle(color: AppColors.fatBar, fontSize: 11, fontWeight: FontWeight.w500)),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(food.subtitle, style: const TextStyle(color: AppColors.fatBar, fontSize: 11, fontWeight: FontWeight.w500)),
+              ),
+              // Nutrition info
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('${food.caloriesPer100g.toStringAsFixed(0)} kcal', style: const TextStyle(color: AppColors.lime, fontSize: 13, fontWeight: FontWeight.w800)),
+                  Text('P${food.proteinPer100g.toStringAsFixed(0)} C${food.carbsPer100g.toStringAsFixed(0)} F${food.fatPer100g.toStringAsFixed(0)}',
+                    style: const TextStyle(color: AppColors.fatBar, fontSize: 10, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Normal mode - show +/- buttons
+    return GestureDetector(
+      onLongPress: () => _showFoodOptions(context),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.lime.withOpacity(0.05) : Colors.transparent,
+          border: Border.all(
+            color: isSelected ? AppColors.lime : AppColors.lavender.withOpacity(0.35),
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            // Emoji icon (using first character of food name as fallback)
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.iconBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                food.foodName.isNotEmpty ? food.foodName[0] : '🍽️',
+                style: const TextStyle(fontSize: 20),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Name + category
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(food.foodName, style: const TextStyle(color: AppColors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                      if (isSelected) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.lime,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${selected!.qty}x',
+                            style: const TextStyle(color: AppColors.nearBlack, fontSize: 11, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(food.category, style: const TextStyle(color: AppColors.fatBar, fontSize: 11, fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+            // Kcal + macros per 100g
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('${food.caloriesPer100g.toStringAsFixed(0)} kcal', style: const TextStyle(color: AppColors.lime, fontSize: 13, fontWeight: FontWeight.w800)),
+                Text('P${food.proteinPer100g.toStringAsFixed(0)} C${food.carbsPer100g.toStringAsFixed(0)} F${food.fatPer100g.toStringAsFixed(0)}',
+                  style: const TextStyle(color: AppColors.fatBar, fontSize: 10, fontWeight: FontWeight.w600)),
               ],
             ),
-          ),
-          // Kcal + macros
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text('${food.kcal} kcal', style: const TextStyle(color: AppColors.lime, fontSize: 13, fontWeight: FontWeight.w800)),
-              Text('P${food.protein} C${food.carbs} F${food.fat}', style: const TextStyle(color: AppColors.fatBar, fontSize: 10, fontWeight: FontWeight.w600)),
-            ],
-          ),
-          const SizedBox(width: 8),
-          // +/- buttons
-          Column(
-            children: [
-              _QtyButton(
-                icon: Icons.add,
-                onTap: onAdd,
-                highlight: !isSelected,
-              ),
-              if (isSelected) ...[
-                const SizedBox(height: 4),
-                _QtyButton(icon: Icons.remove, onTap: onRemove),
+            const SizedBox(width: 8),
+            // +/- buttons
+            Column(
+              children: [
+                _QtyButton(
+                  icon: Icons.add,
+                  onTap: onAdd,
+                  highlight: !isSelected,
+                ),
+                if (isSelected) ...[
+                  const SizedBox(height: 4),
+                  _QtyButton(icon: Icons.remove, onTap: onRemove),
+                ],
               ],
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

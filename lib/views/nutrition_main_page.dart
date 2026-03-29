@@ -29,7 +29,9 @@ class NutritionMainPage extends StatelessWidget {
               const SizedBox(height: 12),
               const _MacrosSection(),
               const SizedBox(height: 12),
-              _AddMealButton(authController: authController),
+              _AddMealButton(
+                authController: authController,
+              ),
               const SizedBox(height: 14),
               const _RecentMealsSection(),
             ],
@@ -321,7 +323,9 @@ class _MacroItem extends StatelessWidget {
 class _AddMealButton extends StatelessWidget {
   final AuthController authController;
 
-  const _AddMealButton({required this.authController});
+  const _AddMealButton({
+    required this.authController,
+  });
 
   @override
   Widget build(BuildContext context) {

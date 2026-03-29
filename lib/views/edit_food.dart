@@ -1,34 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'dart:developer' as developer;
 import '../theme/app_colors.dart';
 import '../controllers/food_controller.dart';
 import '../controllers/auth_controller.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:developer' as developer;
-import 'package:provider/provider.dart';
+import '../models/food.dart';
 
-class AddNewFoodView extends StatefulWidget {
+class EditFoodView extends StatefulWidget {
+  final Food food;
   final AuthController authController;
 
-  const AddNewFoodView({
+  const EditFoodView({
     Key? key,
+    required this.food,
     required this.authController,
   }) : super(key: key);
 
   @override
-  State<AddNewFoodView> createState() => _AddNewFoodViewState();
+  State<EditFoodView> createState() => _EditFoodViewState();
 }
 
-class _AddNewFoodViewState extends State<AddNewFoodView> {
+class _EditFoodViewState extends State<EditFoodView> {
   final _formKey = GlobalKey<FormState>();
   String? _selectedCategory;
 
-  final TextEditingController _foodNameController = TextEditingController();
-  final TextEditingController _servingSizeController = TextEditingController();
-  final TextEditingController _caloriesController = TextEditingController();
-  final TextEditingController _proteinController = TextEditingController();
-  final TextEditingController _carbsController = TextEditingController();
-  final TextEditingController _fatController = TextEditingController();
+  late TextEditingController _foodNameController;
+  late TextEditingController _servingSizeController;
+  late TextEditingController _caloriesController;
+  late TextEditingController _proteinController;
+  late TextEditingController _carbsController;
+  late TextEditingController _fatController;
 
   final List<String> _categories = [
     '🌾 Grains',
@@ -40,6 +42,36 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
     '🥤 Drinks',
     '➕ Other',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize controllers with existing food data
+    _foodNameController = TextEditingController(text: widget.food.foodName);
+    _caloriesController = TextEditingController(text: widget.food.caloriesPer100g.toStringAsFixed(1));
+    _proteinController = TextEditingController(text: widget.food.proteinPer100g.toStringAsFixed(1));
+    _carbsController = TextEditingController(text: widget.food.carbsPer100g.toStringAsFixed(1));
+    _fatController = TextEditingController(text: widget.food.fatPer100g.toStringAsFixed(1));
+    // Set serving size to 100 by default (since we store per 100g)
+    _servingSizeController = TextEditingController(text: '100');
+
+    // Set selected category by matching category name
+    _selectedCategory = _categories.firstWhere(
+      (cat) => cat.contains(widget.food.category),
+      orElse: () => '➕ Other',
+    );
+  }
+
+  @override
+  void dispose() {
+    _foodNameController.dispose();
+    _servingSizeController.dispose();
+    _caloriesController.dispose();
+    _proteinController.dispose();
+    _carbsController.dispose();
+    _fatController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +92,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
           ),
         ),
         title: const Text(
-          'Add New Food',
+          'Edit Food',
           style: TextStyle(
             color: AppColors.purple,
             fontSize: 24,
@@ -134,7 +166,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
 
               // Nutrition per Serving
               const Text(
-                'Nutrition per Serving',
+                'Nutrition per 100g',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -248,7 +280,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
                     ),
                   ),
                   child: const Text(
-                    'Save Food',
+                    'Save Changes',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -298,22 +330,13 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
         hintStyle: TextStyle(color: Colors.grey.shade600),
         filled: true,
         fillColor: const Color(0xFF2A2A2A),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade700),
+          borderSide: BorderSide.none,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade700),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.purple),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       ),
-      style: const TextStyle(color: Colors.white),
-      keyboardType: TextInputType.number,
+      style: const TextStyle(color: Colors.white, fontSize: 14),
     );
   }
 
@@ -324,11 +347,11 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
     required String icon,
   }) {
     return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: color, width: 1.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
       padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade700),
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -336,44 +359,44 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
             children: [
               Text(
                 icon,
-                style: TextStyle(color: color, fontSize: 8),
+                style: TextStyle(color: color, fontSize: 12),
               ),
               const SizedBox(width: 4),
               Text(
                 label,
                 style: const TextStyle(
                   color: Colors.grey,
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
                 ),
-              ),
-              const Spacer(),
-              Text(
-                'g',
-                style: TextStyle(color: color, fontSize: 10),
               ),
             ],
           ),
           const SizedBox(height: 8),
           TextField(
             controller: controller,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
+            ],
             decoration: InputDecoration(
               hintText: '0',
               hintStyle: TextStyle(color: Colors.grey.shade600),
-              border: InputBorder.none,
               filled: true,
-              fillColor: const Color(0xFF1A1A1A),
+              fillColor: const Color(0xFF2A2A2A),
               contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide.none,
+              ),
+              suffixText: 'g',
+              suffixStyle: TextStyle(color: color),
             ),
-            style: const TextStyle(color: Colors.white, fontSize: 12),
-            keyboardType: TextInputType.number,
+            style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold),
           ),
         ],
       ),
     );
   }
-
 
   void _saveFoodData() async {
     if (_foodNameController.text.isEmpty) {
@@ -382,10 +405,6 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
     }
     if (_selectedCategory == null) {
       _showErrorSnackBar('Please select a category');
-      return;
-    }
-    if (_servingSizeController.text.isEmpty) {
-      _showErrorSnackBar('Please enter a serving size');
       return;
     }
     if (_caloriesController.text.isEmpty) {
@@ -403,9 +422,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
         return;
       }
 
-      final servingSize = double.parse(_servingSizeController.text);
       final calories = double.parse(_caloriesController.text);
-      // Use 0 as default if empty
       final protein = _proteinController.text.isEmpty ? 0.0 : double.parse(_proteinController.text);
       final carbs = _carbsController.text.isEmpty ? 0.0 : double.parse(_carbsController.text);
       final fat = _fatController.text.isEmpty ? 0.0 : double.parse(_fatController.text);
@@ -414,59 +431,44 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
       final foodController = context.read<FoodController>();
       final int userId = currentUser.id!;
 
-      developer.log('DEBUG: Attempting to save food with userId: $userId, category: $categoryName');
+      developer.log('DEBUG: Attempting to update food with foodId: ${widget.food.foodId}');
 
-      final success = await foodController.createFood(
+      final success = await foodController.updateFood(
+        foodId: widget.food.foodId,
         foodName: _foodNameController.text.trim(),
         category: categoryName,
-        servingSize: servingSize,
-        calories: calories,
-        protein: protein,
-        carbs: carbs,
-        fat: fat,
+        caloriesPer100g: calories,
+        proteinPer100g: protein,
+        carbsPer100g: carbs,
+        fatPer100g: fat,
         userId: userId,
       );
 
-      developer.log('DEBUG: Save result - $success');
-      developer.log('DEBUG: Controller error - ${foodController.errorMessage}');
+      developer.log('DEBUG: Update result - $success');
 
       if (!mounted) return;
 
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✓ Food saved successfully!'),
+            content: Text('✓ Food updated successfully!'),
             duration: Duration(seconds: 2),
             backgroundColor: AppColors.yellow,
           ),
         );
 
-        _foodNameController.clear();
-        _servingSizeController.clear();
-        _caloriesController.clear();
-        _proteinController.clear();
-        _carbsController.clear();
-        _fatController.clear();
-        _selectedCategory = null;
-
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            Navigator.pop(context, true);  // Return true to indicate success
-          }
-        });
+        if (mounted) {
+          Navigator.pop(context, true);  // Return true to indicate success
+        }
       } else {
         developer.log('DEBUG: Food controller error message: ${foodController.errorMessage}');
         _showErrorSnackBar(foodController.errorMessage.isNotEmpty
             ? foodController.errorMessage
-            : 'Error saving food. Please try again.');
+            : 'Failed to update food. Please try again.');
       }
-    } on FormatException catch (e) {
-      developer.log('DEBUG: FormatException - $e');
-      _showErrorSnackBar('Please enter valid numbers in all fields');
     } catch (e) {
-      developer.log('DEBUG: Unexpected error - $e');
-      developer.log('DEBUG: Error type - ${e.runtimeType}');
-      _showErrorSnackBar('Error saving food. Please try again.');
+      developer.log('DEBUG: Exception - $e');
+      _showErrorSnackBar('An error occurred: $e');
     }
   }
 
@@ -474,21 +476,10 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 3),
         backgroundColor: Colors.red,
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _foodNameController.dispose();
-    _servingSizeController.dispose();
-    _caloriesController.dispose();
-    _proteinController.dispose();
-    _carbsController.dispose();
-    _fatController.dispose();
-    super.dispose();
   }
 }
 
