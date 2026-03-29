@@ -29,6 +29,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
   final TextEditingController _proteinController = TextEditingController();
   final TextEditingController _carbsController = TextEditingController();
   final TextEditingController _fatController = TextEditingController();
+  final TextEditingController _customCategoryController = TextEditingController();
 
   final List<String> _categories = [
     '🌾 Grains',
@@ -48,43 +49,24 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            margin: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade700),
-              borderRadius: BorderRadius.circular(8),
+        leading: Padding(
+          padding: const EdgeInsets.all(8),
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: _iconBtn(
+              child: const Icon(Icons.chevron_left, color: AppColors.lime, size: 18),
             ),
-            child: const Icon(Icons.close, color: Colors.white, size: 20),
           ),
         ),
         title: const Text(
           'Add New Food',
           style: TextStyle(
-            color: AppColors.purple,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            color: AppColors.lavender,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
           ),
         ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.yellow),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Text(
-              'CUSTOM',
-              style: TextStyle(
-                color: AppColors.yellow,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -202,10 +184,16 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
                 runSpacing: 8,
                 children: _categories.map((category) {
                   final isSelected = _selectedCategory == category;
+                  final emoji = category.split(' ')[0];
+                  final label = category.split(' ').skip(1).join(' ');
                   return GestureDetector(
                     onTap: () {
                       setState(() {
                         _selectedCategory = category;
+                        // Clear custom category if switching away from Other
+                        if (category != '➕ Other') {
+                          _customCategoryController.clear();
+                        }
                       });
                     },
                     child: Container(
@@ -220,18 +208,38 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
                             ? AppColors.yellow.withOpacity(0.1)
                             : Colors.transparent,
                       ),
-                      child: Text(
-                        category,
-                        style: TextStyle(
-                          color: isSelected ? AppColors.yellow : Colors.white,
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            emoji,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            label,
+                            style: TextStyle(
+                              color: isSelected ? AppColors.yellow : Colors.white,
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
                 }).toList(),
               ),
+
+              // Custom Category Input (shown when "Other" is selected)
+              if (_selectedCategory == '➕ Other') ...[
+                const SizedBox(height: 16),
+                _buildLabel('CUSTOM CATEGORY'),
+                _buildTextField(
+                  controller: _customCategoryController,
+                  hint: 'e.g. Supplements, Condiments',
+                ),
+              ],
               const SizedBox(height: 32),
 
               // Save Button
@@ -374,6 +382,42 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
     );
   }
 
+  Widget _iconBtn({required Widget child}) {
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.lavender.withOpacity(0.55)),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      alignment: Alignment.center,
+      child: child,
+    );
+  }
+
+  String _getCategoryEmoji(String categoryName) {
+    // Map category names to their emojis
+    const categoryMap = {
+      'Grains': '🌾',
+      'Protein': '🍗',
+      'Dairy': '🥛',
+      'Fruits': '🍎',
+      'Veggies': '🥬',
+      'Snacks': '🍿',
+      'Drinks': '🥤',
+    };
+
+    // Check if it's a predefined category
+    for (var entry in categoryMap.entries) {
+      if (categoryName.toLowerCase().contains(entry.key.toLowerCase())) {
+        return entry.value;
+      }
+    }
+
+    // For "Other" or custom categories, use a generic icon
+    return '➕';
+  }
+
 
   void _saveFoodData() async {
     if (_foodNameController.text.isEmpty) {
@@ -382,6 +426,10 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
     }
     if (_selectedCategory == null) {
       _showErrorSnackBar('Please select a category');
+      return;
+    }
+    if (_selectedCategory == '➕ Other' && _customCategoryController.text.isEmpty) {
+      _showErrorSnackBar('Please enter a custom category name');
       return;
     }
     if (_servingSizeController.text.isEmpty) {
@@ -410,7 +458,9 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
       final carbs = _carbsController.text.isEmpty ? 0.0 : double.parse(_carbsController.text);
       final fat = _fatController.text.isEmpty ? 0.0 : double.parse(_fatController.text);
 
-      final categoryName = _selectedCategory!.split(' ').skip(1).join(' ');
+      final categoryName = _selectedCategory == '➕ Other'
+          ? _customCategoryController.text.trim()
+          : _selectedCategory!.split(' ').skip(1).join(' ');
       final foodController = context.read<FoodController>();
       final int userId = currentUser.id!;
 
@@ -480,6 +530,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
     );
   }
 
+
   @override
   void dispose() {
     _foodNameController.dispose();
@@ -488,6 +539,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
     _proteinController.dispose();
     _carbsController.dispose();
     _fatController.dispose();
+    _customCategoryController.dispose();
     super.dispose();
   }
 }

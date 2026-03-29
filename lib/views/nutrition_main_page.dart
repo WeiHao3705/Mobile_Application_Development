@@ -60,12 +60,6 @@ class _HeaderSection extends StatelessWidget {
             letterSpacing: -0.3,
           ),
         ),
-        const Spacer(),
-        _iconButton(Icons.search_rounded),
-        const SizedBox(width: 6),
-        _iconButton(Icons.notifications_rounded),
-        const SizedBox(width: 6),
-        _iconButton(Icons.person_rounded),
       ],
     );
   }

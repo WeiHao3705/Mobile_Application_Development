@@ -723,6 +723,29 @@ class _FoodRow extends StatelessWidget {
     );
   }
 
+  String _getCategoryEmoji(String categoryName) {
+    // Map category names to their emojis
+    const categoryMap = {
+      'Grains': '🌾',
+      'Protein': '🍗',
+      'Dairy': '🥛',
+      'Fruits': '🍎',
+      'Veggies': '🥬',
+      'Snacks': '🍿',
+      'Drinks': '🥤',
+    };
+
+    // Check if it's a predefined category
+    for (var entry in categoryMap.entries) {
+      if (categoryName.toLowerCase().contains(entry.key.toLowerCase())) {
+        return entry.value;
+      }
+    }
+
+    // For "Other" or custom categories, use a generic icon
+    return '➕';
+  }
+
   void _navigateToEditFood(BuildContext context) {
     onEditFood(); // Call parent's callback to handle navigation and refresh
   }
@@ -820,7 +843,7 @@ class _FoodRow extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  food.foodName.isNotEmpty ? food.foodName[0] : '🍽️',
+                  _getCategoryEmoji(food.category),
                   style: const TextStyle(fontSize: 20),
                 ),
               ),
@@ -866,7 +889,7 @@ class _FoodRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Emoji icon (using first character of food name as fallback)
+            // Category emoji icon
             Container(
               width: 42,
               height: 42,
@@ -876,7 +899,7 @@ class _FoodRow extends StatelessWidget {
               ),
               alignment: Alignment.center,
               child: Text(
-                food.foodName.isNotEmpty ? food.foodName[0] : '🍽️',
+                _getCategoryEmoji(food.category),
                 style: const TextStyle(fontSize: 20),
               ),
             ),
