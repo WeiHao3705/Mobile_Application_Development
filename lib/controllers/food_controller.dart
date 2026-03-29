@@ -157,6 +157,13 @@ class FoodController extends ChangeNotifier {
       );
 
       _currentFood = updatedFood;
+
+      // Update in the _userFoods list as well
+      final index = _userFoods.indexWhere((food) => food.foodId == foodId);
+      if (index != -1) {
+        _userFoods[index] = updatedFood;
+      }
+
       _isSuccess = true;
 
       developer.log('Food updated successfully: ${updatedFood.foodName}');
