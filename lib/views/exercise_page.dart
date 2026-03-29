@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'aerobic_page.dart';
+import 'workout_page.dart';
 
 class ExercisePage extends StatelessWidget{
   const ExercisePage({super.key});
@@ -9,6 +10,7 @@ class ExercisePage extends StatelessWidget{
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text('Exercise'),
         centerTitle: true,
@@ -23,12 +25,13 @@ class ExercisePage extends StatelessWidget{
               const Icon(
                 Icons.fitness_center,
                 size: 80,
-                color: Colors.grey,
+                color: Colors.white54,
               ),
               const SizedBox(height: 32),
               Text(
                 'Choose Your Exercise Type',
                 style: theme.textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -57,7 +60,7 @@ class ExercisePage extends StatelessWidget{
               ElevatedButton(onPressed: (){
                 Navigator.push(
                   context, MaterialPageRoute(
-                    builder: (context) => const AerobicPage()),
+                    builder: (context) => const WorkoutPage()),
                 );
               },
                 style: ElevatedButton.styleFrom(
