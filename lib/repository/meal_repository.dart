@@ -65,10 +65,14 @@ class MealLogRepository {
   // UPDATE meal
   Future<MealLog> updateMeal(MealLog meal) async {
     try {
+      if (meal.mealId == null) {
+        throw Exception('Cannot update meal without an ID');
+      }
+
       final response = await supabase
           .from('MealLog')
           .update(meal.toJson())
-          .eq('meal_id', meal.mealId)
+          .eq('meal_id', meal.mealId!)
           .select()
           .single();
 

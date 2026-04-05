@@ -1,13 +1,113 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../controllers/auth_controller.dart';
 import '../models/auth_user.dart';
+import '../models/daily_goals.dart';
+import '../repository/daily_goals_repository.dart';
+import '../views/dialogs/edit_daily_goals_dialog.dart';
 import 'login_page.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, required this.authController});
 
   final AuthController authController;
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  late DailyGoalsRepository _dailyGoalsRepository;
+  DailyGoals? _dailyGoals;
+  bool _isLoadingGoals = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _dailyGoalsRepository = DailyGoalsRepository(
+      supabase: Supabase.instance.client,
+    );
+    _loadDailyGoals();
+  }
+
+  Future<void> _loadDailyGoals() async {
+    final userId = widget.authController.currentUser?.id;
+    if (userId == null) return;
+
+    setState(() => _isLoadingGoals = true);
+
+    try {
+      final goals = await _dailyGoalsRepository.getDailyGoalsByUserId(
+        int.parse(userId.toString()),
+      );
+
+      setState(() {
+        _dailyGoals = goals;
+        _isLoadingGoals = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingGoals = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading goals: $e')),
+      );
+    }
+  }
+
+  Future<void> _editDailyGoals() async {
+    final userId = widget.authController.currentUser?.id;
+    if (userId == null) return;
+
+    final user = widget.authController.currentUser;
+
+    // Use default goals if none exist
+    final currentGoals = _dailyGoals ??
+        DailyGoals(
+          dailyGoalsId: 0,
+          userId: int.parse(userId.toString()),
+          targetCalories: 2000,
+          targetProtein: 150,
+          targetCarbs: 200,
+          targetFat: 67,
+        );
+
+    showDialog(
+      context: context,
+      builder: (context) => EditDailyGoalsDialog(
+        currentGoals: currentGoals,
+        userId: int.parse(userId.toString()),
+        onSave: _saveDailyGoals,
+        userWeight: user?.currentWeight != null ? user!.currentWeight!.toDouble() : null,
+        userHeight: user?.height != null ? user!.height!.toDouble() : null,
+      ),
+    );
+  }
+
+  Future<void> _saveDailyGoals(DailyGoals updatedGoals) async {
+    try {
+      if (_dailyGoals == null) {
+        // Create new daily goals
+        final newGoals = await _dailyGoalsRepository.createDailyGoals(updatedGoals);
+        setState(() => _dailyGoals = newGoals);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Daily goals created successfully')),
+        );
+      } else {
+        // Update existing daily goals
+        final newGoals = await _dailyGoalsRepository.updateDailyGoals(updatedGoals);
+        setState(() => _dailyGoals = newGoals);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Daily goals updated successfully')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Error saving goals: $e')),
+      );
+    }
+  }
 
   String _displayName(LoginUser? user) {
     return user?.fullName ?? user?.username ?? 'User';
@@ -40,7 +140,7 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final user = authController.currentUser;
+    final user = widget.authController.currentUser;
 
     return Scaffold(
       appBar: AppBar(
@@ -154,13 +254,86 @@ class ProfilePage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _GoalItem(
-                    title: 'Daily Calorie Target',
-                    value: '2,000 kcal',
-                    icon: Icons.local_fire_department,
-                    iconColor: theme.colorScheme.secondary,
+
+                  // Editable Daily Goals Card
+                  GestureDetector(
+                    onTap: _editDailyGoals,
+                    child: Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Daily Nutrition Goals',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.edit,
+                                  color: theme.colorScheme.secondary,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            if (_isLoadingGoals)
+                              const Center(
+                                child: CircularProgressIndicator(),
+                              )
+                            else
+                              GridView.count(
+                                crossAxisCount: 2,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                childAspectRatio: 1.6,
+                                children: [
+                                  _DailyGoalItem(
+                                    label: '🔥 Calories',
+                                    value: '${_dailyGoals?.targetCalories ?? 2000}',
+                                    unit: 'kcal',
+                                  ),
+                                  _DailyGoalItem(
+                                    label: '🥚 Protein',
+                                    value: '${(_dailyGoals?.targetProtein ?? 150).toStringAsFixed(0)}',
+                                    unit: 'g',
+                                  ),
+                                  _DailyGoalItem(
+                                    label: '🌾 Carbs',
+                                    value: '${(_dailyGoals?.targetCarbs ?? 200).toStringAsFixed(0)}',
+                                    unit: 'g',
+                                  ),
+                                  _DailyGoalItem(
+                                    label: '🧈 Fat',
+                                    value: '${(_dailyGoals?.targetFat ?? 67).toStringAsFixed(0)}',
+                                    unit: 'g',
+                                  ),
+                                ],
+                              ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Tap to edit or auto-calculate',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+
                   _GoalItem(
                     title: 'Daily Steps Goal',
                     value: '10,000 steps',
@@ -208,7 +381,7 @@ class ProfilePage extends StatelessWidget {
                     title: 'Logout',
                     icon: Icons.logout,
                     onTap: () {
-                      authController.logout();
+                      widget.authController.logout();
                       Navigator.pushNamedAndRemoveUntil(
                         context,
                         LoginPage.routeName,
@@ -352,6 +525,60 @@ class _OptionItem extends StatelessWidget {
           color: color ?? theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
         ),
         onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _DailyGoalItem extends StatelessWidget {
+  const _DailyGoalItem({
+    required this.label,
+    required this.value,
+    required this.unit,
+  });
+
+  final String label;
+  final String value;
+  final String unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.secondary.withOpacity(0.3),
+        ),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            unit,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.secondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }

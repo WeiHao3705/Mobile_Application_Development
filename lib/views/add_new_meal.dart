@@ -4,6 +4,7 @@ import 'package:mobile_application_development/models/food.dart';
 import 'package:provider/provider.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/food_controller.dart';
+import '../controllers/meal_controller.dart';
 import 'add_new_food.dart';
 import 'edit_food.dart';
 
@@ -13,7 +14,6 @@ class _SelectedItem {
   int qty;
 }
 
-const List<String> _mealTypes  = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
 
 class AddNewMealPage extends StatefulWidget {
@@ -29,13 +29,16 @@ class AddNewMealPage extends StatefulWidget {
 }
 
 class _AddNewMealPageState extends State<AddNewMealPage> {
-  String _mealType      = 'Breakfast';
   String _activeCategory = 'All';
   String _searchQuery   = '';
   final Map<int, _SelectedItem> _selected = {};
   final TextEditingController _searchCtrl = TextEditingController();
   final TextEditingController _noteCtrl   = TextEditingController();
   bool _showToast = false;
+
+  // Meal type selection
+  String _selectedMealType = 'Breakfast';
+  static const List<String> _mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
   // Batch deletion state
   bool _isBatchDeleteMode = false;
@@ -211,12 +214,118 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     });
   }
 
-  void _logMeal() {
+  Future<void> _logMeal() async {
     if (_selected.isEmpty) return;
-    setState(() => _showToast = true);
-    Future.delayed(const Duration(milliseconds: 2200), () {
-      if (mounted) setState(() => _showToast = false);
-    });
+
+    // Get the current user
+    final authController = widget.authController;
+    if (authController.currentUser == null) {
+      _showErrorSnackbar('User not logged in');
+      return;
+    }
+
+    final userId = authController.currentUser!.id;
+    if (userId == null) {
+      _showErrorSnackbar('Invalid user ID');
+      return;
+    }
+
+    // Prepare foods with quantities
+    final foodsWithQuantities = <int, Map<String, dynamic>>{};
+    for (final entry in _selected.entries) {
+      // Convert qty multiplier to grams (each increment = 100g)
+      final quantityInGrams = entry.value.qty * 100.0;
+
+      foodsWithQuantities[entry.key] = {
+        'food_id': entry.key,
+        'quantity': quantityInGrams, // Convert to grams for calorie calculation
+        'unit': 'g', // Default unit is grams
+      };
+    }
+
+    // Show loading state
+    if (!mounted) return;
+    _showLoadingDialog();
+
+    try {
+      // Log the meal
+      final mealController = context.read<MealController>();
+      final success = await mealController.logMeal(
+        userId: int.parse(userId.toString()),
+        mealType: _selectedMealType, // Use selected meal type
+        mealDate: DateTime.now(),
+        foodsWithQuantities: foodsWithQuantities,
+      );
+
+      if (!mounted) return;
+
+      // Close loading dialog safely
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
+      if (success) {
+        // Show success toast and reset form
+        setState(() => _showToast = true);
+        _searchCtrl.clear();
+        _noteCtrl.clear();
+        _selected.clear();
+
+        Future.delayed(const Duration(milliseconds: 2200), () {
+          if (mounted) {
+            setState(() => _showToast = false);
+            // Pop back to previous screen
+            Navigator.of(context).pop(true);
+          }
+        });
+      } else {
+        _showErrorSnackbar(mealController.errorMessage);
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      // Close loading dialog if still open
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
+      _showErrorSnackbar('Error saving meal: ${e.toString()}');
+    }
+  }
+
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        content: Row(
+          children: [
+            CircularProgressIndicator(color: AppColors.lime),
+            SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                'Saving meal...',
+                style: TextStyle(color: AppColors.lavender),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: AppColors.white),
+        ),
+        backgroundColor: Colors.red.shade700,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   @override
@@ -272,7 +381,7 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
                       children: [
                         _buildHeader(context),
                         const SizedBox(height: 18),
-                        _buildMealTypeTabs(),
+                        _buildMealTypeSelector(),
                         const SizedBox(height: 14),
                         _buildSearchBar(),
                         const SizedBox(height: 12),
@@ -427,36 +536,87 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     );
   }
 
-  // ── Meal Type Tabs ─────────────────────────────────────────────────────────
 
-  Widget _buildMealTypeTabs() {
-    return Row(
-      children: _mealTypes.map((type) {
-        final isActive = _mealType == type;
-        return Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => _mealType = type),
-            child: Container(
-              height: 34,
-              margin: EdgeInsets.only(right: type != _mealTypes.last ? 6 : 0),
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.lime : AppColors.white,
-                borderRadius: BorderRadius.circular(17),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                type,
-                style: TextStyle(
-                  color: isActive ? AppColors.nearBlack : AppColors.lavender,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              ),
-            ),
+  // ── Meal Type Selector ─────────────────────────────────────────────────────
+
+  Widget _buildMealTypeSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Meal Type',
+          style: TextStyle(
+            color: AppColors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
           ),
-        );
-      }).toList(),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: _mealTypes.map((mealType) {
+              final isSelected = _selectedMealType == mealType;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedMealType = mealType;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.lime : Colors.transparent,
+                      border: Border.all(
+                        color: isSelected ? AppColors.lime : AppColors.lavender.withOpacity(0.4),
+                        width: 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _getMealTypeEmoji(mealType),
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          mealType,
+                          style: TextStyle(
+                            color: isSelected ? AppColors.nearBlack : AppColors.lavender,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
     );
+  }
+
+  String _getMealTypeEmoji(String mealType) {
+    switch (mealType.toLowerCase()) {
+      case 'breakfast':
+        return '🥣';
+      case 'lunch':
+        return '🍽️';
+      case 'dinner':
+        return '🍖';
+      case 'snacks':
+        return '🍿';
+      default:
+        return '🍴';
+    }
   }
 
   // ── Search Bar ─────────────────────────────────────────────────────────────
@@ -625,20 +785,20 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   // ── Toast ──────────────────────────────────────────────────────────────────
 
   Widget _buildToast() {
-    return Positioned(
-      bottom: 90,
-      left: 18,
-      right: 18,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.lime,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Text(
-          '✓ Meal logged successfully!',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.nearBlack, fontWeight: FontWeight.w800, fontSize: 15),
+    return Positioned.fill(
+      child: Align(
+        alignment: Alignment.center,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.lime,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Text(
+            '✓ Meal logged successfully!',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.nearBlack, fontWeight: FontWeight.w800, fontSize: 15),
+          ),
         ),
       ),
     );

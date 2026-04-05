@@ -44,3 +44,5 @@ class LoginUser {
     return num.tryParse(value.toString());
   }
 }
+
+

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'config/supabase_config.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/food_controller.dart';
+import 'controllers/meal_controller.dart';
 import 'theme/app_theme.dart';
 import 'views/landing_page.dart';
 import 'views/login_page.dart';
@@ -44,6 +45,9 @@ class _MyAppState extends State<MyApp> {
       providers: [
         ChangeNotifierProvider(
           create: (_) => FoodController(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MealController(),
         ),
       ],
       child: MaterialApp(

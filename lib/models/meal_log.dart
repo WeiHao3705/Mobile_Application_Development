@@ -1,31 +1,46 @@
 class MealLog{
-  final int mealId;
+  final int? mealId;
   final String mealType;
   final DateTime mealDate;
   final int userId;
+  final double? totalCalories;
 
   MealLog({
-    required this.mealId,
+    this.mealId,
     required this.mealType,
     required this.mealDate,
-    required this.userId
+    required this.userId,
+    this.totalCalories,
   });
 
   factory MealLog.fromJson(Map<String, dynamic> json){
+    final mealDateValue = json['meal_date'];
+    DateTime parsedDate;
+
+    if (mealDateValue is String) {
+      parsedDate = DateTime.parse(mealDateValue);
+    } else if (mealDateValue is DateTime) {
+      parsedDate = mealDateValue;
+    } else {
+      parsedDate = DateTime.now();
+    }
+
     return MealLog(
-      mealId: json['meal_id'],
-      mealType: json['meal_type'],
-      mealDate: json['meal_date'],
-      userId: json['user_id']
+      mealId: json['meal_id'] as int?,
+      mealType: json['meal_type'] as String? ?? 'Custom',
+      mealDate: parsedDate,
+      userId: json['user_id'] as int? ?? 0,
+      totalCalories: (json['total_calories'] as num?)?.toDouble(),
     );
   }
 
   Map<String, dynamic> toJson(){
     return {
-      'meal_id': mealId,
+      if (mealId != null) 'meal_id': mealId,
       'meal_type': mealType,
-      'meal_date': mealDate,
-      'user_id': userId
+      'meal_date': mealDate.toIso8601String(),
+      'user_id': userId,
+      if (totalCalories != null) 'total_calories': totalCalories,
     };
   }
 
