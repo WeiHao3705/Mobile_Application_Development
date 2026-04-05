@@ -160,7 +160,9 @@ class FoodService {
     }
   }
 
-  /// Validate food input
+
+  // ...existing code...
+
   void _validateFoodInput(String foodName, double servingSize) {
     if (foodName.isEmpty) {
       throw Exception('Food name is required');
