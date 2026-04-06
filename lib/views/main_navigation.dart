@@ -22,7 +22,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   late final List<Widget> _pages = [
     const HomePage(),
-    const ExercisePage(),
+    ExercisePage(authController: widget.authController),
     NutritionMainPage(authController: widget.authController),
     ProfilePage(authController: widget.authController),
   ];

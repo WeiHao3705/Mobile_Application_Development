@@ -8,7 +8,6 @@ class ExerciseRepository {
   final SupabaseClient supabase;
 
   Future<List<Exercise>> getAllExercises() async {
-    // Supabase table names are case-sensitive when quoted in Postgres.
     final response = await supabase.from('Exercise').select();
 
     return (response as List)

@@ -1,13 +1,172 @@
 import 'package:flutter/material.dart';
-import 'exercise_explore_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class WorkoutPage extends StatelessWidget {
-  const WorkoutPage({super.key});
+import '../models/workout_plan.dart';
+import '../repository/workout_plan_repository.dart';
+import 'exercise_explore_page.dart';
+import 'plan_creation_page.dart';
+import 'workout_routine_page.dart';
+import 'package:mobile_application_development/views/workout_plan_detail_page.dart';
+
+enum _PlanMenuAction {
+  edit,
+  duplicate,
+  delete,
+}
+
+class WorkoutPage extends StatefulWidget {
+  const WorkoutPage({super.key, required this.userId});
+
+  final int userId;
+
+  @override
+  State<WorkoutPage> createState() => _WorkoutPageState();
+}
+
+class _WorkoutPageState extends State<WorkoutPage> {
+  late final WorkoutPlanRepository _repository;
+  late Future<List<WorkoutPlan>> _plansFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = WorkoutPlanRepository(supabase: Supabase.instance.client);
+    _plansFuture = _repository.getPlansForUser(widget.userId);
+  }
+
+  void _reloadPlans() {
+    setState(() {
+      _plansFuture = _repository.getPlansForUser(widget.userId);
+    });
+  }
+
+  Future<void> _openPlanCreation() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => PlanCreationPage(userId: widget.userId),
+      ),
+    );
+
+    if (created == true) {
+      _reloadPlans();
+    }
+  }
+
+  void _startPlan(WorkoutPlan plan) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Starting "${plan.planName}" soon.')),
+    );
+  }
+
+  Future<void> _editPlan(WorkoutPlan plan) async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => PlanCreationPage(
+          userId: widget.userId,
+          editingPlanId: plan.planId,
+          initialPlanName: plan.planName,
+          initialExerciseIds: plan.exercises
+              .map((exercise) => exercise.exerciseId)
+              .toSet(),
+        ),
+      ),
+    );
+
+    if (updated == true) {
+      _reloadPlans();
+    }
+  }
+
+  Future<void> _duplicatePlan(WorkoutPlan plan) async {
+    try {
+      await _repository.duplicatePlan(
+        userId: widget.userId,
+        sourcePlanId: plan.planId,
+      );
+      _reloadPlans();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to duplicate plan: $error')),
+      );
+    }
+  }
+
+  Future<void> _deletePlan(WorkoutPlan plan) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          title: const Text('Delete Plan', style: TextStyle(color: Colors.white)),
+          content: Text(
+            'Delete "${plan.planName}"?',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await _repository.deletePlan(plan.planId);
+      _reloadPlans();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete plan: $error')),
+      );
+    }
+  }
+
+  Future<void> _onPlanActionSelected(
+    _PlanMenuAction action,
+    WorkoutPlan plan,
+  ) async {
+    switch (action) {
+      case _PlanMenuAction.edit:
+        await _editPlan(plan);
+        break;
+      case _PlanMenuAction.duplicate:
+        await _duplicatePlan(plan);
+        break;
+      case _PlanMenuAction.delete:
+        await _deletePlan(plan);
+        break;
+    }
+  }
+
+  void _openPlanDetails(WorkoutPlan plan) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => WorkoutPlanDetailPage(plan: plan),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    const myPlans = <Map<String, String>>[];
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -34,7 +193,13 @@ class WorkoutPage extends StatelessWidget {
             _QuickActionTile(
               icon: Icons.add,
               title: 'Start Empty Workout',
-              onTap: () {},
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => WorkoutRoutinePage(userId: widget.userId),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 28),
             Row(
@@ -48,7 +213,7 @@ class WorkoutPage extends StatelessWidget {
                 ),
                 const Spacer(),
                 IconButton(
-                  onPressed: () {},
+                  onPressed: _openPlanCreation,
                   icon: const Icon(Icons.add_box_outlined),
                   color: theme.colorScheme.primary,
                   tooltip: 'Create a new plan',
@@ -62,6 +227,7 @@ class WorkoutPage extends StatelessWidget {
                   child: _QuickActionTile(
                     icon: Icons.note_alt_outlined,
                     title: 'New Plan',
+                    onTap: _openPlanCreation,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -81,48 +247,96 @@ class WorkoutPage extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 28),
-            Text(
-              'My Plans (0)',
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (myPlans.isEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                decoration: BoxDecoration(
-                  color: Colors.white10,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
+            FutureBuilder<List<WorkoutPlan>>(
+              future: _plansFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      'Failed to load plans: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  );
+                }
+
+                final plans = snapshot.data ?? const <WorkoutPlan>[];
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
-                      Icons.fitness_center_outlined,
-                      size: 42,
-                      color: Colors.white70,
+                    Text(
+                      'My Plans (${plans.length})',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      'No plans yet',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+                    if (plans.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                        decoration: BoxDecoration(
+                          color: Colors.white10,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.fitness_center_outlined,
+                              size: 42,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No plans yet',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Create your first workout plan.',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ...plans.map(
+                        (plan) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _PlanCard(
+                            plan: plan,
+                            onTap: () => _openPlanDetails(plan),
+                            onStart: () => _startPlan(plan),
+                            onMenuActionSelected: (action) =>
+                                _onPlanActionSelected(action, plan),
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Create your first workout plan when data is available.',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white70,
-                      ),
-                    ),
                   ],
-                ),
-              ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -168,6 +382,97 @@ class _QuickActionTile extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlanCard extends StatelessWidget {
+  const _PlanCard({
+    required this.plan,
+    required this.onTap,
+    required this.onStart,
+    required this.onMenuActionSelected,
+  });
+
+  final WorkoutPlan plan;
+  final VoidCallback onTap;
+  final VoidCallback onStart;
+  final ValueChanged<_PlanMenuAction> onMenuActionSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final exerciseNames = plan.exercises.map((item) => item.exerciseName).toList();
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111111),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      plan.planName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  PopupMenuButton<_PlanMenuAction>(
+                    icon: const Icon(Icons.more_vert, color: Colors.white70),
+                    color: const Color(0xFF1A1A1A),
+                    onSelected: onMenuActionSelected,
+                    itemBuilder: (context) => const [
+                      PopupMenuItem<_PlanMenuAction>(
+                        value: _PlanMenuAction.edit,
+                        child: Text('Edit'),
+                      ),
+                      PopupMenuItem<_PlanMenuAction>(
+                        value: _PlanMenuAction.duplicate,
+                        child: Text('Duplicate'),
+                      ),
+                      PopupMenuItem<_PlanMenuAction>(
+                        value: _PlanMenuAction.delete,
+                        child: Text('Delete'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                exerciseNames.isEmpty ? 'No exercises added' : exerciseNames.join(' • '),
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: onStart,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                  ),
+                  child: const Text('Start Plan'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

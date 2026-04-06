@@ -1,9 +1,22 @@
 import 'package:flutter/material.dart';
+
+import '../controllers/auth_controller.dart';
 import 'aerobic_page.dart';
 import 'workout_page.dart';
 
-class ExercisePage extends StatelessWidget{
-  const ExercisePage({super.key});
+class ExercisePage extends StatelessWidget {
+  const ExercisePage({super.key, required this.authController});
+
+  final AuthController authController;
+
+  int? get _userId {
+    final currentUser = authController.currentUser;
+    final id = currentUser?.id;
+    if (id is int) {
+      return id;
+    }
+    return int.tryParse(id?.toString() ?? '');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,12 +50,15 @@ class ExercisePage extends StatelessWidget{
               ),
               const SizedBox(height: 48),
               // Aerobic Button
-              ElevatedButton(onPressed: (){
-                Navigator.push(
-                  context, MaterialPageRoute(
-                    builder: (context) => const AerobicPage()),
-                );
-              },
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AerobicPage(),
+                    ),
+                  );
+                },
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
                   backgroundColor: theme.colorScheme.primary,
@@ -57,12 +73,23 @@ class ExercisePage extends StatelessWidget{
 
               const SizedBox(height: 48),
               // Workout Button
-              ElevatedButton(onPressed: (){
-                Navigator.push(
-                  context, MaterialPageRoute(
-                    builder: (context) => const WorkoutPage()),
-                );
-              },
+              ElevatedButton(
+                onPressed: () {
+                  final userId = _userId;
+                  if (userId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please log in again to open Workout.')),
+                    );
+                    return;
+                  }
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => WorkoutPage(userId: userId),
+                    ),
+                  );
+                },
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
                   backgroundColor: theme.colorScheme.primary,

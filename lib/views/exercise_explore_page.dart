@@ -6,7 +6,16 @@ import '../repository/exercise_repository.dart';
 import 'exercise_detail_page.dart';
 
 class ExerciseExplorePage extends StatefulWidget {
-  const ExerciseExplorePage({super.key});
+  const ExerciseExplorePage({
+    super.key,
+    this.selectable = false,
+    this.singleSelection = false,
+    this.initialSelectedExerciseIds = const <String>{},
+  });
+
+  final bool selectable;
+  final bool singleSelection;
+  final Set<String> initialSelectedExerciseIds;
 
   @override
   State<ExerciseExplorePage> createState() => _ExerciseExplorePageState();
@@ -20,11 +29,15 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
   String _selectedEquipment = 'All Equipment';
   String _selectedMuscle = 'All Muscles';
 
+  final Set<String> _selectedExerciseIds = <String>{};
+  List<Exercise> _latestExercises = const <Exercise>[];
+
   @override
   void initState() {
     super.initState();
     _repository = ExerciseRepository(supabase: Supabase.instance.client);
     _exercisesFuture = _repository.getAllExercises();
+    _selectedExerciseIds.addAll(widget.initialSelectedExerciseIds);
     _searchController.addListener(() => setState(() {}));
   }
 
@@ -40,6 +53,30 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
         builder: (_) => ExerciseDetailPage(exercise: exercise),
       ),
     );
+  }
+
+  void _toggleExerciseSelection(String exerciseId) {
+    setState(() {
+      if (widget.singleSelection) {
+        _selectedExerciseIds
+          ..clear()
+          ..add(exerciseId);
+        return;
+      }
+
+      if (_selectedExerciseIds.contains(exerciseId)) {
+        _selectedExerciseIds.remove(exerciseId);
+      } else {
+        _selectedExerciseIds.add(exerciseId);
+      }
+    });
+  }
+
+  void _returnSelectedExercises() {
+    final selectedExercises = _latestExercises
+        .where((exercise) => _selectedExerciseIds.contains(exercise.id))
+        .toList();
+    Navigator.of(context).pop(selectedExercises);
   }
 
   @override
@@ -59,13 +96,28 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
           tooltip: 'Back to Workout',
         ),
         title: Text(
-          'Exercise',
+          widget.selectable
+              ? (widget.singleSelection ? 'Choose Exercise' : 'Choose Exercises')
+              : 'Exercise',
           style: TextStyle(
             color: theme.colorScheme.primary,
             fontWeight: FontWeight.w700,
           ),
         ),
         centerTitle: true,
+        actions: [
+          if (widget.selectable)
+            TextButton(
+              onPressed: _returnSelectedExercises,
+              child: Text(
+                'Done',
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
       ),
       body: SafeArea(
         child: FutureBuilder<List<Exercise>>(
@@ -91,6 +143,7 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
             }
 
             final allExercises = snapshot.data ?? const <Exercise>[];
+            _latestExercises = allExercises;
             final filteredExercises = _filterExercises(allExercises);
             final equipmentOptions = _buildOptions(
               allExercises.map((item) => item.equipment),
@@ -165,9 +218,20 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
                           separatorBuilder: (_, __) =>
                               const Divider(color: Colors.white12, height: 1),
                           itemBuilder: (context, index) {
+                            final exercise = filteredExercises[index];
                             return _ExerciseListTile(
-                              exercise: filteredExercises[index],
-                              onTap: () => _openExerciseDetail(filteredExercises[index]),
+                              exercise: exercise,
+                              selectable: widget.selectable,
+                              singleSelection: widget.singleSelection,
+                              isSelected: _selectedExerciseIds.contains(exercise.id),
+                              onTap: () {
+                                if (widget.selectable) {
+                                  _toggleExerciseSelection(exercise.id);
+                                  return;
+                                }
+                                _openExerciseDetail(exercise);
+                              },
+                              onOpenDetails: () => _openExerciseDetail(exercise),
                             );
                           },
                         ),
@@ -317,24 +381,52 @@ class _ExerciseListTile extends StatelessWidget {
   const _ExerciseListTile({
     required this.exercise,
     required this.onTap,
+    required this.onOpenDetails,
+    required this.selectable,
+    required this.singleSelection,
+    required this.isSelected,
   });
 
   final Exercise exercise;
   final VoidCallback onTap;
+  final VoidCallback onOpenDetails;
+  final bool selectable;
+  final bool singleSelection;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return ListTile(
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      leading: CircleAvatar(
-        radius: 30,
-        backgroundColor: Colors.white,
-        backgroundImage:
-            exercise.imageUrl.isNotEmpty ? NetworkImage(exercise.imageUrl) : null,
-        child: exercise.imageUrl.isEmpty
-            ? const Icon(Icons.fitness_center, color: Colors.black)
-            : null,
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (selectable)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Icon(
+                singleSelection
+                    ? (isSelected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked)
+                    : (isSelected ? Icons.check_circle : Icons.radio_button_unchecked),
+                color: isSelected ? theme.colorScheme.primary : Colors.white54,
+                size: 22,
+              ),
+            ),
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: Colors.white,
+            backgroundImage:
+                exercise.imageUrl.isNotEmpty ? NetworkImage(exercise.imageUrl) : null,
+            child: exercise.imageUrl.isEmpty
+                ? const Icon(Icons.fitness_center, color: Colors.black)
+                : null,
+          ),
+        ],
       ),
       title: Text(
         exercise.name,
@@ -348,14 +440,22 @@ class _ExerciseListTile extends StatelessWidget {
         exercise.primaryMuscle,
         style: const TextStyle(color: Colors.white60, fontSize: 14),
       ),
-      trailing: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white70),
+      trailing: InkWell(
+        onTap: onOpenDetails,
+        borderRadius: BorderRadius.circular(17),
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white70),
+          ),
+          child: Icon(
+            Icons.north_east,
+            color: theme.colorScheme.primary,
+            size: 18,
+          ),
         ),
-        child: Icon(Icons.north_east, color: Theme.of(context).colorScheme.primary, size: 18),
       ),
     );
   }
@@ -378,4 +478,3 @@ class _EmptyExerciseState extends StatelessWidget {
     );
   }
 }
-

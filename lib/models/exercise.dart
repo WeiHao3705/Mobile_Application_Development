@@ -118,9 +118,9 @@ class Exercise {
     if (value.length >= 2) {
       final first = value[0];
       final last = value[value.length - 1];
-      final isDoubleQuoted = first == '"' && last == '"';
       final isSingleQuoted = first == "'" && last == "'";
-      if (isDoubleQuoted || isSingleQuoted) {
+      final isDoubleQuoted = first == '"' && last == '"';
+      if (isSingleQuoted || isDoubleQuoted) {
         return value.substring(1, value.length - 1).trim();
       }
     }
