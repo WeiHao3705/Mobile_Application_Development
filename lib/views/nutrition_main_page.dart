@@ -27,12 +27,18 @@ class _NutritionMainPageState extends State<NutritionMainPage> {
   @override
   void initState() {
     super.initState();
-    _loadUserMeals();
+    // Defer initial meal loading to after first frame when providers are ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadUserMeals();
+      }
+    });
   }
 
   Future<void> _loadUserMeals() async {
     final userId = widget.authController.currentUser?.id;
     if (userId != null) {
+      if (!mounted) return;
       final mealController = context.read<MealController>();
       await mealController.fetchUserMeals(int.parse(userId.toString()));
     }
@@ -60,23 +66,36 @@ class _NutritionMainPageState extends State<NutritionMainPage> {
               ),
               const SizedBox(height: 10),
               if (_selectedTabIndex == 0) ...[
-                const _AnalyticsCard(),
+                // Use Consumer to rebuild when AuthController changes (user logs in)
+                Consumer<AuthController>(
+                  builder: (context, authController, _) {
+                    return _AnalyticsCard(
+                      key: ValueKey(authController.currentUser?.id),
+                    );
+                  },
+                ),
                 const SizedBox(height: 12),
-                const _MacrosSection(),
+                Consumer<AuthController>(
+                  builder: (context, authController, _) {
+                    return _MacrosSection(
+                      key: ValueKey(authController.currentUser?.id),
+                    );
+                  },
+                ),
                 const SizedBox(height: 12),
                 _AddMealButton(
                   authController: widget.authController,
                   onMealAdded: _loadUserMeals,
                 ),
                 const SizedBox(height: 14),
-              _RecentMealsSection(
-                authController: widget.authController,
-                onSeeAll: () {
-                  setState(() {
-                    _selectedTabIndex = 1;
-                  });
-                },
-              ),
+                _RecentMealsSection(
+                  authController: widget.authController,
+                  onSeeAll: () {
+                    setState(() {
+                      _selectedTabIndex = 1;
+                    });
+                  },
+                ),
               ] else ...[
                 _MealLogSection(
                   authController: widget.authController,
@@ -188,7 +207,7 @@ class _TabSection extends StatelessWidget {
 }
 
 class _AnalyticsCard extends StatefulWidget {
-  const _AnalyticsCard();
+  const _AnalyticsCard({super.key});
 
   @override
   State<_AnalyticsCard> createState() => _AnalyticsCardState();
@@ -198,17 +217,29 @@ class _AnalyticsCardState extends State<_AnalyticsCard> {
   late DailyGoalsRepository _dailyGoalsRepository;
   DailyGoals? _dailyGoals;
   bool _isLoading = false;
+  int? _lastLoadedUserId;
 
   @override
   void initState() {
     super.initState();
+    final client = Supabase.instance.client;
+    if (client == null) {
+      print('❌ Supabase client is null in _AnalyticsCardState.initState');
+      return;
+    }
     _dailyGoalsRepository = DailyGoalsRepository(
-      supabase: Supabase.instance.client,
+      supabase: client,
     );
-    _loadDailyGoals();
+    // Defer loading to next frame when context is fully ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadDailyGoals();
+      }
+    });
   }
 
   Future<void> _loadDailyGoals() async {
+    if (!mounted) return;
     final authController = context.read<AuthController>();
     final userId = authController.currentUser?.id;
 
@@ -217,12 +248,7 @@ class _AnalyticsCardState extends State<_AnalyticsCard> {
       return;
     }
 
-    setState(() => _isLoading = true);
-
     try {
-      print('🔍 Loading daily goals for calories - user: $userId');
-      print('🔍 User ID type: ${userId.runtimeType}');
-
       int userIdInt;
       if (userId is int) {
         userIdInt = userId;
@@ -230,24 +256,26 @@ class _AnalyticsCardState extends State<_AnalyticsCard> {
         userIdInt = int.parse(userId.toString());
       }
 
-      print('🔍 Parsed user ID: $userIdInt (type: ${userIdInt.runtimeType})');
+      // Skip loading if we already loaded for this user
+      if (_lastLoadedUserId == userIdInt && _dailyGoals != null) {
+        return;
+      }
+
+      print('🔍 Loading daily goals for calories - user: $userIdInt');
 
       final goals = await _dailyGoalsRepository.getDailyGoalsByUserId(userIdInt);
 
       print('📦 Analytics - Fetched goals: $goals');
       print('📦 Analytics - Target calories: ${goals?.targetCalories}');
 
-      if (mounted) {
-        setState(() {
-          _dailyGoals = goals;
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _dailyGoals = goals;
+        _lastLoadedUserId = userIdInt;
+      });
     } catch (e) {
       print('❌ Error loading daily goals in Analytics: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
     }
   }
 
@@ -433,8 +461,63 @@ class _AnalyticsCardState extends State<_AnalyticsCard> {
   }
 }
 
-class _MacrosSection extends StatelessWidget {
-  const _MacrosSection();
+class _MacrosSection extends StatefulWidget {
+  const _MacrosSection({super.key});
+
+  @override
+  State<_MacrosSection> createState() => _MacrosSectionState();
+}
+
+class _MacrosSectionState extends State<_MacrosSection> {
+  late final DailyGoalsRepository _dailyGoalsRepository;
+  DailyGoals? _dailyGoals;
+  int? _lastLoadedUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    final client = Supabase.instance.client;
+    if (client == null) {
+      print('❌ Supabase client is null in _MacrosSectionState.initState');
+      return;
+    }
+    _dailyGoalsRepository = DailyGoalsRepository(
+      supabase: client,
+    );
+    // Defer loading to next frame when context is fully ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadDailyGoals();
+      }
+    });
+  }
+
+  Future<void> _loadDailyGoals() async {
+    if (!mounted) return;
+    final authController = context.read<AuthController>();
+    final userId = authController.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      final userIdInt = userId is int ? userId : int.parse(userId.toString());
+
+      // Skip loading if we already loaded for this user
+      if (_lastLoadedUserId == userIdInt && _dailyGoals != null) {
+        return;
+      }
+
+      final goals = await _dailyGoalsRepository.getDailyGoalsByUserId(userIdInt);
+      if (!mounted) return;
+
+      setState(() {
+        _dailyGoals = goals;
+        _lastLoadedUserId = userIdInt;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      debugPrint('❌ Error loading daily goals in MacrosSection: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -449,7 +532,7 @@ class _MacrosSection extends StatelessWidget {
         final todaysMeals = mealController.userMeals.where((meal) {
           final mealDate = meal.mealDate;
           return mealDate.isAfter(startOfToday.subtract(const Duration(seconds: 1))) &&
-                 mealDate.isBefore(endOfToday.add(const Duration(seconds: 1)));
+              mealDate.isBefore(endOfToday.add(const Duration(seconds: 1)));
         }).toList();
 
         // Calculate total macros from today's meals
@@ -463,10 +546,10 @@ class _MacrosSection extends StatelessWidget {
           totalFats += meal.totalFats ?? 0.0;
         }
 
-        // Get daily goals (you can customize these)
-        final proteinGoal = 120.0; // Default goal
-        final carbsGoal = 250.0;
-        final fatsGoal = 65.0;
+        // Use database goals, with sensible defaults until the fetch completes
+        final proteinGoal = _dailyGoals?.targetProtein ?? 120.0;
+        final carbsGoal = _dailyGoals?.targetCarbs ?? 250.0;
+        final fatsGoal = _dailyGoals?.targetFat ?? 65.0;
 
         // Calculate progress as percentage
         final proteinProgress = (totalProteins / proteinGoal).clamp(0.0, 1.0);
@@ -1497,3 +1580,5 @@ class _MealLogTile extends StatelessWidget {
     );
   }
 }
+
+

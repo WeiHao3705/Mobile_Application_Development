@@ -4,20 +4,41 @@ import 'package:mobile_application_development/models/food.dart';
 import 'package:mobile_application_development/repository/meal_repository.dart';
 import 'package:mobile_application_development/repository/meal_food_repository.dart';
 import 'package:mobile_application_development/repository/food_repository.dart';
+import 'package:mobile_application_development/repository/daily_goals_repository.dart';
 import 'dart:developer' as developer;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MealService {
   final MealLogRepository _repository;
   final MealFoodRepository _mealFoodRepository;
   final FoodRepository _foodRepository;
+  final DailyGoalsRepository _dailyGoalsRepository;
 
   MealService({
     required MealLogRepository repository,
     required MealFoodRepository mealFoodRepository,
     required FoodRepository foodRepository,
+    DailyGoalsRepository? dailyGoalsRepository,
   })  : _repository = repository,
         _mealFoodRepository = mealFoodRepository,
-        _foodRepository = foodRepository;
+        _foodRepository = foodRepository,
+        _dailyGoalsRepository = _initializeDailyGoalsRepository(dailyGoalsRepository);
+
+  static DailyGoalsRepository _initializeDailyGoalsRepository(DailyGoalsRepository? provided) {
+    if (provided != null) {
+      return provided;
+    }
+    try {
+      final client = Supabase.instance.client;
+      if (client == null) {
+        throw Exception('Supabase client is not initialized');
+      }
+      return DailyGoalsRepository(supabase: client);
+    } catch (e) {
+      developer.log('⚠️ Error initializing DailyGoalsRepository: $e');
+      rethrow;
+    }
+  }
 
   /// Log a meal with multiple foods for a user
   /// Returns the created meal ID or null if failed
@@ -178,10 +199,36 @@ class MealService {
     try {
       final meals = await _repository.getMealsByUser(userId);
       developer.log('Retrieved ${meals.length} meals for user $userId');
+
+      // Also fetch and log daily nutrition goals
+      await _logDailyNutritionGoals(userId);
+
       return meals;
     } catch (e) {
       developer.log('Error in MealService.getUserMeals: $e');
       rethrow;
+    }
+  }
+
+  /// Fetch and log user's daily nutrition goals
+  Future<void> _logDailyNutritionGoals(int userId) async {
+    try {
+      developer.log('📋 Fetching daily nutrition goals for user $userId');
+
+      final goals = await _dailyGoalsRepository.getDailyGoalsByUserId(userId);
+
+      if (goals == null) {
+        developer.log('⚠️ No daily nutrition goals found for user $userId');
+        return;
+      }
+
+      developer.log('✅ Daily Nutrition Goals for user $userId:');
+      developer.log('   ├─ Target Calories: ${goals.targetCalories} kcal');
+      developer.log('   ├─ Target Protein: ${goals.targetProtein} g');
+      developer.log('   ├─ Target Carbs: ${goals.targetCarbs} g');
+      developer.log('   └─ Target Fat: ${goals.targetFat} g');
+    } catch (e) {
+      developer.log('⚠️ Error fetching daily nutrition goals: $e');
     }
   }
 
@@ -303,6 +350,5 @@ class MealService {
     }
   }
 }
-
 
 
