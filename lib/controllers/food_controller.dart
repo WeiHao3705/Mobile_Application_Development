@@ -9,8 +9,15 @@ class FoodController extends ChangeNotifier {
   late final FoodService _service;
 
   FoodController({FoodRepository? repository, FoodService? service}) {
-    final repo = repository ?? FoodRepository(supabase: Supabase.instance.client);
-    _service = service ?? FoodService(repository: repo);
+    try {
+      final repo = repository ?? FoodRepository(supabase: Supabase.instance.client);
+      _service = service ?? FoodService(repository: repo);
+      developer.log('✅ FoodController initialized successfully');
+    } catch (e) {
+      developer.log('❌ FoodController initialization error: $e');
+      // Initialize with a default service that can be used later
+      _service = FoodService(repository: repository ?? FoodRepository(supabase: Supabase.instance.client));
+    }
   }
 
   bool _isLoading = false;
