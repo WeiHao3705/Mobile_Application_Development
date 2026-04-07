@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/meal_log.dart';
-import '../models/meal_with_calories.dart';
 import '../repository/meal_repository.dart';
 import '../repository/meal_food_repository.dart';
 import '../repository/food_repository.dart';
 import '../services/meal_service.dart';
+import '../repository/daily_goals_repository.dart';
 import 'dart:developer' as developer;
 
 class MealController extends ChangeNotifier {
@@ -16,13 +16,19 @@ class MealController extends ChangeNotifier {
       _service = service;
     } else {
       final supabaseClient = Supabase.instance.client;
+      if (supabaseClient == null) {
+        throw Exception('Supabase is not initialized. Ensure Supabase.initialize() is called before creating MealController.');
+      }
       final mealRepo = MealLogRepository(supabase: supabaseClient);
       final mealFoodRepo = MealFoodRepository(supabase: supabaseClient);
       final foodRepo = FoodRepository(supabase: supabaseClient);
+      final dailyGoalsRepo = DailyGoalsRepository(supabase: supabaseClient);
+
       _service = MealService(
         repository: mealRepo,
         mealFoodRepository: mealFoodRepo,
         foodRepository: foodRepo,
+        dailyGoalsRepository: dailyGoalsRepo,
       );
     }
   }
