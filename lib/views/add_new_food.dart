@@ -6,6 +6,7 @@ import '../controllers/auth_controller.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 import 'package:provider/provider.dart';
+import 'widgets/custom_bottom_nav_bar.dart';
 
 class AddNewFoodView extends StatefulWidget {
   final AuthController authController;
@@ -22,6 +23,8 @@ class AddNewFoodView extends StatefulWidget {
 class _AddNewFoodViewState extends State<AddNewFoodView> {
   final _formKey = GlobalKey<FormState>();
   String? _selectedCategory;
+  String? _selectedMealType;
+  int _selectedNavIndex = 2; // Diet tab (3rd item, 0-indexed)
 
   final TextEditingController _foodNameController = TextEditingController();
   final TextEditingController _servingSizeController = TextEditingController();
@@ -30,6 +33,13 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
   final TextEditingController _carbsController = TextEditingController();
   final TextEditingController _fatController = TextEditingController();
   final TextEditingController _customCategoryController = TextEditingController();
+
+  final List<String> _mealTypes = [
+    '🌅 Breakfast',
+    '☀️ Lunch',
+    '🌙 Dinner',
+    '🍪 Snack',
+  ];
 
   final List<String> _categories = [
     '🌾 Grains',
@@ -167,6 +177,67 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
               ),
               const SizedBox(height: 32),
 
+              // Meal Type
+              const Text(
+                'Meal Type',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Meal Type Buttons
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _mealTypes.map((mealType) {
+                  final isSelected = _selectedMealType == mealType;
+                  final emoji = mealType.split(' ')[0];
+                  final label = mealType.split(' ').skip(1).join(' ');
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedMealType = mealType;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: isSelected ? AppColors.yellow : Colors.grey.shade700,
+                          width: isSelected ? 2 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        color: isSelected
+                            ? AppColors.yellow.withOpacity(0.1)
+                            : Colors.transparent,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            emoji,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            label,
+                            style: TextStyle(
+                              color: isSelected ? AppColors.yellow : Colors.white,
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 32),
+
               // Category
               const Text(
                 'Category',
@@ -269,7 +340,22 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
           ),
         ),
       ),
+      bottomNavigationBar: CustomBottomNavBar(
+        selectedIndex: _selectedNavIndex,
+        onTap: _onNavItemTapped,
+      ),
     );
+  }
+
+  void _onNavItemTapped(int index) {
+    if (index == 2) {
+      // Already on Diet tab, no need to navigate
+      return;
+    }
+
+    // Navigate to the selected tab
+    Navigator.of(context).pop();
+    Navigator.of(context).pushReplacementNamed('/main');
   }
 
   Widget _buildLabel(String label) {
@@ -424,6 +510,10 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
       _showErrorSnackBar('Please enter a food name');
       return;
     }
+    if (_selectedMealType == null) {
+      _showErrorSnackBar('Please select a meal type');
+      return;
+    }
     if (_selectedCategory == null) {
       _showErrorSnackBar('Please select a category');
       return;
@@ -461,6 +551,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
       final categoryName = _selectedCategory == '➕ Other'
           ? _customCategoryController.text.trim()
           : _selectedCategory!.split(' ').skip(1).join(' ');
+
       final foodController = context.read<FoodController>();
       final int userId = currentUser.id!;
 
@@ -498,6 +589,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
         _carbsController.clear();
         _fatController.clear();
         _selectedCategory = null;
+        _selectedMealType = null;
 
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_application_development/views/widgets/custom_bottom_nav_bar.dart';
 
 import '../controllers/auth_controller.dart';
 import 'home_page.dart';
@@ -39,55 +40,9 @@ class _MainNavigationState extends State<MainNavigation> {
 
     return Scaffold(
       body: _pages[_selectedIndex],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: theme.brightness == Brightness.light
-              ? Colors.white
-              : theme.scaffoldBackgroundColor,
-          selectedItemColor: theme.colorScheme.secondary,
-          unselectedItemColor: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          elevation: 0,
-          items: [
-            BottomNavigationBarItem(
-              icon: Icon(_selectedIndex == 0 ? Icons.home : Icons.home_outlined),
-              label: 'Home',
-              backgroundColor: theme.colorScheme.primary,
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(_selectedIndex == 1
-                  ? Icons.fitness_center
-                  : Icons.fitness_center_outlined),
-              label: 'Exercise',
-              backgroundColor: theme.colorScheme.primary,
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(_selectedIndex == 2
-                  ? Icons.restaurant
-                  : Icons.restaurant_outlined),
-              label: 'Diet',
-              backgroundColor: theme.colorScheme.primary,
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(_selectedIndex == 3 ? Icons.person : Icons.person_outlined),
-              label: 'Profile',
-              backgroundColor: theme.colorScheme.primary,
-            ),
-          ],
-        ),
+      bottomNavigationBar: CustomBottomNavBar(
+        selectedIndex: _selectedIndex,
+        onTap: _onItemTapped,
       ),
     );
   }

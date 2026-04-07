@@ -50,6 +50,26 @@ class MealController extends ChangeNotifier {
     return _mealCalories[mealId] ?? 0.0;
   }
 
+  /// Get macro summary for a meal based on its MealLog entry
+  Map<String, double> getMealMacros(int mealId) {
+    final meal = _userMeals.firstWhere(
+      (m) => m.mealId == mealId,
+      orElse: () => MealLog(
+        mealId: mealId,
+        mealType: 'Unknown',
+        mealDate: DateTime.now(),
+        userId: 0,
+      ),
+    );
+
+    return {
+      'calories': meal.totalCalories ?? 0.0,
+      'proteins': meal.totalProteins ?? 0.0,
+      'carbs': meal.totalCarbs ?? 0.0,
+      'fats': meal.totalFats ?? 0.0,
+    };
+  }
+
   /// Log a new meal with selected foods
   Future<bool> logMeal({
     required int userId,
@@ -260,5 +280,4 @@ class MealController extends ChangeNotifier {
     notifyListeners();
   }
 }
-
 

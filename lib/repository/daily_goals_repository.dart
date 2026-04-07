@@ -30,6 +30,7 @@ class DailyGoalsRepository {
   Future<DailyGoals?> getDailyGoalsByUserId(int userId) async {
     try {
       log('📖 Fetching daily goals for user $userId');
+      log('📖 User ID type: ${userId.runtimeType}');
 
       final response = await supabase
           .from('DailyGoals')
@@ -39,10 +40,22 @@ class DailyGoalsRepository {
 
       if (response == null) {
         log('⚠️ No daily goals found for user $userId');
+
+        // Log all daily goals to debug
+        try {
+          final allGoals = await supabase
+              .from('DailyGoals')
+              .select('user_id, daily_goals_id, target_calories, target_protein, target_carbs, target_fat');
+          log('📋 All daily goals in DB: $allGoals');
+        } catch (e) {
+          log('❌ Could not fetch all goals for debugging: $e');
+        }
+
         return null;
       }
 
       log('✅ Daily goals fetched successfully');
+      log('📦 Response: $response');
       return DailyGoals.fromJson(response);
     } catch (e) {
       log('❌ Error fetching daily goals: $e');
@@ -78,6 +91,26 @@ class DailyGoalsRepository {
     }
   }
 
+  /// Diagnostic method: Get all daily goals
+  Future<List<Map<String, dynamic>>> getAllDailyGoals() async {
+    try {
+      log('🔍 Fetching ALL daily goals for diagnostics');
+      final response = await supabase
+          .from('DailyGoals')
+          .select('user_id, daily_goals_id, target_calories, target_protein, target_carbs, target_fat, created_at');
+
+      log('📋 All daily goals count: ${(response as List).length}');
+      for (var goal in response as List) {
+        log('   - User ID: ${goal['user_id']}, Daily Goals ID: ${goal['daily_goals_id']}, Calories: ${goal['target_calories']}');
+      }
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      log('❌ Error fetching all daily goals: $e');
+      return [];
+    }
+  }
+
   /// Delete daily goals
   Future<void> deleteDailyGoals(int dailyGoalsId) async {
     try {
@@ -95,4 +128,3 @@ class DailyGoalsRepository {
     }
   }
 }
-

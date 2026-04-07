@@ -130,6 +130,9 @@ class MealFoodRepository {
       rethrow;
     }
   }
+
+  // Alias for consistency
+  Future<void> deleteMealFoods(int mealId) async {
+    return deleteMealFoodsByMealId(mealId);
+  }
 }
-
-
