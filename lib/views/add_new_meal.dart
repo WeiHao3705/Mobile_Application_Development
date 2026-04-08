@@ -34,7 +34,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   String _searchQuery   = '';
   final Map<int, _SelectedItem> _selected = {};
   final TextEditingController _searchCtrl = TextEditingController();
-  final TextEditingController _noteCtrl   = TextEditingController();
   bool _showToast = false;
   int _selectedNavIndex = 2; // Diet tab (3rd item, 0-indexed)
 
@@ -220,7 +219,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   @override
   void dispose() {
     _searchCtrl.dispose();
-    _noteCtrl.dispose();
     super.dispose();
   }
 
@@ -310,7 +308,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
         // Show success toast and reset form
         setState(() => _showToast = true);
         _searchCtrl.clear();
-        _noteCtrl.clear();
         _selected.clear();
 
         Future.delayed(const Duration(milliseconds: 2200), () {
@@ -434,8 +431,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
                           const SizedBox(height: 4),
                           _buildSelectedSummary(),
                         ],
-                        const SizedBox(height: 14),
-                        _buildNoteField(),
                         const SizedBox(height: 16),
                         _buildLogButton(),
                         const SizedBox(height: 80),
@@ -786,29 +781,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     );
   }
 
-  // ── Note Field ─────────────────────────────────────────────────────────────
-
-  Widget _buildNoteField() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.inputBg,
-        border: Border.all(color: AppColors.lavender.withOpacity(0.3)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TextField(
-        controller: _noteCtrl,
-        maxLines: 3,
-        minLines: 2,
-        style: const TextStyle(color: AppColors.white, fontSize: 13),
-        decoration: const InputDecoration(
-          hintText: 'Add a note (e.g. homemade, restaurant name)...',
-          hintStyle: TextStyle(color: Color(0xFF5A5A7A), fontSize: 13),
-          contentPadding: EdgeInsets.all(14),
-          border: InputBorder.none,
-        ),
-      ),
-    );
-  }
 
   // ── Log Button ─────────────────────────────────────────────────────────────
 

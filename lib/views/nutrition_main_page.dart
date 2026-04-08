@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_application_development/views/add_new_meal.dart';
 import 'package:mobile_application_development/views/edit_meal.dart';
+import 'package:mobile_application_development/views/nutrition_analysis.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -312,15 +313,23 @@ class _AnalyticsCardState extends State<_AnalyticsCard> {
         final progressPercentage = (totalCaloriesConsumed / targetCalories).clamp(0.0, 1.0);
         final progressPercent = (progressPercentage * 100).toInt();
 
-        return Container(
-          width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 150),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.lavender,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Stack(
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const NutritionScreen(),
+              ),
+            );
+          },
+          child: Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 150),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.lavender,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Stack(
             children: [
               // ...existing code...
           // ANALYTICS label with bar chart icon
@@ -455,7 +464,8 @@ class _AnalyticsCardState extends State<_AnalyticsCard> {
             ),
           ),
         ],
-      ));
+      )),
+      );
       },
     );
   }

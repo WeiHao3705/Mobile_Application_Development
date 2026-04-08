@@ -12,11 +12,11 @@ class FoodRepository{
     try{
       log("🟦 FoodRepository.createFood START");
       log("📝 Inserting food: ${food.foodName}");
-      log("📊 Food data: ${food.toJson()}");
+      log("📊 Food data: ${food.toJson(includeId: false)}");
 
       final response = await supabase
           .from('Food')
-          .insert(food.toJson())
+          .insert(food.toJson(includeId: false))
           .select()
           .single();
 
@@ -62,7 +62,7 @@ class FoodRepository{
     try{
       final response = await supabase
           .from('Food')
-          .update(food.toJson())
+          .update(food.toJson(includeId: true))
           .eq('food_id', food.foodId)
           .select()
           .single();
