@@ -5,6 +5,7 @@ import '../controllers/auth_controller.dart';
 import '../models/auth_user.dart';
 import '../models/daily_goals.dart';
 import '../repository/daily_goals_repository.dart';
+import '../services/user_session_service.dart';
 import '../views/dialogs/edit_daily_goals_dialog.dart';
 import 'login_page.dart';
 
@@ -19,6 +20,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   late DailyGoalsRepository _dailyGoalsRepository;
+  final SimpleSessionService _sessionService = SimpleSessionService();
   DailyGoals? _dailyGoals;
   bool _isLoadingGoals = false;
 
@@ -396,8 +398,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   _OptionItem(
                     title: 'Logout',
                     icon: Icons.logout,
-                    onTap: () {
+                    onTap: () async {
+                      await _sessionService.clearSession();
                       widget.authController.logout();
+                      if (!context.mounted) {
+                        return;
+                      }
                       Navigator.pushNamedAndRemoveUntil(
                         context,
                         LoginPage.routeName,
