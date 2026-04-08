@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/auth_controller.dart';
+import '../services/user_session_service.dart';
 import '../theme/app_colors.dart';
 import 'aerobic_page.dart';
 import 'exercise_page.dart';
@@ -46,8 +47,12 @@ class AdminDashboardPage extends StatelessWidget {
     );
   }
 
-  void _logout(BuildContext context) {
+  Future<void> _logout(BuildContext context) async {
+    await SimpleSessionService().clearSession();
     authController.logout();
+    if (!context.mounted) {
+      return;
+    }
     Navigator.pushNamedAndRemoveUntil(
       context,
       LoginPage.routeName,

@@ -5,6 +5,7 @@ import '../models/app_user.dart';
 import '../models/auth_user.dart';
 import '../repository/auth_repository.dart';
 import '../repository/user_repository.dart';
+import '../services/user_session_service.dart';
 
 class AuthController extends ChangeNotifier {
   AuthController({AuthRepository? repository, UserRepository? userRepository})
@@ -13,6 +14,7 @@ class AuthController extends ChangeNotifier {
 
   final AuthRepository _repository;
   final UserRepository _userRepository;
+  final SimpleSessionService _sessionService = SimpleSessionService();
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -24,6 +26,34 @@ class AuthController extends ChangeNotifier {
   LoginUser? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
+
+  Future<void> restoreSession() async {
+    final hasSession = await _sessionService.checkLoginStatus();
+    if (!hasSession) {
+      _currentUser = null;
+      notifyListeners();
+      return;
+    }
+
+    final savedUsername = await _sessionService.getSavedUsername();
+    if (savedUsername == null || savedUsername.trim().isEmpty) {
+      _currentUser = null;
+      await _sessionService.clearSession();
+      notifyListeners();
+      return;
+    }
+
+    final user = await _repository.getUserByUsername(savedUsername.trim());
+    if (user == null) {
+      _currentUser = null;
+      await _sessionService.clearSession();
+      notifyListeners();
+      return;
+    }
+
+    _currentUser = user;
+    notifyListeners();
+  }
 
   Future<bool> login({
     required String username,

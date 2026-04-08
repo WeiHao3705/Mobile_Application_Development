@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-
 import '../controllers/auth_controller.dart';
+import '../services/user_session_service.dart';
 import 'admin_dashboard_page.dart';
 import 'main_navigation.dart';
 
@@ -19,6 +19,7 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final SimpleSessionService _sessionService = SimpleSessionService();
 
   AuthController get _authController => widget.authController;
 
@@ -51,6 +52,11 @@ class _LoginPageState extends State<LoginPage> {
       );
       return;
     }
+
+    await _sessionService.setLoggedIn(
+      true,
+      _usernameController.text.trim(),
+    );
 
     final targetRoute = _authController.isAdmin
         ? AdminDashboardPage.routeName

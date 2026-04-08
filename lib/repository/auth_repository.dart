@@ -28,4 +28,20 @@ class AuthRepository {
 
     return LoginUser.fromMap(Map<String, dynamic>.from(response));
   }
+
+  Future<LoginUser?> getUserByUsername(String username) async {
+    final response = await client
+        .from('User')
+        .select(
+      'user_id, username, full_name, email, height, current_weight, target_weight, is_admin',
+    )
+        .eq('username', username)
+        .maybeSingle();
+
+    if (response == null) {
+      return null;
+    }
+
+    return LoginUser.fromMap(Map<String, dynamic>.from(response));
+  }
 }

@@ -33,6 +33,13 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final AuthController _authController = AuthController();
+  late final Future<void> _restoreSessionFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreSessionFuture = _authController.restoreSession();
+  }
 
   @override
   void dispose() {
@@ -60,7 +67,24 @@ class _MyAppState extends State<MyApp> {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
-        initialRoute: LandingPage.routeName,
+        home: FutureBuilder<void>(
+          future: _restoreSessionFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            if (_authController.isLoggedIn) {
+              return _authController.isAdmin
+                  ? AdminDashboardPage(authController: _authController)
+                  : MainNavigation(authController: _authController);
+            }
+
+            return const LandingPage();
+          },
+        ),
         onGenerateRoute: (settings) {
           switch (settings.name) {
             case LandingPage.routeName:
