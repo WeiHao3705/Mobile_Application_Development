@@ -81,7 +81,8 @@ class Exercise {
       equipment: readString(['equipment', 'equipment_name', 'tool'], fallback: 'Bodyweight'),
       imageUrl: readString(['image_url', 'image', 'thumbnail_url']),
       secondaryMuscle: readSecondaryMuscle(
-        ['secondary_muscle', 'secondaryMuscle', 'secondary_muscles'],
+        // Include common spellings plus the DB column `secondary_mescle` (varchar[])
+        ['secondary_muscle', 'secondaryMescle', 'secondary_mescle', 'secondaryMuscle', 'secondary_muscles'],
         fallback: 'Not provided',
       ),
       howTo: readString(

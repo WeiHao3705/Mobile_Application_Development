@@ -270,12 +270,23 @@ class _ExercisePageState extends State<ExercisePage> {
                       leading: CircleAvatar(
                         radius: 24,
                         backgroundColor: AppColors.white,
-                        backgroundImage: exercise.imageUrl.isNotEmpty
-                            ? NetworkImage(exercise.imageUrl)
-                            : null,
-                        child: exercise.imageUrl.isEmpty
-                            ? const Icon(Icons.fitness_center, color: AppColors.black)
-                            : null,
+                        child: ClipOval(
+                          child: exercise.imageUrl.isNotEmpty
+                              ? Image.network(
+                                  exercise.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(
+                                      Icons.fitness_center,
+                                      color: AppColors.black,
+                                    );
+                                  },
+                                )
+                              : const Icon(
+                                  Icons.fitness_center,
+                                  color: AppColors.black,
+                                ),
+                        ),
                       ),
                       title: Text(
                         exercise.name,

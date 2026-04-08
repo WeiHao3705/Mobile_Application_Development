@@ -4,7 +4,7 @@ import '../controllers/auth_controller.dart';
 import 'home_page.dart';
 import 'profile_page.dart';
 import 'nutrition_main_page.dart';
-import 'exercise_page.dart';
+import 'exercise_hub_page.dart';
 
 class MainNavigation extends StatefulWidget {
   static const routeName = '/main';
@@ -22,7 +22,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   late final List<Widget> _pages = [
     HomePage(authController: widget.authController),
-    ExercisePage(authController: widget.authController),
+    ExerciseHubPage(authController: widget.authController),
     NutritionMainPage(authController: widget.authController),
     ProfilePage(authController: widget.authController),
   ];

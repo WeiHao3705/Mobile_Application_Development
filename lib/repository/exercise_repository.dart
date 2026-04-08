@@ -18,29 +18,36 @@ class ExerciseRepository {
   Future<Exercise> createExercise({
     required String name,
     required String primaryMuscle,
-    required String muscleGroup,
+    required List<String> secondaryMuscles,
     required String equipment,
-    required String howTo,
+    String? instruction,
     String? imageUrl,
-    String? secondaryMuscle,
     String? videoUrl,
   }) async {
+    // Generate a simple unique ID for the required `exercise_id` column
+    final exerciseId = 'EX${DateTime.now().millisecondsSinceEpoch}';
+
     final payload = <String, dynamic>{
-      'name': name,
+      // DB column: exercise_id (text, NOT NULL)
+      'exercise_id': exerciseId,
+      // DB column: exercise_name (varchar)
+      'exercise_name': name,
+      // DB column: primary_muscle (varchar)
       'primary_muscle': primaryMuscle,
-      'muscle_group': muscleGroup,
+      // DB column: secondary_muscle (varchar[])
+      'secondary_muscle': secondaryMuscles.isNotEmpty ? secondaryMuscles : null,
+      // DB column: equipment (varchar)
       'equipment': equipment,
-      'instruction': howTo,
     };
 
-    if ((imageUrl ?? '').trim().isNotEmpty) {
-      payload['image_url'] = imageUrl!.trim();
+    if ((instruction ?? '').trim().isNotEmpty) {
+      payload['instruction'] = instruction!.trim();
     }
-    if ((secondaryMuscle ?? '').trim().isNotEmpty) {
-      payload['secondary_muscle'] = secondaryMuscle!.trim();
+    if ((imageUrl ?? '').trim().isNotEmpty) {
+      payload['image'] = imageUrl!.trim();
     }
     if ((videoUrl ?? '').trim().isNotEmpty) {
-      payload['video_url'] = videoUrl!.trim();
+      payload['video'] = videoUrl!.trim();
     }
 
     final response = await supabase.from('Exercise').insert(payload).select().single();
