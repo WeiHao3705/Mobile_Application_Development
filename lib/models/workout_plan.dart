@@ -1,6 +1,7 @@
 class WorkoutPlan {
   const WorkoutPlan({
     required this.planId,
+    required this.userId,
     required this.planName,
     required this.exercises,
     this.description,
@@ -8,6 +9,7 @@ class WorkoutPlan {
   });
 
   final String planId;
+  final int userId;
   final String planName;
   final String? description;
   final DateTime? createdAt;

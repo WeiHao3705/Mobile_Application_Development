@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_application_development/views/widgets/custom_bottom_nav_bar.dart';
 
 import '../controllers/auth_controller.dart';
 import 'home_page.dart';
@@ -22,7 +21,7 @@ class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
 
   late final List<Widget> _pages = [
-    const HomePage(),
+    HomePage(authController: widget.authController),
     ExercisePage(authController: widget.authController),
     NutritionMainPage(authController: widget.authController),
     ProfilePage(authController: widget.authController),
@@ -40,9 +39,55 @@ class _MainNavigationState extends State<MainNavigation> {
 
     return Scaffold(
       body: _pages[_selectedIndex],
-      bottomNavigationBar: CustomBottomNavBar(
-        selectedIndex: _selectedIndex,
-        onTap: _onItemTapped,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: theme.brightness == Brightness.light
+              ? Colors.white
+              : theme.scaffoldBackgroundColor,
+          selectedItemColor: theme.colorScheme.secondary,
+          unselectedItemColor: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          elevation: 0,
+          items: [
+            BottomNavigationBarItem(
+              icon: Icon(_selectedIndex == 0 ? Icons.home : Icons.home_outlined),
+              label: 'Home',
+              backgroundColor: theme.colorScheme.primary,
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(_selectedIndex == 1
+                  ? Icons.fitness_center
+                  : Icons.fitness_center_outlined),
+              label: 'Exercise',
+              backgroundColor: theme.colorScheme.primary,
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(_selectedIndex == 2
+                  ? Icons.restaurant
+                  : Icons.restaurant_outlined),
+              label: 'Diet',
+              backgroundColor: theme.colorScheme.primary,
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(_selectedIndex == 3 ? Icons.person : Icons.person_outlined),
+              label: 'Profile',
+              backgroundColor: theme.colorScheme.primary,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -73,7 +118,7 @@ class _PlaceholderPage extends StatelessWidget {
             Icon(
               title == 'Exercise' ? Icons.fitness_center : Icons.restaurant,
               size: 80,
-              color: theme.colorScheme.secondary.withOpacity(0.5),
+              color: theme.colorScheme.secondary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -86,7 +131,7 @@ class _PlaceholderPage extends StatelessWidget {
             Text(
               'Coming soon...',
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
               ),
             ),
           ],

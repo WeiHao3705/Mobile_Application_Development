@@ -7,6 +7,7 @@ import '../models/exercise.dart';
 import '../models/workout_plan.dart';
 import '../repository/exercise_repository.dart';
 import '../repository/workout_plan_repository.dart';
+import 'exercise_detail_page.dart';
 import 'exercise_explore_page.dart';
 import 'exercise_reorder_page.dart';
 
@@ -44,21 +45,25 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
   ];
 
   final TextEditingController _planNameController = TextEditingController();
-  final List<Exercise> _selectedExercises = <Exercise>[];
-  final Map<int, _ExerciseInputDraft> _exerciseDrafts =
-      <int, _ExerciseInputDraft>{};
-  final Map<String, Map<String, dynamic>> _existingDetailRowsByExerciseId =
-      <String, Map<String, dynamic>>{};
+  final List<_ExercisePlanEntry> _selectedExerciseEntries = <_ExercisePlanEntry>[];
+  final Map<String, _ExerciseInputDraft> _exerciseDrafts = <String, _ExerciseInputDraft>{};
   late final WorkoutPlanRepository _workoutPlanRepository;
   late final ExerciseRepository _exerciseRepository;
   bool _isSaving = false;
   bool _isInitializing = false;
   int _setRowCounter = 0;
+  int _exerciseRowCounter = 0;
 
   String _nextSetRowId() {
     final seconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     _setRowCounter += 1;
     return '${seconds}_$_setRowCounter';
+  }
+
+  String _nextExerciseRowId() {
+    final seconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    _exerciseRowCounter += 1;
+    return 'exercise_${seconds}_$_exerciseRowCounter';
   }
 
   @override
@@ -97,29 +102,32 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
         detailRows.addAll(List<Map<String, dynamic>>.from(detailsResponse as List));
       }
 
-      final selectedExerciseIds = <String>{...widget.initialExerciseIds};
-      if (detailRows.isNotEmpty) {
-        for (final row in detailRows) {
-          final exerciseId = _readTextByKeys(row, _detailExerciseIdColumnCandidates);
-          if (exerciseId.isNotEmpty) {
-            selectedExerciseIds.add(exerciseId);
-            _existingDetailRowsByExerciseId[exerciseId] = row;
-          }
-        }
-      }
-
-      final selectedExercises = <Exercise>[];
+      final selectedEntries = <_ExercisePlanEntry>[];
       if (detailRows.isNotEmpty) {
         for (final row in detailRows) {
           final exerciseId = _readTextByKeys(row, _detailExerciseIdColumnCandidates);
           final exercise = exerciseById[exerciseId];
-          if (exercise != null) {
-            selectedExercises.add(exercise);
+          if (exercise == null) {
+            continue;
           }
+          selectedEntries.add(
+            _ExercisePlanEntry(
+              rowId: _nextExerciseRowId(),
+              exercise: exercise,
+              detailRow: row,
+            ),
+          );
         }
       } else {
-        selectedExercises.addAll(
-          exercises.where((exercise) => selectedExerciseIds.contains(exercise.id)),
+        selectedEntries.addAll(
+          exercises
+              .where((exercise) => widget.initialExerciseIds.contains(exercise.id))
+              .map(
+                (exercise) => _ExercisePlanEntry(
+                  rowId: _nextExerciseRowId(),
+                  exercise: exercise,
+                ),
+              ),
         );
       }
 
@@ -128,11 +136,10 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
       }
 
       setState(() {
-        _selectedExercises
+        _selectedExerciseEntries
           ..clear()
-          ..addAll(selectedExercises);
-        _syncExerciseDrafts(_selectedExercises);
-        _hydrateDraftsFromDetails();
+          ..addAll(selectedEntries);
+        _syncExerciseDrafts(_selectedExerciseEntries);
       });
     } catch (_) {
       // Keep edit page usable even when initial hydrate fails.
@@ -140,24 +147,6 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
       if (mounted) {
         setState(() => _isInitializing = false);
       }
-    }
-  }
-
-  void _hydrateDraftsFromDetails() {
-    for (final entry in _existingDetailRowsByExerciseId.entries) {
-      final draft = _exerciseDrafts[entry.key];
-      if (draft == null) {
-        continue;
-      }
-
-      final row = entry.value;
-      draft.rebuildFromExisting(
-        setCount: _toInt(row['sets']),
-        repsText: _toInt(row['reps']).toString(),
-        weightText: _toNullableDouble(row['weight'])?.toString(),
-        restDuration: Duration(seconds: _toInt(row['rest_seconds'])),
-        notesText: _nullableText(row['notes']) ?? '',
-      );
     }
   }
 
@@ -210,8 +199,8 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
       MaterialPageRoute<List<Exercise>>(
         builder: (_) => ExerciseExplorePage(
           selectable: true,
-          initialSelectedExerciseIds: _selectedExercises
-              .map((exercise) => exercise.id)
+          initialSelectedExerciseIds: _selectedExerciseEntries
+              .map((entry) => entry.exercise.id)
               .toSet(),
         ),
       ),
@@ -219,10 +208,17 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
 
     if (selectedExercises != null) {
       setState(() {
-        _selectedExercises
+        _selectedExerciseEntries
           ..clear()
-          ..addAll(selectedExercises);
-        _syncExerciseDrafts(_selectedExercises);
+          ..addAll(
+            selectedExercises.map(
+              (exercise) => _ExercisePlanEntry(
+                rowId: _nextExerciseRowId(),
+                exercise: exercise,
+              ),
+            ),
+          );
+        _syncExerciseDrafts(_selectedExerciseEntries);
       });
     }
   }
@@ -232,8 +228,8 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
     return equipment.contains('bodyweight') || equipment.contains('body weight');
   }
 
-  void _addSetRow(String exerciseId) {
-    final draft = _exerciseDrafts[exerciseId];
+  void _addSetRow(String rowId) {
+    final draft = _exerciseDrafts[rowId];
     if (draft == null) {
       return;
     }
@@ -248,8 +244,8 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
     );
   }
 
-  void _removeSetRow(String exerciseId, String rowId) {
-    final draft = _exerciseDrafts[exerciseId];
+  void _removeSetRow(String rowId, String setRowId) {
+    final draft = _exerciseDrafts[rowId];
     if (draft == null) {
       return;
     }
@@ -261,31 +257,30 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
       return;
     }
 
-    setState(() => draft.removeSetRow(rowId));
+    setState(() => draft.removeSetRow(setRowId));
   }
 
   Future<void> _rearrangeExercises() async {
-    if (_selectedExercises.length < 2) {
+    if (_selectedExerciseEntries.length < 2) {
       return;
     }
 
     final rowIdsByIndex = List<String>.generate(
-      _selectedExercises.length,
-      (index) => 'row_$index',
+      _selectedExerciseEntries.length,
+      (index) => _selectedExerciseEntries[index].rowId,
     );
-    final draftByRowId = <String, _ExerciseInputDraft>{
-      for (var index = 0; index < _selectedExercises.length; index += 1)
-        rowIdsByIndex[index]: _exerciseDrafts[index]!,
+    final entryByRowId = <String, _ExercisePlanEntry>{
+      for (final entry in _selectedExerciseEntries) entry.rowId: entry,
     };
 
     final reorderedEntries = await Navigator.of(context).push<List<ExerciseReorderResult>>(
       MaterialPageRoute<List<ExerciseReorderResult>>(
         builder: (_) => ExerciseReorderPage(
           entries: List<ExerciseReorderResult>.generate(
-            _selectedExercises.length,
+            _selectedExerciseEntries.length,
             (index) => ExerciseReorderResult(
               rowId: rowIdsByIndex[index],
-              exercise: _selectedExercises[index],
+              exercise: _selectedExerciseEntries[index].exercise,
             ),
           ),
         ),
@@ -297,89 +292,41 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
     }
 
     setState(() {
-      _selectedExercises
+      _selectedExerciseEntries
         ..clear()
-        ..addAll(reorderedEntries.map((entry) => entry.exercise));
-
-      final updatedDrafts = <int, _ExerciseInputDraft>{};
-      final usedRowIds = <String>{};
-
-      for (var index = 0; index < reorderedEntries.length; index += 1) {
-        final rowId = reorderedEntries[index].rowId;
-        final draft = draftByRowId[rowId];
-        if (draft == null) {
-          continue;
-        }
-        usedRowIds.add(rowId);
-        updatedDrafts[index] = draft;
-      }
-
-      for (final entry in draftByRowId.entries) {
-        if (!usedRowIds.contains(entry.key)) {
-          entry.value.dispose();
-        }
-      }
-
-      _exerciseDrafts
-        ..clear()
-        ..addAll(updatedDrafts);
+        ..addAll(
+          reorderedEntries.map((entry) {
+            final original = entryByRowId[entry.rowId];
+            return original == null
+                ? _ExercisePlanEntry(rowId: entry.rowId, exercise: entry.exercise)
+                : original.copyWith(exercise: entry.exercise);
+          }),
+        );
     });
   }
 
-  int _findMatchingExerciseIndex(
-    List<Exercise> previousExercises,
-    Exercise exercise,
-    Set<int> usedIndices,
-  ) {
-    for (var index = 0; index < previousExercises.length; index += 1) {
-      if (usedIndices.contains(index)) {
-        continue;
-      }
-
-      final previousExercise = previousExercises[index];
-      if (identical(previousExercise, exercise) || previousExercise.id == exercise.id) {
-        return index;
-      }
-    }
-
-    return -1;
-  }
-
   void _deleteExerciseAt(int index) {
-    if (index < 0 || index >= _selectedExercises.length) {
+    if (index < 0 || index >= _selectedExerciseEntries.length) {
       return;
     }
 
-    _exerciseDrafts[index]?.dispose();
-    _exerciseDrafts.remove(index);
-    _selectedExercises.removeAt(index);
-
-    // Re-index the remaining drafts
-    final updatedDrafts = <int, _ExerciseInputDraft>{};
-    for (var i = 0; i < _selectedExercises.length; i++) {
-      if (_exerciseDrafts.containsKey(i + 1)) {
-        updatedDrafts[i] = _exerciseDrafts[i + 1]!;
-      }
-    }
-    _exerciseDrafts
-      ..clear()
-      ..addAll(updatedDrafts);
-
+    final entry = _selectedExerciseEntries.removeAt(index);
+    _exerciseDrafts.remove(entry.rowId)?.dispose();
     setState(() {});
   }
 
   Future<void> _changeExerciseAt(int index) async {
-    if (index < 0 || index >= _selectedExercises.length) {
+    if (index < 0 || index >= _selectedExerciseEntries.length) {
       return;
     }
 
-    final currentExercise = _selectedExercises[index];
+    final currentEntry = _selectedExerciseEntries[index];
     final selectedExercises = await Navigator.of(context).push<List<Exercise>>(
       MaterialPageRoute<List<Exercise>>(
         builder: (_) => ExerciseExplorePage(
           selectable: true,
           singleSelection: true,
-          initialSelectedExerciseIds: {currentExercise.id},
+          initialSelectedExerciseIds: {currentEntry.exercise.id},
         ),
       ),
     );
@@ -389,28 +336,37 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
     }
 
     final nextExercise = selectedExercises.first;
-    if (nextExercise.id == currentExercise.id) {
+    if (nextExercise.id == currentEntry.exercise.id) {
       return;
     }
 
     setState(() {
-      _selectedExercises[index] = nextExercise;
-      _syncExerciseDrafts(_selectedExercises);
+      _selectedExerciseEntries[index] = currentEntry.copyWith(exercise: nextExercise);
+      _exerciseDrafts[currentEntry.rowId]?.dispose();
+      _exerciseDrafts[currentEntry.rowId] = _ExerciseInputDraft(
+        firstRowId: _nextSetRowId(),
+        initialSetCount: 1,
+        initialReps: 12,
+        initialWeight: null,
+        initialRestDuration: const Duration(seconds: 60),
+        initialNotes: '',
+      );
     });
   }
 
-  void _syncExerciseDrafts(List<Exercise> selectedExercises) {
+  void _syncExerciseDrafts(List<_ExercisePlanEntry> selectedEntries) {
+    final previousDrafts = _exerciseDrafts.values.toList();
     _exerciseDrafts.clear();
-    for (final draft in _exerciseDrafts.values) {
+    for (final draft in previousDrafts) {
       draft.dispose();
     }
 
-    for (var index = 0; index < selectedExercises.length; index += 1) {
-      final exercise = selectedExercises[index];
-      final detailRow = _existingDetailRowsByExerciseId[exercise.id];
-      _exerciseDrafts[index] = _ExerciseInputDraft(
+    for (final entry in selectedEntries) {
+      final detailRow = entry.detailRow;
+      final initialSetCount = detailRow == null ? 1 : _toInt(detailRow['sets']);
+      _exerciseDrafts[entry.rowId] = _ExerciseInputDraft(
         firstRowId: _nextSetRowId(),
-        initialSetCount: detailRow == null ? 1 : _toInt(detailRow['sets']),
+        initialSetCount: initialSetCount,
         initialReps: detailRow == null ? 12 : _toInt(detailRow['reps']),
         initialWeight: detailRow == null ? null : _toNullableDouble(detailRow['weight']),
         initialRestDuration: detailRow == null
@@ -435,17 +391,17 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
       return;
     }
 
-    if (_selectedExercises.isEmpty) {
+    if (_selectedExerciseEntries.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please choose at least one exercise.')),
       );
       return;
     }
 
-    final payload = _selectedExercises.asMap().entries.map((entry) {
+    final payload = _selectedExerciseEntries.asMap().entries.map((entry) {
       final index = entry.key;
-      final exercise = entry.value;
-      final draft = _exerciseDrafts[index]!;
+      final exercise = entry.value.exercise;
+      final draft = _exerciseDrafts[entry.value.rowId]!;
       final isBodyweight = _isBodyweightExercise(exercise);
 
       final setRows = draft.setRows.asMap().entries.map((setEntry) {
@@ -504,8 +460,8 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
     }
   }
 
-  Future<void> _pickRestTime(String exerciseId) async {
-    final draft = _exerciseDrafts[exerciseId];
+  Future<void> _pickRestTime(String rowId) async {
+    final draft = _exerciseDrafts[rowId];
     if (draft == null) {
       return;
     }
@@ -650,7 +606,7 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
               ),
               const SizedBox(height: 18),
               Text(
-                'Selected Exercises (${_selectedExercises.length})',
+                'Selected Exercises (${_selectedExerciseEntries.length})',
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
@@ -664,7 +620,7 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
                           color: theme.colorScheme.primary,
                         ),
                       )
-                    : _selectedExercises.isEmpty
+                    : _selectedExerciseEntries.isEmpty
                     ? Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
@@ -680,37 +636,36 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
                     : ReorderableListView.builder(
                         buildDefaultDragHandles: false,
                         padding: EdgeInsets.zero,
-                        itemCount: _selectedExercises.length,
+                        itemCount: _selectedExerciseEntries.length,
                         onReorder: (oldIndex, newIndex) {
                           setState(() {
                             if (newIndex > oldIndex) {
                               newIndex -= 1;
                             }
-                            final item = _selectedExercises.removeAt(oldIndex);
-                            _selectedExercises.insert(newIndex, item);
+                            final item = _selectedExerciseEntries.removeAt(oldIndex);
+                            _selectedExerciseEntries.insert(newIndex, item);
                           });
                         },
                         itemBuilder: (context, index) {
-                          final exercise = _selectedExercises[index];
-                          final draft = _exerciseDrafts[index]!;
+                          final entry = _selectedExerciseEntries[index];
+                          final draft = _exerciseDrafts[entry.rowId]!;
 
                           return Padding(
-                            // Use per-entry identity so duplicate exercise IDs can coexist.
-                            key: ObjectKey(draft),
+                            key: ValueKey(entry.rowId),
                             padding: const EdgeInsets.only(bottom: 12),
                             child: _ExerciseEditorCard(
-                              exercise: exercise,
+                              exercise: entry.exercise,
                               draft: draft,
                               orderIndex: index + 1,
                               listIndex: index,
-                              totalExercises: _selectedExercises.length,
-                              isBodyweight: _isBodyweightExercise(exercise),
-                              onAddSet: () => _addSetRow(exercise.id),
+                              totalExercises: _selectedExerciseEntries.length,
+                              isBodyweight: _isBodyweightExercise(entry.exercise),
+                              onAddSet: () => _addSetRow(entry.rowId),
                               onRearrange: _rearrangeExercises,
                               onChangeExercise: () => _changeExerciseAt(index),
                               onDeleteExercise: () => _deleteExerciseAt(index),
-                              onPickRestTime: () => _pickRestTime(exercise.id),
-                              onRemoveSet: (rowId) => _removeSetRow(exercise.id, rowId),
+                              onPickRestTime: () => _pickRestTime(entry.rowId),
+                              onRemoveSet: (rowId) => _removeSetRow(entry.rowId, rowId),
                             ),
                           );
                         },
@@ -768,59 +723,68 @@ class _ExerciseEditorCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.white,
-                backgroundImage:
-                    exercise.imageUrl.isNotEmpty ? NetworkImage(exercise.imageUrl) : null,
-                child: exercise.imageUrl.isEmpty
-                    ? const Icon(Icons.fitness_center, color: Colors.black, size: 18)
-                    : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  '$orderIndex. ${exercise.name}',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ExerciseDetailPage(exercise: exercise),
+                ),
+              );
+            },
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.white,
+                  backgroundImage:
+                      exercise.imageUrl.isNotEmpty ? NetworkImage(exercise.imageUrl) : null,
+                  child: exercise.imageUrl.isEmpty
+                      ? const Icon(Icons.fitness_center, color: Colors.black, size: 18)
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '$orderIndex. ${exercise.name}',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-              PopupMenuButton<_ExerciseMenuAction>(
-                icon: const Icon(Icons.more_vert, color: Colors.white70),
-                color: const Color(0xFF1A1A1A),
-                onSelected: (action) {
-                  switch (action) {
-                    case _ExerciseMenuAction.rearrange:
-                      onRearrange();
-                      break;
-                    case _ExerciseMenuAction.change:
-                      onChangeExercise();
-                      break;
-                    case _ExerciseMenuAction.delete:
-                      onDeleteExercise();
-                      break;
-                  }
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem<_ExerciseMenuAction>(
-                    value: _ExerciseMenuAction.rearrange,
-                    child: Text('Rearrange exercises'),
-                  ),
-                  PopupMenuItem<_ExerciseMenuAction>(
-                    value: _ExerciseMenuAction.change,
-                    child: Text('Change exercise'),
-                  ),
-                  PopupMenuItem<_ExerciseMenuAction>(
-                    value: _ExerciseMenuAction.delete,
-                    child: Text('Delete exercise'),
-                  ),
-                ],
-              ),
-            ],
+                PopupMenuButton<_ExerciseMenuAction>(
+                  icon: const Icon(Icons.more_vert, color: Colors.white70),
+                  color: const Color(0xFF1A1A1A),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _ExerciseMenuAction.rearrange:
+                        onRearrange();
+                        break;
+                      case _ExerciseMenuAction.change:
+                        onChangeExercise();
+                        break;
+                      case _ExerciseMenuAction.delete:
+                        onDeleteExercise();
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem<_ExerciseMenuAction>(
+                      value: _ExerciseMenuAction.rearrange,
+                      child: Text('Rearrange exercises'),
+                    ),
+                    PopupMenuItem<_ExerciseMenuAction>(
+                      value: _ExerciseMenuAction.change,
+                      child: Text('Change exercise'),
+                    ),
+                    PopupMenuItem<_ExerciseMenuAction>(
+                      value: _ExerciseMenuAction.delete,
+                      child: Text('Delete exercise'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -1080,6 +1044,29 @@ class _ExerciseInputField extends StatelessWidget {
           borderSide: BorderSide.none,
         ),
       ),
+    );
+  }
+}
+
+class _ExercisePlanEntry {
+  const _ExercisePlanEntry({
+    required this.rowId,
+    required this.exercise,
+    this.detailRow,
+  });
+
+  final String rowId;
+  final Exercise exercise;
+  final Map<String, dynamic>? detailRow;
+
+  _ExercisePlanEntry copyWith({
+    Exercise? exercise,
+    Map<String, dynamic>? detailRow,
+  }) {
+    return _ExercisePlanEntry(
+      rowId: rowId,
+      exercise: exercise ?? this.exercise,
+      detailRow: detailRow ?? this.detailRow,
     );
   }
 }

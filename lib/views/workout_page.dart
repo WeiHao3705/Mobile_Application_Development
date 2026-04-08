@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/exercise.dart';
 import '../models/workout_plan.dart';
 import '../repository/workout_plan_repository.dart';
 import 'exercise_explore_page.dart';
@@ -27,6 +28,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
   late final WorkoutPlanRepository _repository;
   late Future<List<WorkoutPlan>> _plansFuture;
 
+  static const List<String> _detailExerciseIdColumnCandidates = <String>[
+    'exercise_id',
+    'exerciseId',
+    'id_exercise',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -52,9 +59,157 @@ class _WorkoutPageState extends State<WorkoutPage> {
     }
   }
 
-  void _startPlan(WorkoutPlan plan) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Starting "${plan.planName}" soon.')),
+  Future<List<WorkoutRoutineExerciseSeed>> _loadPlanRoutineSeeds(WorkoutPlan plan) async {
+    final supabase = Supabase.instance.client;
+
+    final detailResponse = await supabase
+        .from('Exercise_Plan_Details')
+        .select('*')
+        .eq('plan_id', plan.planId)
+        .order('order_index', ascending: true);
+
+    final detailRows = List<Map<String, dynamic>>.from(detailResponse as List);
+    if (detailRows.isEmpty) {
+      return plan.exercises
+          .map(
+            (exercise) => WorkoutRoutineExerciseSeed(
+              exercise: Exercise(
+                id: exercise.exerciseId,
+                name: exercise.exerciseName,
+                primaryMuscle: 'Unknown Muscle',
+                muscleGroup: 'Unknown Muscle',
+                equipment: 'Unknown Equipment',
+                imageUrl: '',
+                secondaryMuscle: 'Not provided',
+                howTo: 'No instructions provided.',
+              ),
+            ),
+          )
+          .toList();
+    }
+
+    final exerciseIds = detailRows
+        .map((row) => _readTextByKeys(row, _detailExerciseIdColumnCandidates))
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    final exerciseById = <String, Map<String, dynamic>>{};
+    if (exerciseIds.isNotEmpty) {
+      final exerciseResponse = await supabase
+          .from('Exercise')
+          .select('*')
+          .inFilter('exercise_id', exerciseIds.toList());
+
+      for (final row in List<Map<String, dynamic>>.from(exerciseResponse as List)) {
+        final exerciseId = (row['exercise_id'] ?? '').toString().trim();
+        if (exerciseId.isNotEmpty) {
+          exerciseById[exerciseId] = row;
+        }
+      }
+    }
+
+    return detailRows.map((row) {
+      final exerciseId = _readTextByKeys(row, _detailExerciseIdColumnCandidates);
+      final exerciseRow = exerciseById[exerciseId];
+      final exerciseName = _readFirstNonEmpty(
+        exerciseRow,
+        const ['exercise_name', 'name', 'title'],
+        fallback: exerciseId,
+      );
+      final equipment = _readFirstNonEmpty(exerciseRow, const ['equipment', 'equipment_name', 'tool']);
+      final imageUrl = _readFirstNonEmpty(exerciseRow, const ['image', 'image_url', 'thumbnail_url']);
+      final isBodyweight = _isBodyweightExercise(equipment);
+      final sets = _toInt(row['sets']);
+      final reps = _toInt(row['reps']);
+      final weightValue = _toNullableDouble(row['weight']);
+
+      return WorkoutRoutineExerciseSeed(
+        exercise: Exercise(
+          id: exerciseId,
+          name: exerciseName,
+          primaryMuscle: isBodyweight ? 'Bodyweight' : 'Unknown Muscle',
+          muscleGroup: isBodyweight ? 'Bodyweight' : 'Unknown Muscle',
+          equipment: isBodyweight ? 'Bodyweight' : (equipment.isEmpty ? 'Unknown Equipment' : equipment),
+          imageUrl: imageUrl,
+          secondaryMuscle: 'Not provided',
+          howTo: 'No instructions provided.',
+        ),
+        setCount: sets <= 0 ? 1 : sets,
+        repsText: reps <= 0 ? '12' : reps.toString(),
+        weightText: isBodyweight || weightValue == null
+            ? ''
+            : weightValue.toStringAsFixed(weightValue % 1 == 0 ? 0 : 1),
+      );
+    }).toList();
+  }
+
+  static String _readTextByKeys(Map<String, dynamic> row, List<String> keys) {
+    for (final key in keys) {
+      final text = (row[key] ?? '').toString().trim();
+      if (text.isNotEmpty) {
+        return text;
+      }
+    }
+    return '';
+  }
+
+  static String _readFirstNonEmpty(
+    Map<String, dynamic>? row,
+    List<String> keys, {
+    String fallback = '',
+  }) {
+    if (row == null) {
+      return fallback;
+    }
+
+    for (final key in keys) {
+      final text = (row[key] ?? '').toString().trim();
+      if (text.isNotEmpty) {
+        return text;
+      }
+    }
+
+    return fallback;
+  }
+
+  static int _toInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+    return int.tryParse((value ?? '').toString()) ?? 0;
+  }
+
+  static double? _toNullableDouble(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is double) {
+      return value;
+    }
+    if (value is int) {
+      return value.toDouble();
+    }
+    return double.tryParse(value.toString());
+  }
+
+  static bool _isBodyweightExercise(String equipment) {
+    final normalized = equipment.toLowerCase();
+    return normalized.contains('bodyweight') || normalized.contains('body weight');
+  }
+
+  Future<void> _startPlan(WorkoutPlan plan) async {
+    final seeds = await _loadPlanRoutineSeeds(plan);
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => WorkoutRoutinePage(
+          userId: plan.userId,
+          initialExercises: seeds,
+        ),
+      ),
     );
   }
 
@@ -202,23 +357,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
               },
             ),
             const SizedBox(height: 28),
-            Row(
-              children: [
-                Text(
-                  'Plans',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: _openPlanCreation,
-                  icon: const Icon(Icons.add_box_outlined),
-                  color: theme.colorScheme.primary,
-                  tooltip: 'Create a new plan',
-                ),
-              ],
+            Text(
+              'Plans',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 12),
             Row(
@@ -398,7 +542,7 @@ class _PlanCard extends StatelessWidget {
 
   final WorkoutPlan plan;
   final VoidCallback onTap;
-  final VoidCallback onStart;
+  final Future<void> Function() onStart;
   final ValueChanged<_PlanMenuAction> onMenuActionSelected;
 
   @override
@@ -463,7 +607,9 @@ class _PlanCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: onStart,
+                  onPressed: () {
+                    onStart();
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary,
                     foregroundColor: theme.colorScheme.onPrimary,
@@ -478,3 +624,4 @@ class _PlanCard extends StatelessWidget {
     );
   }
 }
+

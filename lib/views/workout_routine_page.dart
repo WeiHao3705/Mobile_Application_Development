@@ -6,8 +6,25 @@ import 'package:flutter/services.dart';
 
 import '../models/exercise.dart';
 import '../repository/workout_record_repository.dart';
+import 'exercise_detail_page.dart';
 import 'exercise_explore_page.dart';
 import 'save_workout_page.dart';
+
+class WorkoutRoutineExerciseSeed {
+  const WorkoutRoutineExerciseSeed({
+    required this.exercise,
+    this.setCount = 1,
+    this.repsText = '12',
+    this.weightText = '',
+    this.notes = '',
+  });
+
+  final Exercise exercise;
+  final int setCount;
+  final String repsText;
+  final String weightText;
+  final String notes;
+}
 
 String _formatRestDuration(Duration value) {
   final minutes = value.inMinutes;
@@ -19,9 +36,11 @@ class WorkoutRoutinePage extends StatefulWidget {
   const WorkoutRoutinePage({
     super.key,
     required this.userId,
+    this.initialExercises = const <WorkoutRoutineExerciseSeed>[],
   });
 
   final int userId;
+  final List<WorkoutRoutineExerciseSeed> initialExercises;
 
   @override
   State<WorkoutRoutinePage> createState() => _WorkoutRoutinePageState();
@@ -40,6 +59,10 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
   void initState() {
     super.initState();
     _startedAt = DateTime.now();
+    if (widget.initialExercises.isNotEmpty) {
+      _selectedExercises.addAll(widget.initialExercises.map((seed) => seed.exercise));
+    }
+    _syncExerciseDrafts(widget.initialExercises);
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) {
         return;
@@ -72,7 +95,7 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
     return equipment.contains('bodyweight') || equipment.contains('body weight');
   }
 
-  void _syncExerciseDrafts() {
+  void _syncExerciseDrafts([List<WorkoutRoutineExerciseSeed>? seeds]) {
     final existingDrafts = _exerciseDrafts.values.toList();
     for (final draft in existingDrafts) {
       draft.dispose();
@@ -80,7 +103,24 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
     _exerciseDrafts.clear();
 
     for (var index = 0; index < _selectedExercises.length; index += 1) {
-      _exerciseDrafts[index] = _RoutineExerciseDraft(firstRowId: _nextSetRowId());
+      final seed = seeds != null && index < seeds.length ? seeds[index] : null;
+      final draft = _RoutineExerciseDraft(
+        firstRowId: _nextSetRowId(),
+        notesText: seed?.notes ?? '',
+        repsText: seed?.repsText ?? '12',
+        weightText: seed?.weightText ?? '',
+      );
+
+      final setCount = seed?.setCount ?? 1;
+      for (var rowIndex = 1; rowIndex < setCount; rowIndex += 1) {
+        draft.addSetRow(
+          rowId: _nextSetRowId(),
+          repsText: seed?.repsText ?? '12',
+          weightText: seed?.weightText ?? '',
+        );
+      }
+
+      _exerciseDrafts[index] = draft;
     }
   }
 
@@ -123,9 +163,77 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
   }
 
   String _formatWorkoutDuration(Duration value) {
-    final minutes = value.inMinutes;
+    final hours = value.inHours;
+    final minutes = value.inMinutes.remainder(60);
     final seconds = value.inSeconds.remainder(60);
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _pickRoutineDuration() async {
+    final picked = await showModalBottomSheet<Duration>(
+      context: context,
+      backgroundColor: const Color(0xFF111111),
+      builder: (context) {
+        var currentDuration = _elapsed;
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      const Text(
+                        'Select Duration',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(currentDuration),
+                        child: const Text('Done'),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  height: 220,
+                  child: CupertinoTimerPicker(
+                    mode: CupertinoTimerPickerMode.hms,
+                    initialTimerDuration: currentDuration,
+                    backgroundColor: const Color(0xFF111111),
+                    onTimerDurationChanged: (duration) {
+                      currentDuration = duration;
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (picked == null) {
+      return;
+    }
+
+    setState(() {
+      _startedAt = DateTime.now().subtract(picked);
+      _elapsed = picked;
+    });
   }
 
   Future<void> _addExercise() async {
@@ -267,16 +375,21 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
         continue;
       }
 
-      final firstSet = draft.setRows.isNotEmpty ? draft.setRows.first : null;
+      final completedSets = draft.setRows.where((row) => row.isCompleted).toList();
+      if (completedSets.isEmpty) {
+        continue;
+      }
+
+      final firstSet = completedSets.first;
       details.add(
         WorkoutRecordDetailInput(
           exerciseName: exercise.name,
           orderIndex: index,
-          sets: draft.setRows.length,
-          reps: int.tryParse(firstSet?.repsController.text.trim() ?? '') ?? 0,
+          sets: completedSets.length,
+          reps: int.tryParse(firstSet.repsController.text.trim()) ?? 0,
           weight: _isBodyweightExercise(exercise)
               ? 0
-              : int.tryParse(firstSet?.weightController.text.trim() ?? '') ?? 0,
+              : int.tryParse(firstSet.weightController.text.trim()) ?? 0,
           notes: draft.notesController.text.trim(),
         ),
       );
@@ -286,8 +399,8 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
   }
 
   Future<void> _openSaveWorkoutPage() async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => SaveWorkoutPage(
           userId: widget.userId,
           duration: _elapsed,
@@ -298,6 +411,10 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
         ),
       ),
     );
+
+    if (saved == true && mounted) {
+      Navigator.of(context).pop(true);
+    }
   }
 
   @override
@@ -334,9 +451,12 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
             Row(
               children: [
                 Expanded(
-                  child: _WorkoutStatTile(
-                    label: 'Duration',
-                    value: _formatWorkoutDuration(_elapsed),
+                  child: GestureDetector(
+                    onTap: _pickRoutineDuration,
+                    child: _WorkoutStatTile(
+                      label: 'Duration',
+                      value: _formatWorkoutDuration(_elapsed),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -491,28 +611,37 @@ class _RoutineExerciseCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.white,
-                backgroundImage:
-                    exercise.imageUrl.isNotEmpty ? NetworkImage(exercise.imageUrl) : null,
-                child: exercise.imageUrl.isEmpty
-                    ? const Icon(Icons.fitness_center, color: Colors.black, size: 18)
-                    : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  '$orderIndex. ${exercise.name}',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ExerciseDetailPage(exercise: exercise),
+                ),
+              );
+            },
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.white,
+                  backgroundImage:
+                      exercise.imageUrl.isNotEmpty ? NetworkImage(exercise.imageUrl) : null,
+                  child: exercise.imageUrl.isEmpty
+                      ? const Icon(Icons.fitness_center, color: Colors.black, size: 18)
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '$orderIndex. ${exercise.name}',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           _RoutineInputField(
@@ -745,10 +874,14 @@ class _RoutineInputField extends StatelessWidget {
 }
 
 class _RoutineExerciseDraft {
-  _RoutineExerciseDraft({required String firstRowId})
-      : notesController = TextEditingController(),
+  _RoutineExerciseDraft({
+    required String firstRowId,
+    String notesText = '',
+    String repsText = '12',
+    String weightText = '',
+  })  : notesController = TextEditingController(text: notesText),
         setRows = <_RoutineSetRowDraft>[
-          _RoutineSetRowDraft(rowId: firstRowId),
+          _RoutineSetRowDraft(rowId: firstRowId, repsText: repsText, weightText: weightText),
         ];
 
   final TextEditingController notesController;
@@ -853,4 +986,3 @@ class _RoutineSetRowDraft {
     weightController.dispose();
   }
 }
-

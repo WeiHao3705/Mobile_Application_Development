@@ -2,6 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../models/exercise.dart';
 
+class ExerciseReorderResult {
+  const ExerciseReorderResult({
+    required this.rowId,
+    required this.exercise,
+  });
+
+  final String rowId;
+  final Exercise exercise;
+}
+
 class ExerciseReorderPage extends StatefulWidget {
   const ExerciseReorderPage({super.key, required this.entries});
 
@@ -12,30 +22,24 @@ class ExerciseReorderPage extends StatefulWidget {
 }
 
 class _ExerciseReorderPageState extends State<ExerciseReorderPage> {
-  late final List<_ExerciseReorderRow> _exercises;
+  late final List<ExerciseReorderResult> _entries;
 
   @override
   void initState() {
     super.initState();
-    _exercises = widget.entries
-        .map((entry) => _ExerciseReorderRow(rowId: entry.rowId, exercise: entry.exercise))
-        .toList();
+    _entries = List<ExerciseReorderResult>.from(widget.entries);
   }
 
   void _save() {
-    Navigator.of(context).pop(
-      _exercises
-          .map((row) => ExerciseReorderResult(rowId: row.rowId, exercise: row.exercise))
-          .toList(),
-    );
+    Navigator.of(context).pop(List<ExerciseReorderResult>.from(_entries));
   }
 
   void _deleteExerciseAt(int index) {
-    if (index < 0 || index >= _exercises.length) {
+    if (index < 0 || index >= _entries.length) {
       return;
     }
     setState(() {
-      _exercises.removeAt(index);
+      _entries.removeAt(index);
     });
   }
 
@@ -83,21 +87,21 @@ class _ExerciseReorderPageState extends State<ExerciseReorderPage> {
               child: ReorderableListView.builder(
                 buildDefaultDragHandles: false,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _exercises.length,
+                itemCount: _entries.length,
                 onReorder: (oldIndex, newIndex) {
                   setState(() {
                     if (newIndex > oldIndex) {
                       newIndex -= 1;
                     }
-                    final item = _exercises.removeAt(oldIndex);
-                    _exercises.insert(newIndex, item);
+                    final item = _entries.removeAt(oldIndex);
+                    _entries.insert(newIndex, item);
                   });
                 },
                 itemBuilder: (context, index) {
-                  final row = _exercises[index];
-                  final exercise = row.exercise;
+                  final entry = _entries[index];
+                  final exercise = entry.exercise;
                   return Container(
-                    key: ValueKey(row.rowId),
+                    key: ValueKey(entry.rowId),
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     decoration: BoxDecoration(
@@ -180,24 +184,4 @@ class _ExerciseReorderPageState extends State<ExerciseReorderPage> {
       ),
     );
   }
-}
-
-class _ExerciseReorderRow {
-  _ExerciseReorderRow({
-    required this.rowId,
-    required this.exercise,
-  });
-
-  final String rowId;
-  final Exercise exercise;
-}
-
-class ExerciseReorderResult {
-  const ExerciseReorderResult({
-    required this.rowId,
-    required this.exercise,
-  });
-
-  final String rowId;
-  final Exercise exercise;
 }

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/exercise.dart';
 import '../models/workout_plan.dart';
+import 'exercise_detail_page.dart';
+import 'workout_routine_page.dart';
 
 class WorkoutPlanDetailPage extends StatefulWidget {
   const WorkoutPlanDetailPage({super.key, required this.plan});
@@ -73,6 +76,24 @@ class _WorkoutPlanDetailPageState extends State<WorkoutPlanDetailPage> {
       final equipment = _readFirstNonEmpty(exerciseRow, const ['equipment', 'equipment_name', 'tool']);
       final isBodyweight = _isBodyweightExercise(equipment);
 
+      Exercise? parsedExercise;
+      if (exerciseRow != null) {
+        try {
+          parsedExercise = Exercise.fromJson(exerciseRow);
+        } catch (_) {}
+      }
+
+      parsedExercise ??= Exercise(
+        id: exerciseId,
+        name: exerciseName,
+        imageUrl: imageUrl,
+        equipment: equipment,
+        primaryMuscle: '',
+        muscleGroup: '',
+        secondaryMuscle: '',
+        howTo: '',
+      );
+
       return _ExercisePlanDetailView(
         exerciseId: exerciseId,
         exerciseName: exerciseName,
@@ -81,6 +102,7 @@ class _WorkoutPlanDetailPageState extends State<WorkoutPlanDetailPage> {
         reps: _toInt(row['reps']),
         weight: _toNullableDouble(row['weight']),
         isBodyweight: isBodyweight,
+        fullExercise: parsedExercise,
       );
     }).toList();
   }
@@ -153,9 +175,44 @@ class _WorkoutPlanDetailPageState extends State<WorkoutPlanDetailPage> {
   }
 
   void _startPlan() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Starting "${widget.plan.planName}" soon.')),
-    );
+    _detailsFuture.then((details) async {
+      if (!mounted) {
+        return;
+      }
+
+      final seeds = details
+          .map(
+            (detail) => WorkoutRoutineExerciseSeed(
+              exercise: Exercise(
+                id: detail.exerciseId,
+                name: detail.exerciseName,
+                primaryMuscle: detail.isBodyweight ? 'Bodyweight' : 'Unknown Muscle',
+                muscleGroup: detail.isBodyweight ? 'Bodyweight' : 'Unknown Muscle',
+                equipment: detail.isBodyweight ? 'Bodyweight' : 'Unknown Equipment',
+                imageUrl: detail.imageUrl,
+                secondaryMuscle: 'Not provided',
+                howTo: 'No instructions provided.',
+              ),
+              setCount: detail.sets <= 0 ? 1 : detail.sets,
+              repsText: detail.reps.toString(),
+              weightText: detail.isBodyweight || detail.weight == null ? '' : detail.weight!.toStringAsFixed(detail.weight! % 1 == 0 ? 0 : 1),
+            ),
+          )
+          .toList();
+
+      final didSave = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          builder: (_) => WorkoutRoutinePage(
+            userId: widget.plan.userId,
+            initialExercises: seeds,
+          ),
+        ),
+      );
+
+      if (didSave == true && mounted) {
+        Navigator.of(context).pop();
+      }
+    });
   }
 
   @override
@@ -269,28 +326,37 @@ class _ExerciseDetailCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.white,
-              backgroundImage: detail.imageUrl.isNotEmpty ? NetworkImage(detail.imageUrl) : null,
-              child: detail.imageUrl.isEmpty
-                  ? const Icon(Icons.fitness_center, color: Colors.black, size: 18)
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                detail.exerciseName,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w700,
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ExerciseDetailPage(exercise: detail.fullExercise),
+              ),
+            );
+          },
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.white,
+                backgroundImage: detail.imageUrl.isNotEmpty ? NetworkImage(detail.imageUrl) : null,
+                child: detail.imageUrl.isEmpty
+                    ? const Icon(Icons.fitness_center, color: Colors.black, size: 18)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  detail.exerciseName,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         Row(
@@ -388,6 +454,7 @@ class _ExercisePlanDetailView {
     required this.reps,
     required this.weight,
     required this.isBodyweight,
+    required this.fullExercise,
   });
 
   final String exerciseId;
@@ -397,4 +464,5 @@ class _ExercisePlanDetailView {
   final int reps;
   final double? weight;
   final bool isBodyweight;
+  final Exercise fullExercise;
 }
