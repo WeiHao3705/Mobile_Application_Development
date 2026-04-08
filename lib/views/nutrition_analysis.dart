@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
 import 'package:mobile_application_development/views/widgets/custom_bottom_nav_bar.dart';
 import 'package:mobile_application_development/controllers/meal_controller.dart';
+import 'package:mobile_application_development/controllers/auth_controller.dart';
 import 'package:mobile_application_development/services/nutrition_aggregation_service.dart';
 import 'package:mobile_application_development/models/nutrition_aggregation.dart';
 import 'package:mobile_application_development/models/meal_log.dart';
@@ -45,6 +46,8 @@ class _NutritionScreenState extends State<NutritionScreen>
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
   int _selectedNavIndex = 2; // Default to Diet (nutrition) tab
+  int? _selectedWeeklyDay; // Track selected day on weekly chart
+  DateTime _selectedMonth = DateTime.now(); // Track selected month for monthly view
 
   // Data models
   final NutritionAggregationService _aggregationService = NutritionAggregationService();
@@ -90,14 +93,22 @@ class _NutritionScreenState extends State<NutritionScreen>
       setState(() => _isLoading = true);
 
       final mealController = context.read<MealController>();
+      final authController = context.read<AuthController>();
       final now = DateTime.now();
 
       // Get current user's daily goals - always fetch fresh data
       var goals;
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = authController.currentUser?.id;
       if (userId != null) {
         try {
-          goals = await _dailyGoalsRepository.getDailyGoalsByUserId(int.parse(userId));
+          // Handle both int and string userId formats
+          int userIdInt;
+          if (userId is int) {
+            userIdInt = userId;
+          } else {
+            userIdInt = int.parse(userId.toString());
+          }
+          goals = await _dailyGoalsRepository.getDailyGoalsByUserId(userIdInt);
         } catch (e) {
           print('⚠️ Could not load daily goals: $e');
           goals = null;
@@ -118,7 +129,7 @@ class _NutritionScreenState extends State<NutritionScreen>
       );
 
       final monthly = _aggregationService.getMonthlyAggregation(
-        endDate: now,
+        endDate: _selectedMonth,
         allMeals: mealController.userMeals,
         goals: goals,
       );
@@ -301,7 +312,6 @@ class _NutritionScreenState extends State<NutritionScreen>
 
   Widget _buildDailySummaryCard(DailyAggregation daily) {
     final percentOfGoal = (daily.totalCalories / daily.calorieGoal * 100).clamp(0, 200);
-    final isOnTrack = daily.isOnTrack;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -312,33 +322,13 @@ class _NutritionScreenState extends State<NutritionScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                'Today\'s Summary',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.65),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (isOnTrack ? AppColors.nutritionNeonGreen : Color(0xFFFF6B6B)).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                child: Text(
-                  isOnTrack ? 'On track' : 'Off track',
-                  style: TextStyle(
-                    color: isOnTrack ? AppColors.nutritionNeonGreen : Color(0xFFFF6B6B),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            'Today\'s Summary',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -585,11 +575,11 @@ class _NutritionScreenState extends State<NutritionScreen>
             const SizedBox(height: 8),
             Row(
               children: [
-                _miniMacroIndicator('P', meal.totalProteins ?? 0, 'g'),
+                _miniMacroIndicator('Protein', meal.totalProteins ?? 0, 'g'),
                 const SizedBox(width: 12),
-                _miniMacroIndicator('C', meal.totalCarbs ?? 0, 'g'),
+                _miniMacroIndicator('Carbs', meal.totalCarbs ?? 0, 'g'),
                 const SizedBox(width: 12),
-                _miniMacroIndicator('F', meal.totalFats ?? 0, 'g'),
+                _miniMacroIndicator('Fat', meal.totalFats ?? 0, 'g'),
               ],
             ),
           ],
@@ -600,10 +590,13 @@ class _NutritionScreenState extends State<NutritionScreen>
 
   Widget _miniMacroIndicator(String label, double value, String unit) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           label,
-          style: TextStyle(color: AppColors.nutritionSubtleText, fontSize: 10),
+          style: TextStyle(color: AppColors.nutritionSubtleText, fontSize: 9, fontWeight: FontWeight.w500),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 2),
         Text(
@@ -632,7 +625,14 @@ class _NutritionScreenState extends State<NutritionScreen>
   }
 
   Widget _buildWeeklyCalorieTrendCard(WeeklyAggregation weekly) {
-    final avgPercentage = (weekly.avgDailyCalories / (weekly.weeklyCalorieGoal / 7) * 100).clamp(0, 200);
+    // Determine which value to display - selected day or average
+    final displayValue = _selectedWeeklyDay != null
+      ? weekly.caloriesList[_selectedWeeklyDay!].toStringAsFixed(0)
+      : weekly.avgDailyCalories.toStringAsFixed(0);
+
+    final displayLabel = _selectedWeeklyDay != null
+      ? '${weekly.dayLabels[_selectedWeeklyDay!]} calories'
+      : 'kcal avg per day';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
@@ -653,68 +653,100 @@ class _NutritionScreenState extends State<NutritionScreen>
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.nutritionNeonGreen.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.trending_up, color: AppColors.nutritionNeonGreen, size: 13),
-                    const SizedBox(width: 3),
-                    Text(
-                      '${avgPercentage.toStringAsFixed(0)}%',
-                      style: const TextStyle(
-                        color: AppColors.nutritionNeonGreen,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 6),
-          Text(
-            '${weekly.avgDailyCalories.toStringAsFixed(0)}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 34,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -1,
-            ),
-          ),
-          Text(
-            'kcal avg per day',
-            style: TextStyle(
-              color: AppColors.nutritionSubtleText,
-              fontSize: 13,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayValue,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                  Text(
+                    displayLabel,
+                    style: TextStyle(
+                      color: AppColors.nutritionSubtleText,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              if (_selectedWeeklyDay != null) ...[
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => setState(() => _selectedWeeklyDay = null),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.nutritionNeonGreen.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Clear',
+                      style: TextStyle(
+                        color: AppColors.nutritionNeonGreen,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 110,
-            child: CustomPaint(
-              painter: _CalorieChartPainter(data: weekly.caloriesList),
-              size: const Size(double.infinity, 110),
+          GestureDetector(
+            onTapDown: (details) {
+              final size = Size(MediaQuery.of(context).size.width - 32, 110);
+              final localX = details.localPosition.dx;
+              final dayIndex = ((localX / size.width) * weekly.caloriesList.length)
+                  .clamp(0, weekly.caloriesList.length - 1)
+                  .toInt();
+              setState(() => _selectedWeeklyDay = dayIndex);
+            },
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: SizedBox(
+                height: 110,
+                child: CustomPaint(
+                  painter: _CalorieChartPainter(
+                    data: weekly.caloriesList,
+                    selectedIndex: _selectedWeeklyDay,
+                  ),
+                  size: const Size(double.infinity, 110),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: weekly.dayLabels
-                .map((d) => Text(
-              d,
-              style: TextStyle(
-                color: AppColors.nutritionSubtleText,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.3,
-              ),
-            ))
+                .asMap()
+                .entries
+                .map((entry) {
+                  final isSelected = _selectedWeeklyDay == entry.key;
+                  return Text(
+                    entry.value,
+                    style: TextStyle(
+                      color: isSelected
+                        ? AppColors.nutritionNeonGreen
+                        : AppColors.nutritionSubtleText,
+                      fontSize: 10,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      letterSpacing: 0.3,
+                    ),
+                  );
+                })
                 .toList(),
           ),
           const SizedBox(height: 12),
@@ -879,6 +911,8 @@ class _NutritionScreenState extends State<NutritionScreen>
 
     return Column(
       children: [
+        _buildMonthNavigationBar(),
+        const SizedBox(height: 14),
         _buildMonthlySummaryCard(_monthlyAggregation!),
         const SizedBox(height: 14),
         _buildMonthlyMacroCard(_monthlyAggregation!),
@@ -888,9 +922,89 @@ class _NutritionScreenState extends State<NutritionScreen>
     );
   }
 
+  Widget _buildMonthNavigationBar() {
+    final monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+    final monthName = monthNames[_selectedMonth.month - 1];
+    final year = _selectedMonth.year;
+
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+              _loadAggregationData();
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.nutritionCardBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.chevron_left,
+              color: AppColors.nutritionNeonGreen,
+              size: 20,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.nutritionCardBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$monthName $year',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+              _loadAggregationData();
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.nutritionCardBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.chevron_right,
+              color: AppColors.nutritionNeonGreen,
+              size: 20,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ...existing code...
+
   Widget _buildMonthlySummaryCard(MonthlyAggregation monthly) {
     final percentOfGoal = (monthly.totalCalories / monthly.monthlyCalorieGoal * 100).clamp(0, 200);
     final isOnTrack = percentOfGoal >= 90 && percentOfGoal <= 110;
+
+    // Get month name from start date
+    final monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+    final monthName = monthNames[monthly.startDate.month - 1];
+    final year = monthly.startDate.year;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -904,7 +1018,7 @@ class _NutritionScreenState extends State<NutritionScreen>
           Row(
             children: [
               Text(
-                'Monthly Summary',
+                '$monthName $year',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.65),
                   fontSize: 13,
@@ -1174,7 +1288,9 @@ class _NutritionScreenState extends State<NutritionScreen>
 
 class _CalorieChartPainter extends CustomPainter {
   final List<double> data;
-  _CalorieChartPainter({required this.data});
+  final int? selectedIndex;
+
+  _CalorieChartPainter({required this.data, this.selectedIndex});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1237,21 +1353,30 @@ class _CalorieChartPainter extends CustomPainter {
 
     canvas.drawPath(linePath, linePaint);
 
-    // Highlight dot on last point
-    final dotPaint = Paint()..color = AppColors.nutritionNeonGreen;
-    canvas.drawCircle(points.last, 5, dotPaint);
-    canvas.drawCircle(
-      points.last,
-      5,
-      Paint()
-        ..color = AppColors.nutritionNeonGreen.withValues(alpha: 0.3)
-        ..strokeWidth = 3
-        ..style = PaintingStyle.stroke,
-    );
+    // Draw dots on all points
+    final dotPaint = Paint()
+      ..color = AppColors.nutritionNeonGreen
+      ..style = PaintingStyle.fill;
+
+    final dotOutlinePaint = Paint()
+      ..color = AppColors.nutritionNeonGreen.withValues(alpha: 0.3)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    for (int i = 0; i < points.length; i++) {
+      if (selectedIndex == i) {
+        // Draw larger circle for selected point
+        canvas.drawCircle(points[i], 7, dotPaint);
+        canvas.drawCircle(points[i], 7, dotOutlinePaint);
+      } else {
+        // Draw smaller circles for other points
+        canvas.drawCircle(points[i], 4, dotPaint);
+      }
+    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 class _DonutChartPainter extends CustomPainter {
