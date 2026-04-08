@@ -46,17 +46,23 @@ class NutritionAggregationService {
     );
   }
 
-  /// Get weekly aggregation for the last 7 days ending on the given date
+  /// Get weekly aggregation for Monday to Sunday week
   WeeklyAggregation getWeeklyAggregation({
     required DateTime endDate,
     required List<MealLog> allMeals,
     required DailyGoals? goals,
   }) {
-    final startDate = endDate.subtract(const Duration(days: 6));
+    // Calculate the start of the week (Monday)
+    // weekday: 1=Monday, 7=Sunday
+    final daysSinceMonday = (endDate.weekday - 1);
+    final startDate = endDate.subtract(Duration(days: daysSinceMonday));
+
+    // Normalize to start of day
+    final mondayStart = DateTime(startDate.year, startDate.month, startDate.day);
     final dailyData = <DailyAggregation>[];
 
     for (int i = 0; i < 7; i++) {
-      final date = startDate.add(Duration(days: i));
+      final date = mondayStart.add(Duration(days: i));
       dailyData.add(getDailyAggregation(
         date: date,
         allMeals: allMeals,
@@ -98,17 +104,24 @@ class NutritionAggregationService {
     );
   }
 
-  /// Get monthly aggregation for the last 30 days ending on the given date
+  /// Get monthly aggregation for the calendar month of the given date
   MonthlyAggregation getMonthlyAggregation({
     required DateTime endDate,
     required List<MealLog> allMeals,
     required DailyGoals? goals,
   }) {
-    final startDate = endDate.subtract(const Duration(days: 29));
+    // Get the first day of the month
+    final startDate = DateTime(endDate.year, endDate.month, 1);
+
+    // Get the last day of the month
+    final lastDayOfMonth = DateTime(endDate.year, endDate.month + 1, 0).day;
+    final endOfMonth = DateTime(endDate.year, endDate.month, lastDayOfMonth, 23, 59, 59);
+
     final dailyData = <DailyAggregation>[];
 
-    for (int i = 0; i < 30; i++) {
-      final date = startDate.add(Duration(days: i));
+    // Generate daily data for each day of the month
+    for (int i = 1; i <= lastDayOfMonth; i++) {
+      final date = DateTime(endDate.year, endDate.month, i);
       dailyData.add(getDailyAggregation(
         date: date,
         allMeals: allMeals,
@@ -127,9 +140,12 @@ class NutritionAggregationService {
     final totalCarbs = dailyData.fold<double>(0.0, (sum, d) => sum + d.totalCarbs);
     final totalFats = dailyData.fold<double>(0.0, (sum, d) => sum + d.totalFats);
 
+    // Calculate daily goals based on actual days in month
+    final daysInMonth = lastDayOfMonth;
+
     return MonthlyAggregation(
       startDate: startDate,
-      endDate: endDate,
+      endDate: endOfMonth,
       dailyData: dailyData,
       totalCalories: totalCalories,
       totalProteins: totalProteins,
@@ -139,10 +155,10 @@ class NutritionAggregationService {
       avgDailyProteins: dailyData.isEmpty ? 0.0 : totalProteins / dailyData.length,
       avgDailyCarbs: dailyData.isEmpty ? 0.0 : totalCarbs / dailyData.length,
       avgDailyFats: dailyData.isEmpty ? 0.0 : totalFats / dailyData.length,
-      monthlyCalorieGoal: calorieGoal * 30,
-      monthlyProteinGoal: proteinGoal * 30,
-      monthlyCarbsGoal: carbsGoal * 30,
-      monthlyFatGoal: fatGoal * 30,
+      monthlyCalorieGoal: calorieGoal * daysInMonth,
+      monthlyProteinGoal: proteinGoal * daysInMonth,
+      monthlyCarbsGoal: carbsGoal * daysInMonth,
+      monthlyFatGoal: fatGoal * daysInMonth,
     );
   }
 }
