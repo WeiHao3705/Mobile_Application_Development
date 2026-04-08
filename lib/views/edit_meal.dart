@@ -151,7 +151,7 @@ class _EditMealViewState extends State<EditMealView> {
       builder: (BuildContext context, Widget? child) {
         return Theme(
           data: ThemeData.dark(),
-          child: child!,
+          child: child ?? const SizedBox.shrink(),
         );
       },
     );
@@ -176,7 +176,7 @@ class _EditMealViewState extends State<EditMealView> {
       builder: (BuildContext context, Widget? child) {
         return Theme(
           data: ThemeData.dark(),
-          child: child!,
+          child: child ?? const SizedBox.shrink(),
         );
       },
     );

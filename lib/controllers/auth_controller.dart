@@ -5,14 +5,20 @@ import '../models/app_user.dart';
 import '../models/auth_user.dart';
 import '../repository/auth_repository.dart';
 import '../repository/user_repository.dart';
+import '../services/auth_session_storage.dart';
 
 class AuthController extends ChangeNotifier {
-  AuthController({AuthRepository? repository, UserRepository? userRepository})
-      : _repository = repository ?? AuthRepository(),
-        _userRepository = userRepository ?? UserRepository();
+  AuthController({
+    AuthRepository? repository,
+    UserRepository? userRepository,
+    AuthSessionStorage? sessionStorage,
+  })  : _repository = repository ?? AuthRepository(),
+        _userRepository = userRepository ?? UserRepository(),
+        _sessionStorage = sessionStorage ?? AuthSessionStorage();
 
   final AuthRepository _repository;
   final UserRepository _userRepository;
+  final AuthSessionStorage _sessionStorage;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -22,8 +28,19 @@ class AuthController extends ChangeNotifier {
 
   LoginUser? _currentUser;
   LoginUser? get currentUser => _currentUser;
-  bool get isLoggedIn => _currentUser != null;
+  bool get isLoggedIn => _currentUser?.id != null;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
+
+  Future<void> restoreSession() async {
+    final restoredUser = await _sessionStorage.read();
+    if (restoredUser?.id == null) {
+      _currentUser = null;
+      await _sessionStorage.clear();
+    } else {
+      _currentUser = restoredUser;
+    }
+    notifyListeners();
+  }
 
   Future<bool> login({
     required String username,
@@ -46,6 +63,7 @@ class AuthController extends ChangeNotifier {
       }
 
       _currentUser = user;
+      await _sessionStorage.save(user);
       return true;
     } on PostgrestException catch (e) {
       _errorMessage = 'Database error: ${e.message}';
@@ -66,16 +84,22 @@ class AuthController extends ChangeNotifier {
 
     try {
       await _userRepository.createUserProfile(profile);
-      _currentUser = LoginUser(
-        id: null,
-        username: profile.username,
-        fullName: profile.fullName,
-        email: profile.email,
-        height: profile.height,
-        currentWeight: profile.currentWeight,
-        targetWeight: profile.targetWeight,
-        isAdmin: profile.isAdmin,
+
+      // Reuse login query so we always keep the same user shape as normal login.
+      final signedUpUser = await _repository.login(
+        username: profile.username.trim(),
+        password: profile.password.trim(),
       );
+
+      if (signedUpUser == null || signedUpUser.id == null) {
+        _errorMessage =
+            'Account created but unable to start session. Please login manually.';
+        _currentUser = null;
+        return false;
+      }
+
+      _currentUser = signedUpUser;
+      await _sessionStorage.save(signedUpUser);
       return true;
     } on PostgrestException catch (e) {
       if (_isRlsInsertError(e)) {
@@ -94,9 +118,10 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
     _currentUser = null;
     _errorMessage = '';
+    await _sessionStorage.clear();
     notifyListeners();
   }
 

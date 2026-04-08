@@ -30,7 +30,8 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) {
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) {
       return;
     }
 
@@ -143,4 +144,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-

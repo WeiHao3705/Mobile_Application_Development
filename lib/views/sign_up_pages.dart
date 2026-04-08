@@ -90,7 +90,8 @@ class _SignUpState extends State<SignUpPages> {
   }
 
   void _goNext() {
-    if (!_formKey.currentState!.validate()) {
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) {
       return;
     }
 
@@ -101,14 +102,23 @@ class _SignUpState extends State<SignUpPages> {
   }
 
   Future<void> _handleSignUp() async {
-    if (!_formKey.currentState!.validate()) {
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) {
+      return;
+    }
+
+    final selectedGender = _selectedGender;
+    if (selectedGender == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select your gender')),
+      );
       return;
     }
 
     FocusScope.of(context).unfocus();
 
     final profile = SignUpProfileData(
-      gender: _selectedGender!,
+      gender: selectedGender,
       dateOfBirth: _selectedDateOfBirth,
       height: double.parse(_heightController.text.trim()),
       currentWeight: double.parse(_weightController.text.trim()),

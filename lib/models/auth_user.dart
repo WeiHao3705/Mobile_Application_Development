@@ -23,13 +23,30 @@ class LoginUser {
     return LoginUser(
       id: map['user_id'] ?? map['id'],
       username: (map['username'] ?? '').toString(),
-      fullName: _toNullableString(map['full_name']),
+      fullName: _toNullableString(map['full_name'] ?? map['fullName']),
       email: _toNullableString(map['email']),
       height: _toNullableNum(map['height']),
-      currentWeight: _toNullableNum(map['current_weight']),
-      targetWeight: _toNullableNum(map['target_weight']),
+      currentWeight: _toNullableNum(map['current_weight'] ?? map['currentWeight']),
+      targetWeight: _toNullableNum(map['target_weight'] ?? map['targetWeight']),
       isAdmin: _toBool(map['is_admin'] ?? map['isAdmin']),
     );
+  }
+
+  Map<String, dynamic> toSessionMap() {
+    return <String, dynamic>{
+      'id': id,
+      'username': username,
+      'fullName': fullName,
+      'email': email,
+      'height': height,
+      'currentWeight': currentWeight,
+      'targetWeight': targetWeight,
+      'isAdmin': isAdmin,
+    };
+  }
+
+  factory LoginUser.fromSessionMap(Map<String, dynamic> map) {
+    return LoginUser.fromMap(map);
   }
 
   static String? _toNullableString(dynamic value) {
@@ -59,5 +76,4 @@ class LoginUser {
     return text == 'true' || text == '1' || text == 't';
   }
 }
-
 
