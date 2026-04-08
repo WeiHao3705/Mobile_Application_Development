@@ -52,10 +52,17 @@ class ExercisePage extends StatelessWidget {
               // Aerobic Button
               ElevatedButton(
                 onPressed: () {
+                  final userId = _userId;
+                  if (userId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('User ID not available')),
+                    );
+                    return;
+                  }
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const AerobicPage(),
+                      builder: (context) => AerobicPage(userId: userId),
                     ),
                   );
                 },
