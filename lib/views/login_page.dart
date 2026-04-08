@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/auth_controller.dart';
+import 'admin_dashboard_page.dart';
 import 'main_navigation.dart';
 
 class LoginPage extends StatefulWidget {
@@ -51,9 +52,13 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    final targetRoute = _authController.isAdmin
+        ? AdminDashboardPage.routeName
+        : MainNavigation.routeName;
+
     Navigator.pushNamedAndRemoveUntil(
       context,
-      MainNavigation.routeName,
+      targetRoute,
       (route) => false,
     );
   }

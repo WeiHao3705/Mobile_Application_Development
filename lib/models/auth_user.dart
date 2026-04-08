@@ -7,6 +7,7 @@ class LoginUser {
     required this.height,
     required this.currentWeight,
     required this.targetWeight,
+    required this.isAdmin,
   });
 
   final dynamic id;
@@ -16,6 +17,7 @@ class LoginUser {
   final num? height;
   final num? currentWeight;
   final num? targetWeight;
+  final bool isAdmin;
 
   factory LoginUser.fromMap(Map<String, dynamic> map) {
     return LoginUser(
@@ -26,6 +28,7 @@ class LoginUser {
       height: _toNullableNum(map['height']),
       currentWeight: _toNullableNum(map['current_weight']),
       targetWeight: _toNullableNum(map['target_weight']),
+      isAdmin: _toBool(map['is_admin'] ?? map['isAdmin']),
     );
   }
 
@@ -42,6 +45,18 @@ class LoginUser {
       return value;
     }
     return num.tryParse(value.toString());
+  }
+
+  static bool _toBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value != 0;
+    }
+
+    final text = value?.toString().trim().toLowerCase();
+    return text == 'true' || text == '1' || text == 't';
   }
 }
 

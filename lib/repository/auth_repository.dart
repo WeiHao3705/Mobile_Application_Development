@@ -16,7 +16,7 @@ class AuthRepository {
     final response = await client
         .from('User')
         .select(
-      'user_id, username, full_name, email, height, current_weight, target_weight',
+      'user_id, username, full_name, email, height, current_weight, target_weight, is_admin',
     )
         .eq('username', username)
         .eq('password', password)

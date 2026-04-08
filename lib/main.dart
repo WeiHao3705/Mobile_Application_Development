@@ -10,6 +10,7 @@ import 'theme/app_theme.dart';
 import 'views/landing_page.dart';
 import 'views/login_page.dart';
 import 'views/main_navigation.dart';
+import 'views/admin_dashboard_page.dart';
 import 'views/sign_up_pages.dart';
 
 Future<void> main() async {
@@ -75,6 +76,11 @@ class _MyAppState extends State<MyApp> {
             case MainNavigation.routeName:
               return MaterialPageRoute<void>(
                 builder: (_) => MainNavigation(authController: _authController),
+                settings: settings,
+              );
+            case AdminDashboardPage.routeName:
+              return MaterialPageRoute<void>(
+                builder: (_) => AdminDashboardPage(authController: _authController),
                 settings: settings,
               );
             case SignUpPages.routeName:

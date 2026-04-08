@@ -23,6 +23,7 @@ class AuthController extends ChangeNotifier {
   LoginUser? _currentUser;
   LoginUser? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
+  bool get isAdmin => _currentUser?.isAdmin ?? false;
 
   Future<bool> login({
     required String username,
@@ -73,6 +74,7 @@ class AuthController extends ChangeNotifier {
         height: profile.height,
         currentWeight: profile.currentWeight,
         targetWeight: profile.targetWeight,
+        isAdmin: profile.isAdmin,
       );
       return true;
     } on PostgrestException catch (e) {

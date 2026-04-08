@@ -194,6 +194,22 @@ class _ProfilePageState extends State<ProfilePage> {
                       color: Colors.black.withOpacity(0.7),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      user?.isAdmin == true ? 'Admin' : 'Member',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 24),
                 ],
               ),
