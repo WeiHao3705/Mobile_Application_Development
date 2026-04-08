@@ -1,7 +1,14 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
 import 'package:mobile_application_development/views/widgets/custom_bottom_nav_bar.dart';
+import 'package:mobile_application_development/controllers/meal_controller.dart';
+import 'package:mobile_application_development/services/nutrition_aggregation_service.dart';
+import 'package:mobile_application_development/models/nutrition_aggregation.dart';
+import 'package:mobile_application_development/models/meal_log.dart';
+import 'package:mobile_application_development/repository/daily_goals_repository.dart';
 
 void main() {
   runApp(const NutritionApp());
@@ -39,10 +46,15 @@ class _NutritionScreenState extends State<NutritionScreen>
   late Animation<double> _fadeAnim;
   int _selectedNavIndex = 2; // Default to Diet (nutrition) tab
 
-  final List<double> _calorieData = [
-    1800, 2000, 1600, 1900, 2400, 2600, 2100
-  ];
-  final List<String> _days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  // Data models
+  final NutritionAggregationService _aggregationService = NutritionAggregationService();
+  late DailyGoalsRepository _dailyGoalsRepository;
+
+  DailyAggregation? _dailyAggregation;
+  WeeklyAggregation? _weeklyAggregation;
+  MonthlyAggregation? _monthlyAggregation;
+
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -54,12 +66,77 @@ class _NutritionScreenState extends State<NutritionScreen>
     );
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
+
+    final client = Supabase.instance.client;
+    if (client != null) {
+      _dailyGoalsRepository = DailyGoalsRepository(supabase: client);
+    }
+
+    // Load data in next frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAggregationData();
+    });
   }
 
   @override
   void dispose() {
     _animController.dispose();
     super.dispose();
+  }
+
+  /// Load and aggregate nutrition data for daily/weekly/monthly views
+  Future<void> _loadAggregationData() async {
+    try {
+      setState(() => _isLoading = true);
+
+      final mealController = context.read<MealController>();
+      final now = DateTime.now();
+
+      // Get current user's daily goals - always fetch fresh data
+      var goals;
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId != null) {
+        try {
+          goals = await _dailyGoalsRepository.getDailyGoalsByUserId(int.parse(userId));
+        } catch (e) {
+          print('⚠️ Could not load daily goals: $e');
+          goals = null;
+        }
+      }
+
+      // Generate aggregations
+      final daily = _aggregationService.getDailyAggregation(
+        date: now,
+        allMeals: mealController.userMeals,
+        goals: goals,
+      );
+
+      final weekly = _aggregationService.getWeeklyAggregation(
+        endDate: now,
+        allMeals: mealController.userMeals,
+        goals: goals,
+      );
+
+      final monthly = _aggregationService.getMonthlyAggregation(
+        endDate: now,
+        allMeals: mealController.userMeals,
+        goals: goals,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _dailyAggregation = daily;
+        _weeklyAggregation = weekly;
+        _monthlyAggregation = monthly;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('❌ Error loading aggregation data: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _onNavTapped(int index) {
@@ -89,11 +166,21 @@ class _NutritionScreenState extends State<NutritionScreen>
                   child: Column(
                     children: [
                       const SizedBox(height: 16),
-                      _buildCalorieTrendCard(),
-                      const SizedBox(height: 14),
-                      _buildMacroCard(),
-                      const SizedBox(height: 14),
-                      _buildSummaryCard(),
+                      if (_isLoading)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32),
+                            child: CircularProgressIndicator(
+                              color: AppColors.nutritionNeonGreen,
+                            ),
+                          ),
+                        )
+                      else if (_selectedTab == 0)
+                        _buildDailyContent()
+                      else if (_selectedTab == 1)
+                        _buildWeeklyContent()
+                      else
+                        _buildMonthlyContent(),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -176,7 +263,377 @@ class _NutritionScreenState extends State<NutritionScreen>
     );
   }
 
-  Widget _buildCalorieTrendCard() {
+  Widget _macroLegendRow(Color color, String label, String value) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 10),
+        Text(label,
+            style: const TextStyle(color: Colors.white70, fontSize: 13)),
+        const Spacer(),
+        Text(value,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+      ],
+    );
+  }
+
+  // ===== DAILY TAB CONTENT =====
+  Widget _buildDailyContent() {
+    if (_dailyAggregation == null) {
+      return _buildEmptyState();
+    }
+
+    return Column(
+      children: [
+        _buildDailySummaryCard(_dailyAggregation!),
+        const SizedBox(height: 14),
+        _buildDailyMacroCard(_dailyAggregation!),
+        const SizedBox(height: 14),
+        _buildDailyMealsCard(_dailyAggregation!),
+      ],
+    );
+  }
+
+  Widget _buildDailySummaryCard(DailyAggregation daily) {
+    final percentOfGoal = (daily.totalCalories / daily.calorieGoal * 100).clamp(0, 200);
+    final isOnTrack = daily.isOnTrack;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.nutritionCardBg,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Today\'s Summary',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.65),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (isOnTrack ? AppColors.nutritionNeonGreen : Color(0xFFFF6B6B)).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Text(
+                  isOnTrack ? 'On track' : 'Off track',
+                  style: TextStyle(
+                    color: isOnTrack ? AppColors.nutritionNeonGreen : Color(0xFFFF6B6B),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Consumed',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Goal: ${daily.calorieGoal.toStringAsFixed(0)} kcal',
+                    style: TextStyle(color: AppColors.nutritionSubtleText, fontSize: 12),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${daily.totalCalories.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      color: AppColors.nutritionNeonGreen,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    '${percentOfGoal.toStringAsFixed(0)}% of goal',
+                    style: TextStyle(
+                      color: AppColors.nutritionSubtleText,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: (percentOfGoal / 200).clamp(0, 1),
+              backgroundColor: AppColors.nutritionProgressBg,
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.nutritionNeonGreen),
+              minHeight: 6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyMacroCard(DailyAggregation daily) {
+    final totalMacros = daily.totalProteins + daily.totalCarbs + daily.totalFats;
+    final proteinPct = totalMacros > 0 ? daily.totalProteins / totalMacros : 0;
+    final carbsPct = totalMacros > 0 ? daily.totalCarbs / totalMacros : 0;
+    final fatPct = totalMacros > 0 ? daily.totalFats / totalMacros : 0;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.nutritionCardBg,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Macro Breakdown',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              SizedBox(
+                width: 120,
+                height: 120,
+                child: CustomPaint(
+                  painter: _DonutChartPainter(
+                    segments: [
+                      (carbsPct.toDouble(), AppColors.nutritionNeonGreen),
+                      (proteinPct.toDouble(), AppColors.nutritionPurple),
+                      (fatPct.toDouble(), AppColors.nutritionCyan),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 28),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _macroLegendRow(
+                      AppColors.nutritionNeonGreen,
+                      'Carbs',
+                      '${daily.totalCarbs.toStringAsFixed(0)}g',
+                    ),
+                    const SizedBox(height: 14),
+                    _macroLegendRow(
+                      AppColors.nutritionPurple,
+                      'Protein',
+                      '${daily.totalProteins.toStringAsFixed(0)}g',
+                    ),
+                    const SizedBox(height: 14),
+                    _macroLegendRow(
+                      AppColors.nutritionCyan,
+                      'Fat',
+                      '${daily.totalFats.toStringAsFixed(0)}g',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyMealsCard(DailyAggregation daily) {
+    if (daily.meals.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.nutritionCardBg,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Meals Consumed',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.65),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Center(
+              child: Column(
+                children: [
+                  Icon(Icons.restaurant_outlined, color: AppColors.nutritionSubtleText, size: 40),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No meals logged',
+                    style: TextStyle(color: AppColors.nutritionSubtleText, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.nutritionCardBg,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Meals Consumed (${daily.meals.length})',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...daily.meals.map((meal) => _buildMealTile(meal)).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMealTile(MealLog meal) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.nutritionDarkBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        meal.mealType,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${meal.mealDate.hour}:${meal.mealDate.minute.toString().padLeft(2, '0')}',
+                        style: TextStyle(color: AppColors.nutritionSubtleText, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${(meal.totalCalories ?? 0).toStringAsFixed(0)} kcal',
+                      style: const TextStyle(
+                        color: AppColors.nutritionNeonGreen,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _miniMacroIndicator('P', meal.totalProteins ?? 0, 'g'),
+                const SizedBox(width: 12),
+                _miniMacroIndicator('C', meal.totalCarbs ?? 0, 'g'),
+                const SizedBox(width: 12),
+                _miniMacroIndicator('F', meal.totalFats ?? 0, 'g'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniMacroIndicator(String label, double value, String unit) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(color: AppColors.nutritionSubtleText, fontSize: 10),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '${value.toStringAsFixed(0)}$unit',
+          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+  }
+
+  // ===== WEEKLY TAB CONTENT =====
+  Widget _buildWeeklyContent() {
+    if (_weeklyAggregation == null) {
+      return _buildEmptyState();
+    }
+
+    return Column(
+      children: [
+        _buildWeeklyCalorieTrendCard(_weeklyAggregation!),
+        const SizedBox(height: 14),
+        _buildWeeklyMacroCard(_weeklyAggregation!),
+        const SizedBox(height: 14),
+        _buildWeeklyDeviationCard(_weeklyAggregation!),
+      ],
+    );
+  }
+
+  Widget _buildWeeklyCalorieTrendCard(WeeklyAggregation weekly) {
+    final avgPercentage = (weekly.avgDailyCalories / (weekly.weeklyCalorieGoal / 7) * 100).clamp(0, 200);
+
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
       decoration: BoxDecoration(
@@ -189,7 +646,7 @@ class _NutritionScreenState extends State<NutritionScreen>
           Row(
             children: [
               Text(
-                'Daily Calorie Trend',
+                'Weekly Calorie Trend',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.65),
                   fontSize: 13,
@@ -198,19 +655,18 @@ class _NutritionScreenState extends State<NutritionScreen>
               ),
               const Spacer(),
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.nutritionNeonGreen.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
-                  children: const [
-                    Icon(Icons.trending_up, color: AppColors.nutritionNeonGreen, size: 13),
-                    SizedBox(width: 3),
+                  children: [
+                    const Icon(Icons.trending_up, color: AppColors.nutritionNeonGreen, size: 13),
+                    const SizedBox(width: 3),
                     Text(
-                      '+5%',
-                      style: TextStyle(
+                      '${avgPercentage.toStringAsFixed(0)}%',
+                      style: const TextStyle(
                         color: AppColors.nutritionNeonGreen,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -222,9 +678,9 @@ class _NutritionScreenState extends State<NutritionScreen>
             ],
           ),
           const SizedBox(height: 6),
-          const Text(
-            '2,100',
-            style: TextStyle(
+          Text(
+            '${weekly.avgDailyCalories.toStringAsFixed(0)}',
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 34,
               fontWeight: FontWeight.w800,
@@ -232,7 +688,7 @@ class _NutritionScreenState extends State<NutritionScreen>
             ),
           ),
           Text(
-            'kcal avg',
+            'kcal avg per day',
             style: TextStyle(
               color: AppColors.nutritionSubtleText,
               fontSize: 13,
@@ -242,14 +698,14 @@ class _NutritionScreenState extends State<NutritionScreen>
           SizedBox(
             height: 110,
             child: CustomPaint(
-              painter: _CalorieChartPainter(data: _calorieData),
+              painter: _CalorieChartPainter(data: weekly.caloriesList),
               size: const Size(double.infinity, 110),
             ),
           ),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: _days
+            children: weekly.dayLabels
                 .map((d) => Text(
               d,
               style: TextStyle(
@@ -267,7 +723,12 @@ class _NutritionScreenState extends State<NutritionScreen>
     );
   }
 
-  Widget _buildMacroCard() {
+  Widget _buildWeeklyMacroCard(WeeklyAggregation weekly) {
+    final totalMacros = weekly.avgDailyProteins + weekly.avgDailyCarbs + weekly.avgDailyFats;
+    final proteinPct = totalMacros > 0 ? weekly.avgDailyProteins / totalMacros : 0;
+    final carbsPct = totalMacros > 0 ? weekly.avgDailyCarbs / totalMacros : 0;
+    final fatPct = totalMacros > 0 ? weekly.avgDailyFats / totalMacros : 0;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -278,7 +739,7 @@ class _NutritionScreenState extends State<NutritionScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Macro Distribution',
+            'Average Macro Distribution',
             style: TextStyle(
               color: Colors.white.withOpacity(0.65),
               fontSize: 13,
@@ -292,7 +753,13 @@ class _NutritionScreenState extends State<NutritionScreen>
                 width: 120,
                 height: 120,
                 child: CustomPaint(
-                  painter: _DonutChartPainter(),
+                  painter: _DonutChartPainter(
+                    segments: [
+                      (carbsPct.toDouble(), AppColors.nutritionNeonGreen),
+                      (proteinPct.toDouble(), AppColors.nutritionPurple),
+                      (fatPct.toDouble(), AppColors.nutritionCyan),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 28),
@@ -300,11 +767,23 @@ class _NutritionScreenState extends State<NutritionScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _macroLegendRow(AppColors.nutritionNeonGreen, 'Carbs', '50%'),
+                    _macroLegendRow(
+                      AppColors.nutritionNeonGreen,
+                      'Carbs',
+                      '${weekly.avgDailyCarbs.toStringAsFixed(0)}g',
+                    ),
                     const SizedBox(height: 14),
-                    _macroLegendRow(AppColors.nutritionPurple, 'Protein', '25%'),
+                    _macroLegendRow(
+                      AppColors.nutritionPurple,
+                      'Protein',
+                      '${weekly.avgDailyProteins.toStringAsFixed(0)}g',
+                    ),
                     const SizedBox(height: 14),
-                    _macroLegendRow(AppColors.nutritionCyan, 'Fat', '25%'),
+                    _macroLegendRow(
+                      AppColors.nutritionCyan,
+                      'Fat',
+                      '${weekly.avgDailyFats.toStringAsFixed(0)}g',
+                    ),
                   ],
                 ),
               ),
@@ -315,26 +794,104 @@ class _NutritionScreenState extends State<NutritionScreen>
     );
   }
 
-  Widget _macroLegendRow(Color color, String label, String pct) {
-    return Row(
+  Widget _buildWeeklyDeviationCard(WeeklyAggregation weekly) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.nutritionCardBg,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Daily Deviation from Goal',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...weekly.dailyData.asMap().entries.map((entry) {
+            final day = entry.value;
+            final dayLabel = weekly.dayLabels[entry.key];
+            final deviation = day.totalCalories - day.calorieGoal;
+            final isOver = deviation > 0;
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 35,
+                    child: Text(
+                      dayLabel,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: (day.totalCalories / (day.calorieGoal * 1.5)).clamp(0, 1),
+                        backgroundColor: AppColors.nutritionProgressBg,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isOver ? Color(0xFFFF6B6B) : AppColors.nutritionNeonGreen,
+                        ),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 50,
+                    child: Text(
+                      '${isOver ? '+' : ''}${deviation.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        color: isOver ? Color(0xFFFF6B6B) : AppColors.nutritionNeonGreen,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        textBaseline: TextBaseline.alphabetic,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  // ===== MONTHLY TAB CONTENT =====
+  Widget _buildMonthlyContent() {
+    if (_monthlyAggregation == null) {
+      return _buildEmptyState();
+    }
+
+    return Column(
       children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 10),
-        Text(label,
-            style: const TextStyle(color: Colors.white70, fontSize: 13)),
-        const Spacer(),
-        Text(pct,
-            style: const TextStyle(
-                color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+        _buildMonthlySummaryCard(_monthlyAggregation!),
+        const SizedBox(height: 14),
+        _buildMonthlyMacroCard(_monthlyAggregation!),
+        const SizedBox(height: 14),
+        _buildMonthlyHighlightsCard(_monthlyAggregation!),
       ],
     );
   }
 
-  Widget _buildSummaryCard() {
+  Widget _buildMonthlySummaryCard(MonthlyAggregation monthly) {
+    final percentOfGoal = (monthly.totalCalories / monthly.monthlyCalorieGoal * 100).clamp(0, 200);
+    final isOnTrack = percentOfGoal >= 90 && percentOfGoal <= 110;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -347,7 +904,7 @@ class _NutritionScreenState extends State<NutritionScreen>
           Row(
             children: [
               Text(
-                'Summary',
+                'Monthly Summary',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.65),
                   fontSize: 13,
@@ -356,16 +913,15 @@ class _NutritionScreenState extends State<NutritionScreen>
               ),
               const Spacer(),
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.nutritionNeonGreen.withOpacity(0.15),
+                  color: (isOnTrack ? AppColors.nutritionNeonGreen : Color(0xFFFF6B6B)).withOpacity(0.15),
                   borderRadius: BorderRadius.circular(7),
                 ),
-                child: const Text(
-                  'On track',
+                child: Text(
+                  isOnTrack ? 'On track' : 'Off track',
                   style: TextStyle(
-                    color: AppColors.nutritionNeonGreen,
+                    color: isOnTrack ? AppColors.nutritionNeonGreen : Color(0xFFFF6B6B),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -377,11 +933,11 @@ class _NutritionScreenState extends State<NutritionScreen>
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Weekly Average',
+                    'Total Consumed',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -390,7 +946,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Target: 2,250 kcal',
+                    'Goal: ${monthly.monthlyCalorieGoal.toStringAsFixed(0)} kcal',
                     style: TextStyle(color: AppColors.nutritionSubtleText, fontSize: 12),
                   ),
                 ],
@@ -399,16 +955,16 @@ class _NutritionScreenState extends State<NutritionScreen>
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text(
-                    '2,100',
-                    style: TextStyle(
+                  Text(
+                    '${monthly.totalCalories.toStringAsFixed(0)}',
+                    style: const TextStyle(
                       color: AppColors.nutritionNeonGreen,
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   Text(
-                    '93% of goal',
+                    '${percentOfGoal.toStringAsFixed(0)}% of goal',
                     style: TextStyle(
                       color: AppColors.nutritionSubtleText,
                       fontSize: 11,
@@ -422,7 +978,7 @@ class _NutritionScreenState extends State<NutritionScreen>
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
-              value: 0.93,
+              value: (percentOfGoal / 200).clamp(0, 1),
               backgroundColor: AppColors.nutritionProgressBg,
               valueColor: const AlwaysStoppedAnimation<Color>(AppColors.nutritionNeonGreen),
               minHeight: 6,
@@ -432,9 +988,189 @@ class _NutritionScreenState extends State<NutritionScreen>
       ),
     );
   }
+
+  Widget _buildMonthlyMacroCard(MonthlyAggregation monthly) {
+    final totalMacros = monthly.avgDailyProteins + monthly.avgDailyCarbs + monthly.avgDailyFats;
+    final proteinPct = totalMacros > 0 ? monthly.avgDailyProteins / totalMacros : 0;
+    final carbsPct = totalMacros > 0 ? monthly.avgDailyCarbs / totalMacros : 0;
+    final fatPct = totalMacros > 0 ? monthly.avgDailyFats / totalMacros : 0;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.nutritionCardBg,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Average Daily Macros',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              SizedBox(
+                width: 120,
+                height: 120,
+                child: CustomPaint(
+                  painter: _DonutChartPainter(
+                    segments: [
+                      (carbsPct.toDouble(), AppColors.nutritionNeonGreen),
+                      (proteinPct.toDouble(), AppColors.nutritionPurple),
+                      (fatPct.toDouble(), AppColors.nutritionCyan),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 28),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _macroLegendRow(
+                      AppColors.nutritionNeonGreen,
+                      'Carbs',
+                      '${monthly.avgDailyCarbs.toStringAsFixed(0)}g',
+                    ),
+                    const SizedBox(height: 14),
+                    _macroLegendRow(
+                      AppColors.nutritionPurple,
+                      'Protein',
+                      '${monthly.avgDailyProteins.toStringAsFixed(0)}g',
+                    ),
+                    const SizedBox(height: 14),
+                    _macroLegendRow(
+                      AppColors.nutritionCyan,
+                      'Fat',
+                      '${monthly.avgDailyFats.toStringAsFixed(0)}g',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMonthlyHighlightsCard(MonthlyAggregation monthly) {
+    final highlights = monthly.getNutrientHighlights();
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.nutritionCardBg,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Nutrient Insights',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...highlights.take(3).map((highlight) {
+            final isOver = highlight.isOver;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.nutritionDarkBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: (isOver ? Color(0xFFFF6B6B) : AppColors.nutritionNeonGreen).withOpacity(0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            highlight.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: (isOver ? Color(0xFFFF6B6B) : AppColors.nutritionNeonGreen).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            isOver ? '+${highlight.percentageString}' : highlight.percentageString,
+                            style: TextStyle(
+                              color: isOver ? Color(0xFFFF6B6B) : AppColors.nutritionNeonGreen,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          'Avg: ${highlight.actual.toStringAsFixed(1)}${highlight.unit}',
+                          style: TextStyle(color: AppColors.nutritionSubtleText, fontSize: 12),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Goal: ${highlight.goal.toStringAsFixed(1)}${highlight.unit}',
+                          style: TextStyle(color: AppColors.nutritionSubtleText, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.restaurant_outlined, color: AppColors.nutritionSubtleText, size: 60),
+            const SizedBox(height: 16),
+            Text(
+              'No data available',
+              style: TextStyle(color: AppColors.nutritionSubtleText, fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-// --- Custom Painters ---
+// --- Custom Painters (Top-level classes) ---
 
 class _CalorieChartPainter extends CustomPainter {
   final List<double> data;
@@ -442,6 +1178,8 @@ class _CalorieChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (data.isEmpty) return;
+
     final minVal = data.reduce(min);
     final maxVal = data.reduce(max);
     final range = maxVal - minVal;
@@ -449,7 +1187,7 @@ class _CalorieChartPainter extends CustomPainter {
     List<Offset> points = [];
     for (int i = 0; i < data.length; i++) {
       final x = i * size.width / (data.length - 1);
-      final y = size.height - ((data[i] - minVal) / range) * (size.height * 0.8) - size.height * 0.05;
+      final y = size.height - ((data[i] - minVal) / (range > 0 ? range : 1)) * (size.height * 0.8) - size.height * 0.05;
       points.add(Offset(x, y));
     }
 
@@ -482,8 +1220,8 @@ class _CalorieChartPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          AppColors.nutritionNeonGreen.withOpacity(0.35),
-          AppColors.nutritionNeonGreen.withOpacity(0.0),
+          AppColors.nutritionNeonGreen.withValues(alpha: 0.35),
+          AppColors.nutritionNeonGreen.withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
       ..style = PaintingStyle.fill;
@@ -506,7 +1244,7 @@ class _CalorieChartPainter extends CustomPainter {
       points.last,
       5,
       Paint()
-        ..color = AppColors.nutritionNeonGreen.withOpacity(0.3)
+        ..color = AppColors.nutritionNeonGreen.withValues(alpha: 0.3)
         ..strokeWidth = 3
         ..style = PaintingStyle.stroke,
     );
@@ -517,13 +1255,17 @@ class _CalorieChartPainter extends CustomPainter {
 }
 
 class _DonutChartPainter extends CustomPainter {
+  final List<(double, Color)>? segments;
+
+  _DonutChartPainter({this.segments});
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 10;
     const strokeWidth = 14.0;
 
-    final segments = [
+    final segs = segments ?? [
       (0.50, AppColors.nutritionNeonGreen),   // Carbs 50%
       (0.25, AppColors.nutritionPurple),      // Protein 25%
       (0.25, AppColors.nutritionCyan),        // Fat 25%
@@ -532,7 +1274,7 @@ class _DonutChartPainter extends CustomPainter {
     double startAngle = -pi / 2;
     const gap = 0.03;
 
-    for (final seg in segments) {
+    for (final seg in segs) {
       final sweepAngle = seg.$1 * 2 * pi - gap;
       final paint = Paint()
         ..color = seg.$2
