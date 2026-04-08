@@ -71,6 +71,15 @@ class _LiveMap extends State<LiveMap> {
     }
   }
 
+  void _refreshLocation() {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+      _currentLocation = null;
+    });
+    _getUserLocation();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,7 +126,7 @@ class _LiveMap extends State<LiveMap> {
       child:FlutterMap(
         options: MapOptions(
           initialCenter: _currentLocation!,
-          initialZoom: 200.0,
+          initialZoom: 20.0,
         ),
         children: [
           // shows the map in background

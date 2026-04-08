@@ -23,17 +23,9 @@ class AdminDashboardPage extends StatelessWidget {
       return;
     }
 
-    final userIdInt = userId is int ? userId : int.tryParse(userId.toString());
-    if (userIdInt == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid user ID')),
-      );
-      return;
-    }
-
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => AerobicPage(userId: userIdInt),
+        builder: (_) => AerobicPage(userId: userId),
       ),
     );
   }
