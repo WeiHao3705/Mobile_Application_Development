@@ -181,8 +181,35 @@ class MealService {
           await _mealFoodRepository.createMealFoods(mealFoods);
           developer.log('✅ All ${mealFoods.length} foods saved successfully to MealFood table');
         } catch (e) {
-          developer.log('⚠️ Warning: Foods were not saved to MealFood table: $e');
-          // Continue anyway - meal is already created
+          developer.log('❌ ERROR: Foods were not saved to MealFood table: $e');
+          developer.log('❌ Stack trace: ${StackTrace.current}');
+
+          // Check if it's a duplicate key error (schema issue, not transactional)
+          if (e.toString().contains('duplicate key') || e.toString().contains('23505')) {
+            developer.log('⚠️ WARNING: Duplicate key constraint violation detected');
+            developer.log('📋 This usually means the MealFood table has incorrect unique constraints');
+            developer.log('💡 Expected: unique constraint on (meal_id, food_id)');
+            developer.log('❌ Found: unique constraint on food_id only');
+            developer.log('🔧 ACTION REQUIRED: Fix the MealFood table constraints in Supabase');
+
+            // Don't rollback for schema errors - keep the meal, but fail the operation
+            throw Exception('Database Schema Error: MealFood table has incorrect unique constraint. '
+                'Expected unique(meal_id, food_id) but found unique(food_id). '
+                'Please fix the constraint in Supabase and try again.');
+          } else {
+            // For other errors, attempt rollback
+            developer.log('❌ Attempting to rollback: deleting meal ${createdMeal.mealId} to maintain data consistency...');
+
+            try {
+              await _repository.deleteMeal(createdMeal.mealId!);
+              developer.log('✅ Meal rolled back successfully');
+            } catch (rollbackError) {
+              developer.log('⚠️ WARNING: Failed to rollback meal deletion: $rollbackError');
+            }
+
+            // Re-throw the original error
+            throw Exception('Failed to save food items for meal: $e');
+          }
         }
       }
 
@@ -244,26 +271,148 @@ class MealService {
     }
   }
 
-  /// Update an existing meal
+  /// Update an existing meal with new foods and recalculate nutrition
   Future<MealLog> updateMeal({
     required int mealId,
     required String mealType,
     required DateTime mealDate,
     required int userId,
+    Map<int, Map<String, dynamic>>? foodsWithQuantities,
   }) async {
     try {
-      final meal = MealLog(
-        mealId: mealId,
-        mealType: mealType,
-        mealDate: mealDate,
-        userId: userId,
-      );
+      developer.log('🟨 MealService.updateMeal START');
+      developer.log('👤 Meal ID: $mealId');
+      developer.log('🍽️ Meal Type: $mealType');
+      developer.log('📅 Meal Date: $mealDate');
+      developer.log('📊 Foods provided: ${foodsWithQuantities?.length ?? 0}');
 
-      final updatedMeal = await _repository.updateMeal(meal);
-      developer.log('Meal updated via service: $mealId');
-      return updatedMeal;
+      // If foods are provided, delete old meal foods and recalculate nutrition
+      if (foodsWithQuantities != null && foodsWithQuantities.isNotEmpty) {
+        developer.log('💾 Updating meal foods...');
+
+        // Delete old meal foods
+        try {
+          await _mealFoodRepository.deleteMealFoodsByMealId(mealId);
+          developer.log('✅ Deleted old meal foods');
+        } catch (e) {
+          developer.log('⚠️ Error deleting old meal foods: $e');
+          // Continue anyway
+        }
+
+        // Calculate new nutrition
+        developer.log('💾 Calculating new meal nutrition...');
+        double totalCalories = 0.0;
+        double totalProteins = 0.0;
+        double totalCarbs = 0.0;
+        double totalFats = 0.0;
+
+        try {
+          final allFoods = await _foodRepository.getFoodsByUser(userId);
+          final foodMap = {for (var food in allFoods) food.foodId: food};
+          developer.log('📚 Loaded ${foodMap.length} foods from database');
+
+          for (final entry in foodsWithQuantities.entries) {
+            final foodId = entry.key;
+            final foodData = entry.value;
+            final quantity = (foodData['quantity'] as num).toDouble();
+
+            developer.log('🔍 Looking up food ID: $foodId');
+            developer.log('   Quantity: $quantity grams');
+
+            final food = foodMap[foodId];
+
+            if (food == null) {
+              developer.log('❌ Food ID $foodId not found in user foods.');
+              continue;
+            }
+
+            developer.log('✓ Found food: ${food.foodName}');
+
+            final foodCalories = (food.caloriesPer100g / 100.0) * quantity;
+            final foodProteins = (food.proteinPer100g / 100.0) * quantity;
+            final foodCarbs = (food.carbsPer100g / 100.0) * quantity;
+            final foodFats = (food.fatPer100g / 100.0) * quantity;
+
+            totalCalories += foodCalories;
+            totalProteins += foodProteins;
+            totalCarbs += foodCarbs;
+            totalFats += foodFats;
+
+            developer.log('📝 ${food.foodName}: $quantity g');
+            developer.log('   ├─ Calories: ${foodCalories.toStringAsFixed(2)} kcal');
+            developer.log('   ├─ Protein: ${foodProteins.toStringAsFixed(2)} g');
+            developer.log('   ├─ Carbs: ${foodCarbs.toStringAsFixed(2)} g');
+            developer.log('   └─ Fat: ${foodFats.toStringAsFixed(2)} g');
+          }
+        } catch (e) {
+          developer.log('❌ Error calculating nutrition: $e');
+          totalCalories = 0.0;
+          totalProteins = 0.0;
+          totalCarbs = 0.0;
+          totalFats = 0.0;
+        }
+
+        developer.log('✅ Total calculated nutrition:');
+        developer.log('   ├─ Calories: ${totalCalories.toStringAsFixed(2)} kcal');
+        developer.log('   ├─ Protein: ${totalProteins.toStringAsFixed(2)} g');
+        developer.log('   ├─ Carbs: ${totalCarbs.toStringAsFixed(2)} g');
+        developer.log('   └─ Fat: ${totalFats.toStringAsFixed(2)} g');
+
+        // Create updated meal with new nutrition values
+        final meal = MealLog(
+          mealId: mealId,
+          mealType: mealType,
+          mealDate: mealDate,
+          userId: userId,
+          totalCalories: totalCalories > 0 ? totalCalories : null,
+          totalProteins: totalProteins > 0 ? totalProteins : null,
+          totalCarbs: totalCarbs > 0 ? totalCarbs : null,
+          totalFats: totalFats > 0 ? totalFats : null,
+        );
+
+        developer.log('💾 Updating meal with new nutrition data...');
+        final updatedMeal = await _repository.updateMeal(meal);
+        developer.log('✅ Meal updated successfully with new nutrition');
+
+        // Save new meal foods
+        developer.log('💾 Saving new meal foods...');
+        final mealFoods = <MealFood>[];
+        for (final entry in foodsWithQuantities.entries) {
+          final foodData = entry.value;
+          mealFoods.add(MealFood(
+            mealFoodId: 0,
+            mealId: mealId,
+            foodId: foodData['food_id'] as int,
+            quantity: (foodData['quantity'] as num).toDouble(),
+            unit: foodData['unit'] as String? ?? 'g',
+          ));
+        }
+
+        try {
+          await _mealFoodRepository.createMealFoods(mealFoods);
+          developer.log('✅ All ${mealFoods.length} foods saved successfully');
+        } catch (e) {
+          developer.log('❌ ERROR: Foods were not saved: $e');
+          throw Exception('Failed to save food items for meal: $e');
+        }
+
+        return updatedMeal;
+      } else {
+        // No foods provided, just update basic info (type and date)
+        developer.log('⚠️ No foods provided. Updating basic meal info only.');
+        final meal = MealLog(
+          mealId: mealId,
+          mealType: mealType,
+          mealDate: mealDate,
+          userId: userId,
+        );
+
+        final updatedMeal = await _repository.updateMeal(meal);
+        developer.log('✅ Meal basic info updated via service: $mealId');
+        return updatedMeal;
+      }
     } catch (e) {
-      developer.log('Error in MealService.updateMeal: $e');
+      developer.log('❌ Error in MealService.updateMeal: $e');
       rethrow;
     }
   }
@@ -271,10 +420,19 @@ class MealService {
   /// Delete a meal
   Future<void> deleteMeal(int mealId) async {
     try {
+      developer.log('🔵 MealService.deleteMeal START for meal $mealId');
+
+      // First, delete all meal foods associated with this meal
+      developer.log('🗑️ Deleting associated meal foods...');
+      await _mealFoodRepository.deleteMealFoodsByMealId(mealId);
+      developer.log('✅ Meal foods deleted');
+
+      // Then delete the meal itself
+      developer.log('🗑️ Deleting meal record...');
       await _repository.deleteMeal(mealId);
-      developer.log('Meal deleted via service: $mealId');
+      developer.log('✅ Meal deleted via service: $mealId');
     } catch (e) {
-      developer.log('Error in MealService.deleteMeal: $e');
+      developer.log('❌ Error in MealService.deleteMeal: $e');
       rethrow;
     }
   }

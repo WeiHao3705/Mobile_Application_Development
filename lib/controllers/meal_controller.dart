@@ -193,23 +193,29 @@ class MealController extends ChangeNotifier {
     }
   }
 
-  /// Update an existing meal
+  /// Update an existing meal with new foods and recalculate nutrition
   Future<bool> updateMeal({
     required int mealId,
     required String mealType,
     required DateTime mealDate,
     required int userId,
+    Map<int, Map<String, dynamic>>? foodsWithQuantities,
   }) async {
     _isLoading = true;
     _errorMessage = '';
     notifyListeners();
 
     try {
+      developer.log('🟨 MealController.updateMeal START');
+      developer.log('👤 Meal ID: $mealId');
+      developer.log('📊 Foods provided: ${foodsWithQuantities?.length ?? 0}');
+
       final updatedMeal = await _service.updateMeal(
         mealId: mealId,
         mealType: mealType,
         mealDate: mealDate,
         userId: userId,
+        foodsWithQuantities: foodsWithQuantities,
       );
 
       _currentMeal = updatedMeal;
@@ -218,19 +224,28 @@ class MealController extends ChangeNotifier {
       final index = _userMeals.indexWhere((meal) => meal.mealId == mealId);
       if (index != -1) {
         _userMeals[index] = updatedMeal;
+        // Also update the cached calories
+        if (updatedMeal.totalCalories != null) {
+          _mealCalories[mealId] = updatedMeal.totalCalories!;
+        }
       }
 
       _isSuccess = true;
 
-      developer.log('Meal updated successfully: $mealId');
+      developer.log('✅ Meal updated successfully: $mealId');
+      developer.log('✅ Updated nutrition - Calories: ${updatedMeal.totalCalories}');
       return true;
+    } on PostgrestException catch (e) {
+      _errorMessage = 'Database error: ${e.message}';
+      developer.log('❌ PostgrestException in MealController: $_errorMessage');
+      return false;
     } on Exception catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');
-      developer.log('Error updating meal: $_errorMessage');
+      developer.log('❌ Error updating meal: $_errorMessage');
       return false;
     } catch (e) {
       _errorMessage = 'Failed to update meal. Please try again.';
-      developer.log('Unexpected error updating meal: $e');
+      developer.log('❌ Unexpected error updating meal: $e');
       return false;
     } finally {
       _isLoading = false;

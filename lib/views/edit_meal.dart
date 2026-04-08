@@ -7,7 +7,9 @@ import '../controllers/food_controller.dart';
 import '../controllers/auth_controller.dart';
 import '../models/meal_log.dart';
 import '../models/food.dart';
+import '../repository/meal_food_repository.dart';
 import 'add_new_food.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class _SelectedMealFood {
   _SelectedMealFood({required this.food, required this.quantity});
@@ -54,13 +56,76 @@ class _EditMealViewState extends State<EditMealView> {
 
   Future<void> _loadMealFoods() async {
     try {
-      // For now, start with empty foods - user can add foods from the list below
-      // In the future, we can fetch existing meal foods if the API supports it
-      if (mounted) {
-        setState(() => _isLoading = false);
+      developer.log('🔵 Loading existing meal foods for meal ${widget.meal.mealId}');
+
+      if (widget.meal.mealId == null || widget.meal.mealId! <= 0) {
+        developer.log('⚠️ No meal ID available, skipping load');
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        return;
       }
+
+      // Get meal food repository
+      final supabaseClient = Supabase.instance.client;
+      final mealFoodRepo = MealFoodRepository(supabase: supabaseClient);
+      final foodController = context.read<FoodController>();
+
+      // Fetch existing meal foods
+      final mealFoods = await mealFoodRepo.getMealFoodsByMealId(widget.meal.mealId!);
+      developer.log('📊 Found ${mealFoods.length} foods in this meal');
+
+      if (mealFoods.isEmpty) {
+        developer.log('ℹ️ No foods found in this meal');
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
+
+      // Load user foods to get food details
+      final allFoods = foodController.userFoods;
+      if (allFoods.isEmpty) {
+        developer.log('⚠️ User foods not loaded, fetching...');
+        await foodController.fetchAllFoods();
+      }
+
+      // Map meal foods to _selected
+      final Map<int, _SelectedMealFood> selectedFoods = {};
+
+      for (final mealFood in mealFoods) {
+        developer.log('🔍 Processing food ID: ${mealFood.foodId}, Quantity: ${mealFood.quantity}g');
+
+        // Find the food from foodController
+        Food? foundFood;
+        try {
+          foundFood = foodController.userFoods.firstWhere(
+            (f) => f.foodId == mealFood.foodId,
+          );
+        } catch (e) {
+          developer.log('❌ Food ID ${mealFood.foodId} not found in user foods');
+          continue;
+        }
+
+        if (foundFood != null) {
+          selectedFoods[mealFood.foodId] = _SelectedMealFood(
+            food: foundFood,
+            quantity: mealFood.quantity,
+          );
+          developer.log('✅ Added ${foundFood.foodName} (${mealFood.quantity}g) to selected foods');
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _selected.addAll(selectedFoods);
+          _isLoading = false;
+        });
+      }
+
+      developer.log('✅ Finished loading ${selectedFoods.length} meal foods');
     } catch (e) {
-      developer.log('Error loading meal foods: $e');
+      developer.log('❌ Error loading meal foods: $e');
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -164,19 +229,18 @@ class _EditMealViewState extends State<EditMealView> {
     final mealController = context.read<MealController>();
 
     try {
-      // Update meal basic info (type and date)
+      // Update meal with new foods and recalculate nutrition
       final success = await mealController.updateMeal(
         mealId: widget.meal.mealId ?? 0,
         mealType: _selectedMealType,
         mealDate: _selectedDate,
         userId: widget.meal.userId,
+        foodsWithQuantities: foodsWithQuantities,
       );
 
       if (!mounted) return;
 
       if (success) {
-        // TODO: In future, also update the meal foods
-        // For now, the basic meal info is updated
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✓ Meal updated successfully!'),
