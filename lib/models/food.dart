@@ -31,9 +31,8 @@ class Food {
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'food_id': foodId,
+  Map<String, dynamic> toJson({bool includeId = true}) {
+    final json = {
       'user_id': userId,
       'food_name': foodName,
       'category': category,
@@ -42,6 +41,13 @@ class Food {
       'carbs_per_100g': carbsPer100g,
       'fat_per_100g': fatPer100g,
     };
+
+    // Only include food_id if it's not 0 (new record) or if explicitly requested
+    if (includeId && foodId != 0) {
+      json['food_id'] = foodId;
+    }
+
+    return json;
   }
 
   /// Create a copy of this Food with optional field overrides

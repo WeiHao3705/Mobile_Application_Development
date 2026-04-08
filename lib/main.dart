@@ -43,6 +43,9 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<AuthController>(
+          create: (_) => _authController,
+        ),
         ChangeNotifierProvider(
           create: (_) => FoodController(),
         ),

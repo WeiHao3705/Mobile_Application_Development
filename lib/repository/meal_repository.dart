@@ -10,17 +10,36 @@ class MealLogRepository {
   // CREATE a new meal
   Future<MealLog> createMeal(MealLog meal) async {
     try {
+      log("🔵 MealLogRepository.createMeal START");
+      log("📝 Meal data: ${meal.toJson()}");
+      log("📊 Attempting to insert into 'MealLog' table...");
+
       final response = await supabase
           .from('MealLog')
           .insert(meal.toJson())
           .select()
           .single();
 
-      log("Insert new meal success: $response");
+      log("✅ Insert new meal success: $response");
 
       return MealLog.fromJson(response);
+    } on PostgrestException catch (e) {
+      log("❌ PostgrestException in createMeal:");
+      log("   Message: ${e.message}");
+      log("   Code: ${e.code}");
+      log("   Details: ${e.details}");
+      log("   Hint: ${e.hint}");
+
+      // Provide helpful debugging information
+      if (e.code == 'PGRST205') {
+        log("⚠️ TABLE NOT FOUND - The 'MealLog' table doesn't exist in Supabase");
+        log("⚠️ Hint from Supabase: ${e.hint}");
+        log("⚠️ Available tables: Check your Supabase dashboard");
+      }
+
+      rethrow;
     } catch (e) {
-      log("Insert failed. Error", error: e);
+      log("❌ Unexpected error in createMeal: $e");
       rethrow;
     }
   }

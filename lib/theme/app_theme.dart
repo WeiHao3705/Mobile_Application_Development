@@ -15,6 +15,7 @@ class AppTheme {
     ),
 
     textTheme: const TextTheme(
+      headlineSmall: TextStyle(color: AppColors.lightText),
       bodyMedium: TextStyle(color: AppColors.lightText),
     ),
   );
@@ -31,6 +32,7 @@ class AppTheme {
     ),
 
     textTheme: const TextTheme(
+      headlineSmall: TextStyle(color: AppColors.darkText),
       bodyMedium: TextStyle(color: AppColors.darkText),
     ),
   );

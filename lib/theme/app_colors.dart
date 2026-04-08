@@ -24,6 +24,15 @@ class AppColors {
   static const inputBg = Color(0xFF111111);
   static const iconBg = Color(0xFF111111);
 
+  // Nutrition Analysis Colors
+  static const nutritionNeonGreen = Color(0xFFC8F135);
+  static const nutritionCardBg = Color(0xFF1A1F1B);
+  static const nutritionSubtleText = Color(0xFF6B7A6D);
+  static const nutritionPurple = Color(0xFFB08FFF);
+  static const nutritionCyan = Color(0xFF4FC3F7);
+  static const nutritionDarkBg = Color(0xFF000000);
+  static const nutritionProgressBg = Color(0xFF2A3028);
+
   // Legacy colors (for backward compatibility)
   static const primary = purple;
   static const secondary = lavender;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
 import 'package:mobile_application_development/models/food.dart';
+import 'package:mobile_application_development/views/widgets/custom_bottom_nav_bar.dart';
 import 'package:provider/provider.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/food_controller.dart';
@@ -33,11 +34,11 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   String _searchQuery   = '';
   final Map<int, _SelectedItem> _selected = {};
   final TextEditingController _searchCtrl = TextEditingController();
-  final TextEditingController _noteCtrl   = TextEditingController();
   bool _showToast = false;
+  int _selectedNavIndex = 2; // Diet tab (3rd item, 0-indexed)
 
-  // Meal type selection
-  String _selectedMealType = 'Breakfast';
+  // Meal type selection - will be set in initState based on current time
+  late String _selectedMealType;
   static const List<String> _mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
   // Batch deletion state
@@ -51,6 +52,27 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     Future.microtask(() {
       context.read<FoodController>().fetchAllFoods();
     });
+
+    // Auto-assign meal type based on current time
+    _selectedMealType = _getDefaultMealType();
+  }
+
+  String _getDefaultMealType() {
+    final now = DateTime.now();
+    final hour = now.hour;
+    final offset = now.timeZoneOffset;
+
+    if (hour >= 5 && hour < 11) {
+      return 'Breakfast';
+    } else if (hour >= 11 && hour < 15) {
+      return 'Lunch';
+    } else if (hour >= 15 && hour < 18) {
+      return 'Snacks';
+    } else if (hour >= 18 && hour < 22) {
+      return 'Dinner';
+    } else {
+      return 'Snacks';
+    }
   }
 
   Future<void> _navigateToAddFood() async {
@@ -183,10 +205,20 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     }
   }
 
+  void _onNavItemTapped(int index) {
+    if (index == 2) {
+      // Already on Diet tab, no need to navigate
+      return;
+    }
+
+    // Navigate to the selected tab
+    Navigator.of(context).pop();
+    Navigator.of(context).pushReplacementNamed('/main');
+  }
+
   @override
   void dispose() {
     _searchCtrl.dispose();
-    _noteCtrl.dispose();
     super.dispose();
   }
 
@@ -198,10 +230,18 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     return matchCat && matchQ;
   }).toList();
 
-  int get _totalKcal    => _selected.values.fold(0, (s, i) => s + (i.food.caloriesPer100g * i.qty).toInt());
-  int get _totalProtein => _selected.values.fold(0, (s, i) => s + (i.food.proteinPer100g * i.qty).toInt());
-  int get _totalCarbs   => _selected.values.fold(0, (s, i) => s + (i.food.carbsPer100g * i.qty).toInt());
-  int get _totalFat     => _selected.values.fold(0, (s, i) => s + (i.food.fatPer100g * i.qty).toInt());
+  /// Calculate total calories: each qty increment = 100g
+  /// Formula: (caloriesPer100g / 100) * (qty * 100g)
+  double get _totalKcal => _selected.values.fold(0.0, (s, i) => s + ((i.food.caloriesPer100g / 100.0) * (i.qty * 100.0)));
+  
+  /// Calculate total protein: each qty increment = 100g
+  double get _totalProtein => _selected.values.fold(0.0, (s, i) => s + ((i.food.proteinPer100g / 100.0) * (i.qty * 100.0)));
+  
+  /// Calculate total carbs: each qty increment = 100g
+  double get _totalCarbs => _selected.values.fold(0.0, (s, i) => s + ((i.food.carbsPer100g / 100.0) * (i.qty * 100.0)));
+  
+  /// Calculate total fat: each qty increment = 100g
+  double get _totalFat => _selected.values.fold(0.0, (s, i) => s + ((i.food.fatPer100g / 100.0) * (i.qty * 100.0)));
 
   void _changeQty(int id, int delta) {
     setState(() {
@@ -268,7 +308,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
         // Show success toast and reset form
         setState(() => _showToast = true);
         _searchCtrl.clear();
-        _noteCtrl.clear();
         _selected.clear();
 
         Future.delayed(const Duration(milliseconds: 2200), () {
@@ -392,8 +431,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
                           const SizedBox(height: 4),
                           _buildSelectedSummary(),
                         ],
-                        const SizedBox(height: 14),
-                        _buildNoteField(),
                         const SizedBox(height: 16),
                         _buildLogButton(),
                         const SizedBox(height: 80),
@@ -405,6 +442,10 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
             );
           },
         ),
+      ),
+      bottomNavigationBar: CustomBottomNavBar(
+        selectedIndex: _selectedNavIndex,
+        onTap: _onNavItemTapped,
       ),
     );
   }
@@ -722,17 +763,17 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Selected Items', style: TextStyle(color: AppColors.white, fontSize: 15, fontWeight: FontWeight.w800)),
-              Text('$_totalKcal kcal', style: const TextStyle(color: AppColors.lime, fontSize: 15, fontWeight: FontWeight.w800)),
+              Text('${_totalKcal.toStringAsFixed(0)} kcal', style: const TextStyle(color: AppColors.lime, fontSize: 15, fontWeight: FontWeight.w800)),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              _MacroSummaryChip(label: 'PROTEIN', value: '${_totalProtein}g', valueColor: AppColors.lavender, bgColor: Color(0x1AB3A0FF)),
+              _MacroSummaryChip(label: 'PROTEIN', value: '${_totalProtein.toStringAsFixed(1)}g', valueColor: AppColors.lavender, bgColor: Color(0x1AB3A0FF)),
               const SizedBox(width: 8),
-              _MacroSummaryChip(label: 'CARBS',   value: '${_totalCarbs}g',   valueColor: AppColors.lime,     bgColor: Color(0x12EBFF45)),
+              _MacroSummaryChip(label: 'CARBS',   value: '${_totalCarbs.toStringAsFixed(1)}g',   valueColor: AppColors.lime,     bgColor: Color(0x12EBFF45)),
               const SizedBox(width: 8),
-              _MacroSummaryChip(label: 'FAT',     value: '${_totalFat}g',     valueColor: AppColors.slateGray, bgColor: Color(0x2664748B)),
+              _MacroSummaryChip(label: 'FAT',     value: '${_totalFat.toStringAsFixed(1)}g',     valueColor: AppColors.slateGray, bgColor: Color(0x2664748B)),
             ],
           ),
         ],
@@ -740,29 +781,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     );
   }
 
-  // ── Note Field ─────────────────────────────────────────────────────────────
-
-  Widget _buildNoteField() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.inputBg,
-        border: Border.all(color: AppColors.lavender.withOpacity(0.3)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TextField(
-        controller: _noteCtrl,
-        maxLines: 3,
-        minLines: 2,
-        style: const TextStyle(color: AppColors.white, fontSize: 13),
-        decoration: const InputDecoration(
-          hintText: 'Add a note (e.g. homemade, restaurant name)...',
-          hintStyle: TextStyle(color: Color(0xFF5A5A7A), fontSize: 13),
-          contentPadding: EdgeInsets.all(14),
-          border: InputBorder.none,
-        ),
-      ),
-    );
-  }
 
   // ── Log Button ─────────────────────────────────────────────────────────────
 

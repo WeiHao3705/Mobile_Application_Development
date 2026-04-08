@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/meal_log.dart';
-import '../models/meal_with_calories.dart';
 import '../repository/meal_repository.dart';
 import '../repository/meal_food_repository.dart';
 import '../repository/food_repository.dart';
 import '../services/meal_service.dart';
+import '../repository/daily_goals_repository.dart';
 import 'dart:developer' as developer;
 
 class MealController extends ChangeNotifier {
@@ -16,13 +16,19 @@ class MealController extends ChangeNotifier {
       _service = service;
     } else {
       final supabaseClient = Supabase.instance.client;
+      if (supabaseClient == null) {
+        throw Exception('Supabase is not initialized. Ensure Supabase.initialize() is called before creating MealController.');
+      }
       final mealRepo = MealLogRepository(supabase: supabaseClient);
       final mealFoodRepo = MealFoodRepository(supabase: supabaseClient);
       final foodRepo = FoodRepository(supabase: supabaseClient);
+      final dailyGoalsRepo = DailyGoalsRepository(supabase: supabaseClient);
+
       _service = MealService(
         repository: mealRepo,
         mealFoodRepository: mealFoodRepo,
         foodRepository: foodRepo,
+        dailyGoalsRepository: dailyGoalsRepo,
       );
     }
   }
@@ -48,6 +54,26 @@ class MealController extends ChangeNotifier {
   /// Get calories for a specific meal
   double getMealCalories(int mealId) {
     return _mealCalories[mealId] ?? 0.0;
+  }
+
+  /// Get macro summary for a meal based on its MealLog entry
+  Map<String, double> getMealMacros(int mealId) {
+    final meal = _userMeals.firstWhere(
+      (m) => m.mealId == mealId,
+      orElse: () => MealLog(
+        mealId: mealId,
+        mealType: 'Unknown',
+        mealDate: DateTime.now(),
+        userId: 0,
+      ),
+    );
+
+    return {
+      'calories': meal.totalCalories ?? 0.0,
+      'proteins': meal.totalProteins ?? 0.0,
+      'carbs': meal.totalCarbs ?? 0.0,
+      'fats': meal.totalFats ?? 0.0,
+    };
   }
 
   /// Log a new meal with selected foods
@@ -167,23 +193,29 @@ class MealController extends ChangeNotifier {
     }
   }
 
-  /// Update an existing meal
+  /// Update an existing meal with new foods and recalculate nutrition
   Future<bool> updateMeal({
     required int mealId,
     required String mealType,
     required DateTime mealDate,
     required int userId,
+    Map<int, Map<String, dynamic>>? foodsWithQuantities,
   }) async {
     _isLoading = true;
     _errorMessage = '';
     notifyListeners();
 
     try {
+      developer.log('🟨 MealController.updateMeal START');
+      developer.log('👤 Meal ID: $mealId');
+      developer.log('📊 Foods provided: ${foodsWithQuantities?.length ?? 0}');
+
       final updatedMeal = await _service.updateMeal(
         mealId: mealId,
         mealType: mealType,
         mealDate: mealDate,
         userId: userId,
+        foodsWithQuantities: foodsWithQuantities,
       );
 
       _currentMeal = updatedMeal;
@@ -192,19 +224,28 @@ class MealController extends ChangeNotifier {
       final index = _userMeals.indexWhere((meal) => meal.mealId == mealId);
       if (index != -1) {
         _userMeals[index] = updatedMeal;
+        // Also update the cached calories
+        if (updatedMeal.totalCalories != null) {
+          _mealCalories[mealId] = updatedMeal.totalCalories!;
+        }
       }
 
       _isSuccess = true;
 
-      developer.log('Meal updated successfully: $mealId');
+      developer.log('✅ Meal updated successfully: $mealId');
+      developer.log('✅ Updated nutrition - Calories: ${updatedMeal.totalCalories}');
       return true;
+    } on PostgrestException catch (e) {
+      _errorMessage = 'Database error: ${e.message}';
+      developer.log('❌ PostgrestException in MealController: $_errorMessage');
+      return false;
     } on Exception catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');
-      developer.log('Error updating meal: $_errorMessage');
+      developer.log('❌ Error updating meal: $_errorMessage');
       return false;
     } catch (e) {
       _errorMessage = 'Failed to update meal. Please try again.';
-      developer.log('Unexpected error updating meal: $e');
+      developer.log('❌ Unexpected error updating meal: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -260,5 +301,4 @@ class MealController extends ChangeNotifier {
     notifyListeners();
   }
 }
-
 

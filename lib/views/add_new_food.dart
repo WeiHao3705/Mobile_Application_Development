@@ -6,6 +6,7 @@ import '../controllers/auth_controller.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 import 'package:provider/provider.dart';
+import 'widgets/custom_bottom_nav_bar.dart';
 
 class AddNewFoodView extends StatefulWidget {
   final AuthController authController;
@@ -22,6 +23,7 @@ class AddNewFoodView extends StatefulWidget {
 class _AddNewFoodViewState extends State<AddNewFoodView> {
   final _formKey = GlobalKey<FormState>();
   String? _selectedCategory;
+  int _selectedNavIndex = 2; // Diet tab (3rd item, 0-indexed)
 
   final TextEditingController _foodNameController = TextEditingController();
   final TextEditingController _servingSizeController = TextEditingController();
@@ -167,6 +169,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
               ),
               const SizedBox(height: 32),
 
+
               // Category
               const Text(
                 'Category',
@@ -269,7 +272,22 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
           ),
         ),
       ),
+      bottomNavigationBar: CustomBottomNavBar(
+        selectedIndex: _selectedNavIndex,
+        onTap: _onNavItemTapped,
+      ),
     );
+  }
+
+  void _onNavItemTapped(int index) {
+    if (index == 2) {
+      // Already on Diet tab, no need to navigate
+      return;
+    }
+
+    // Navigate to the selected tab
+    Navigator.of(context).pop();
+    Navigator.of(context).pushReplacementNamed('/main');
   }
 
   Widget _buildLabel(String label) {
@@ -461,6 +479,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
       final categoryName = _selectedCategory == '➕ Other'
           ? _customCategoryController.text.trim()
           : _selectedCategory!.split(' ').skip(1).join(' ');
+
       final foodController = context.read<FoodController>();
       final int userId = currentUser.id!;
 

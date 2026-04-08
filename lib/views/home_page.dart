@@ -1,7 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../controllers/auth_controller.dart';
+import '../repository/workout_record_repository.dart';
+import 'workout_record_detail_page.dart';
+import 'workout_record_list_page.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, required this.authController});
+
+  final AuthController authController;
+
+  int? get _userId {
+    final currentUser = authController.currentUser;
+    final id = currentUser?.id;
+    if (id is int) {
+      return id;
+    }
+    return int.tryParse(id?.toString() ?? '');
+  }
+
+  Future<WorkoutRecordSummary?> _loadLatestStrengthTrainingRecord() async {
+    final userId = _userId;
+    if (userId == null) {
+      return null;
+    }
+
+    final repository = WorkoutRecordRepository(supabase: Supabase.instance.client);
+    return repository.getLatestRecordForUser(userId);
+  }
+
+  String _formatWorkoutDuration(Duration value) {
+    final minutes = value.inMinutes;
+    final seconds = value.inSeconds.remainder(60);
+    return '${minutes.toString().padLeft(2, '0')}min ${seconds.toString().padLeft(2, '0')}s';
+  }
+
+  void _openWorkoutRecords(BuildContext context) {
+    final userId = _userId;
+    if (userId == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => WorkoutRecordListPage(userId: userId),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +75,7 @@ class HomePage extends StatelessWidget {
               Text(
                 'Let\'s crush your fitness goals today',
                 style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: 24),
@@ -128,11 +171,25 @@ class HomePage extends StatelessWidget {
                 iconColor: theme.colorScheme.tertiary,
               ),
               const SizedBox(height: 8),
-              _WorkoutItem(
-                title: 'Strength Training',
-                subtitle: '45 min • 180 calories',
-                icon: Icons.fitness_center,
-                iconColor: theme.colorScheme.secondary,
+              FutureBuilder<WorkoutRecordSummary?>(
+                future: _loadLatestStrengthTrainingRecord(),
+                builder: (context, snapshot) {
+                  final record = snapshot.data;
+                  final isLoading = snapshot.connectionState == ConnectionState.waiting;
+                  final subtitle = isLoading
+                      ? 'Loading latest workout...'
+                      : record == null
+                          ? 'No saved strength workout yet'
+                          : '${_formatWorkoutDuration(Duration(seconds: record.duration))} • ${record.trainingVolume} kg';
+
+                  return _WorkoutItem(
+                    title: 'Strength Training',
+                    subtitle: subtitle,
+                    icon: Icons.fitness_center,
+                    iconColor: theme.colorScheme.secondary,
+                    onTap: () => _openWorkoutRecords(context),
+                  );
+                },
               ),
               const SizedBox(height: 8),
               _WorkoutItem(
@@ -171,7 +228,7 @@ class _StatItem extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: color, size: 28),
@@ -186,7 +243,7 @@ class _StatItem extends StatelessWidget {
         Text(
           label,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
           ),
         ),
       ],
@@ -244,12 +301,14 @@ class _WorkoutItem extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.iconColor,
+    this.onTap,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
   final Color iconColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -258,28 +317,52 @@ class _WorkoutItem extends StatelessWidget {
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(14.0),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.65),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (onTap != null)
+                Icon(
+                  Icons.chevron_right,
+                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.4),
+                ),
+            ],
           ),
-          child: Icon(icon, color: iconColor),
-        ),
-        title: Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        subtitle: Text(subtitle),
-        trailing: Icon(
-          Icons.arrow_forward_ios,
-          size: 16,
-          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
         ),
       ),
     );

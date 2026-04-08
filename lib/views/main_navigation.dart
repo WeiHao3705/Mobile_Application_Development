@@ -21,7 +21,7 @@ class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
 
   late final List<Widget> _pages = [
-    const HomePage(),
+    HomePage(authController: widget.authController),
     ExercisePage(authController: widget.authController),
     NutritionMainPage(authController: widget.authController),
     ProfilePage(authController: widget.authController),
@@ -43,7 +43,7 @@ class _MainNavigationState extends State<MainNavigation> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
@@ -57,7 +57,7 @@ class _MainNavigationState extends State<MainNavigation> {
               ? Colors.white
               : theme.scaffoldBackgroundColor,
           selectedItemColor: theme.colorScheme.secondary,
-          unselectedItemColor: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+          unselectedItemColor: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
           selectedFontSize: 12,
           unselectedFontSize: 12,
           elevation: 0,
@@ -118,7 +118,7 @@ class _PlaceholderPage extends StatelessWidget {
             Icon(
               title == 'Exercise' ? Icons.fitness_center : Icons.restaurant,
               size: 80,
-              color: theme.colorScheme.secondary.withOpacity(0.5),
+              color: theme.colorScheme.secondary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -131,7 +131,7 @@ class _PlaceholderPage extends StatelessWidget {
             Text(
               'Coming soon...',
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
               ),
             ),
           ],

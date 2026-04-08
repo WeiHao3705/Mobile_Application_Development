@@ -88,7 +88,7 @@ class WorkoutPlanRepository {
   Future<List<WorkoutPlan>> getPlansForUser(int userId) async {
     final planResponse = await supabase
         .from('Exercise_Plan')
-        .select('plan_id, plan_name, description, created_at')
+        .select('plan_id, user_id, plan_name, description, created_at')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
@@ -148,6 +148,7 @@ class WorkoutPlanRepository {
 
       return WorkoutPlan(
         planId: planId,
+        userId: _toInt(row['user_id']),
         planName: (row['plan_name'] ?? 'Untitled Plan').toString(),
         description: _nullableText(row['description']),
         createdAt: parsedCreatedAt,
@@ -349,4 +350,3 @@ class WorkoutPlanRepository {
     );
   }
 }
-
