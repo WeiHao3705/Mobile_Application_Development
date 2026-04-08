@@ -167,7 +167,7 @@ class _ExercisePageState extends State<ExercisePage> {
         title: const Text('Exercise Management'),
         centerTitle: true,
         backgroundColor: AppColors.cardBg,
-        foregroundColor: AppColors.white,
+        foregroundColor: AppColors.lavender,
         elevation: 0,
       ),
       body: SafeArea(
@@ -183,10 +183,18 @@ class _ExercisePageState extends State<ExercisePage> {
                   hintStyle: const TextStyle(color: AppColors.slateGray),
                   prefixIcon: const Icon(Icons.search, color: AppColors.lavender),
                   filled: true,
-                  fillColor: AppColors.inputBg,
+                  fillColor: AppColors.cardBg,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(color: AppColors.purple.withValues(alpha: 0.25)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.purple.withValues(alpha: 0.25)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.purple, width: 1.4),
                   ),
                 ),
               ),
@@ -236,7 +244,7 @@ class _ExercisePageState extends State<ExercisePage> {
                     child: Text(
                       _errorMessage,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.slateGray),
+                      style: const TextStyle(color: AppColors.lavender),
                     ),
                   ),
                 ),
@@ -246,7 +254,7 @@ class _ExercisePageState extends State<ExercisePage> {
                 child: Center(
                   child: Text(
                     'No exercises found.',
-                    style: TextStyle(color: AppColors.slateGray),
+                    style: TextStyle(color: AppColors.lavender),
                   ),
                 ),
               )
@@ -255,54 +263,52 @@ class _ExercisePageState extends State<ExercisePage> {
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   itemCount: _filteredExercises.length,
-                  separatorBuilder: (_, _) => const Divider(color: Colors.white12, height: 1),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final exercise = _filteredExercises[index];
-                    return ListTile(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => ExerciseDetailPage(exercise: exercise),
-                          ),
-                        );
-                      },
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      leading: CircleAvatar(
-                        radius: 24,
-                        backgroundColor: AppColors.white,
-                        child: ClipOval(
-                          child: exercise.imageUrl.isNotEmpty
-                              ? Image.network(
-                                  exercise.imageUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Icon(
-                                      Icons.fitness_center,
-                                      color: AppColors.black,
-                                    );
-                                  },
-                                )
-                              : const Icon(
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.cardBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.purple.withValues(alpha: 0.2)),
+                      ),
+                      child: ListTile(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => ExerciseDetailPage(exercise: exercise),
+                            ),
+                          );
+                        },
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        leading: CircleAvatar(
+                          radius: 24,
+                          backgroundColor: AppColors.inputBg,
+                          backgroundImage:
+                              exercise.imageUrl.isNotEmpty ? NetworkImage(exercise.imageUrl) : null,
+                          child: exercise.imageUrl.isEmpty
+                              ? const Icon(
                                   Icons.fitness_center,
-                                  color: AppColors.black,
-                                ),
+                                  color: AppColors.lavender,
+                                )
+                              : null,
                         ),
-                      ),
-                      title: Text(
-                        exercise.name,
-                        style: const TextStyle(
-                          color: AppColors.white,
-                          fontWeight: FontWeight.w700,
+                        title: Text(
+                          exercise.name,
+                          style: const TextStyle(
+                            color: AppColors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      subtitle: Text(
-                        '${exercise.primaryMuscle} • ${exercise.equipment}',
-                        style: const TextStyle(color: AppColors.slateGray),
-                      ),
-                      trailing: IconButton(
-                        tooltip: 'Delete',
-                        onPressed: () => _deleteExercise(exercise),
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                        subtitle: Text(
+                          '${exercise.primaryMuscle} • ${exercise.equipment}',
+                          style: const TextStyle(color: AppColors.lavender),
+                        ),
+                        trailing: IconButton(
+                          tooltip: 'Delete',
+                          onPressed: () => _deleteExercise(exercise),
+                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                        ),
                       ),
                     );
                   },

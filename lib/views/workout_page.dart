@@ -326,7 +326,10 @@ class _WorkoutPageState extends State<WorkoutPage> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Workout'),
+        title: const Text(
+          'Workout',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         centerTitle: true,
         backgroundColor: Colors.black,
         foregroundColor: theme.colorScheme.primary,

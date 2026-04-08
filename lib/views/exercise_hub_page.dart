@@ -59,9 +59,12 @@ class ExerciseHubPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.black,
       appBar: AppBar(
-        backgroundColor: AppColors.cardBg,
-        foregroundColor: AppColors.white,
-        title: const Text('Exercise'),
+        backgroundColor: AppColors.black,
+        foregroundColor: AppColors.lavender,
+        title: const Text(
+          'Exercise',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         centerTitle: true,
         elevation: 0,
       ),
@@ -73,9 +76,14 @@ class ExerciseHubPage extends StatelessWidget {
             Text(
               'Choose Activity',
               style: theme.textTheme.headlineSmall?.copyWith(
-                color: AppColors.white,
+                color: AppColors.lavender,
                 fontWeight: FontWeight.w800,
               ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Pick a training mode to continue.',
+              style: TextStyle(color: AppColors.lightGray, fontSize: 13),
             ),
             const SizedBox(height: 16),
             _ExerciseHubCard(
@@ -114,10 +122,10 @@ class _ExerciseHubCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: AppColors.cardBg,
+      color: AppColors.purple,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: AppColors.purple.withValues(alpha: 0.4)),
+        side: BorderSide(color: AppColors.purple.withValues(alpha: 0.25)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -130,10 +138,11 @@ class _ExerciseHubCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.purple.withValues(alpha: 0.25),
+                  color: AppColors.inputBg,
+                  border: Border.all(color: AppColors.purple.withValues(alpha: 0.35)),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: AppColors.lavender),
+                child: Icon(icon, color: AppColors.white),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -152,7 +161,7 @@ class _ExerciseHubCard extends StatelessWidget {
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        color: AppColors.slateGray,
+                        color: AppColors.black,
                         fontSize: 13,
                       ),
                     ),
