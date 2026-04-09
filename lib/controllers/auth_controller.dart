@@ -12,7 +12,8 @@ class AuthController extends ChangeNotifier {
     AuthRepository? repository,
     UserRepository? userRepository,
     AuthSessionStorage? sessionStorage,
-  })  : _repository = repository ?? AuthRepository(),
+  })
+      : _repository = repository ?? AuthRepository(),
         _userRepository = userRepository ?? UserRepository(),
         _sessionStorage = sessionStorage ?? AuthSessionStorage();
 
@@ -28,7 +29,7 @@ class AuthController extends ChangeNotifier {
 
   LoginUser? _currentUser;
   LoginUser? get currentUser => _currentUser;
-  bool get isLoggedIn => _currentUser?.id != null;
+  bool get isLoggedIn => _currentUser != null;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
 
   Future<void> restoreSession() async {
@@ -63,7 +64,6 @@ class AuthController extends ChangeNotifier {
       }
 
       _currentUser = user;
-      await _sessionStorage.save(user);
       return true;
     } on PostgrestException catch (e) {
       _errorMessage = 'Database error: ${e.message}';
@@ -84,22 +84,16 @@ class AuthController extends ChangeNotifier {
 
     try {
       await _userRepository.createUserProfile(profile);
-
-      // Reuse login query so we always keep the same user shape as normal login.
-      final signedUpUser = await _repository.login(
-        username: profile.username.trim(),
-        password: profile.password.trim(),
+      _currentUser = LoginUser(
+        id: null,
+        username: profile.username,
+        fullName: profile.fullName,
+        email: profile.email,
+        height: profile.height,
+        currentWeight: profile.currentWeight,
+        targetWeight: profile.targetWeight,
+        isAdmin: profile.isAdmin,
       );
-
-      if (signedUpUser == null || signedUpUser.id == null) {
-        _errorMessage =
-            'Account created but unable to start session. Please login manually.';
-        _currentUser = null;
-        return false;
-      }
-
-      _currentUser = signedUpUser;
-      await _sessionStorage.save(signedUpUser);
       return true;
     } on PostgrestException catch (e) {
       if (_isRlsInsertError(e)) {
@@ -118,10 +112,9 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  Future<void> logout() async {
+  void logout() {
     _currentUser = null;
     _errorMessage = '';
-    await _sessionStorage.clear();
     notifyListeners();
   }
 

@@ -481,11 +481,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
           : _selectedCategory!.split(' ').skip(1).join(' ');
 
       final foodController = context.read<FoodController>();
-      final userId = int.tryParse(currentUser.id?.toString() ?? '');
-      if (userId == null) {
-        _showErrorSnackBar('Invalid user ID. Please login again.');
-        return;
-      }
+      final int userId = currentUser.id!;
 
       developer.log('DEBUG: Attempting to save food with userId: $userId, category: $categoryName');
 

@@ -5,12 +5,12 @@ allprojects {
     }
 }
 
-// Keep Android outputs under this Flutter project's build/ so flutter tool can find APKs.
-val projectBuildDir = rootProject.layout.projectDirectory.dir("../build")
-rootProject.layout.buildDirectory.set(projectBuildDir)
+val newBuildDir = rootProject.layout.buildDirectory.dir("../../build").get()
+rootProject.layout.buildDirectory.set(newBuildDir)
 
 subprojects {
-    project.layout.buildDirectory.set(projectBuildDir.dir(project.name))
+    val newSubprojectBuildDir = newBuildDir.dir(project.name)
+    project.layout.buildDirectory.set(newSubprojectBuildDir)
 }
 subprojects {
     project.evaluationDependsOn(":app")

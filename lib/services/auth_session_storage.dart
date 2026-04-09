@@ -33,4 +33,3 @@ class AuthSessionStorage {
     await prefs.remove(_sessionKey);
   }
 }
-

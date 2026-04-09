@@ -264,7 +264,7 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
       return;
     }
 
-    final userId = int.tryParse(authController.currentUser?.id?.toString() ?? '');
+    final userId = authController.currentUser!.id;
     if (userId == null) {
       _showErrorSnackbar('Invalid user ID');
       return;
@@ -291,7 +291,7 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
       // Log the meal
       final mealController = context.read<MealController>();
       final success = await mealController.logMeal(
-        userId: userId,
+        userId: int.parse(userId.toString()),
         mealType: _selectedMealType, // Use selected meal type
         mealDate: DateTime.now(),
         foodsWithQuantities: foodsWithQuantities,

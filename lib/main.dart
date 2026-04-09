@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config/supabase_config.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/food_controller.dart';
 import 'controllers/meal_controller.dart';
 import 'theme/app_theme.dart';
+import 'views/admin_dashboard_page.dart';
 import 'views/landing_page.dart';
 import 'views/login_page.dart';
 import 'views/main_navigation.dart';
-import 'views/admin_dashboard_page.dart';
 import 'views/sign_up_pages.dart';
 
 Future<void> main() async {
@@ -33,18 +33,89 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final AuthController _authController = AuthController();
-  late final Future<void> _restoreSessionFuture;
+  late final Future<void> _startupFuture;
+
+  Route<dynamic> _buildSafeRoute({
+    required RouteSettings settings,
+    required WidgetBuilder builder,
+  }) {
+    return MaterialPageRoute<void>(
+      settings: settings,
+      builder: (context) {
+        try {
+          return builder(context);
+        } catch (error, stackTrace) {
+          debugPrint('Route build failed for ${settings.name}: $error');
+          debugPrintStack(stackTrace: stackTrace);
+          return _RouteErrorScreen(routeName: settings.name);
+        }
+      },
+    );
+  }
+
+  Route<dynamic> _onGenerateRoute(RouteSettings settings) {
+    try {
+      switch (settings.name) {
+        case LandingPage.routeName:
+          return _buildSafeRoute(
+            settings: settings,
+            builder: (_) => const LandingPage(),
+          );
+        case LoginPage.routeName:
+          return _buildSafeRoute(
+            settings: settings,
+            builder: (_) => LoginPage(authController: _authController),
+          );
+        case MainNavigation.routeName:
+          return _buildSafeRoute(
+            settings: settings,
+            builder: (_) => MainNavigation(authController: _authController),
+          );
+        case AdminDashboardPage.routeName:
+          return _buildSafeRoute(
+            settings: settings,
+            builder: (_) => AdminDashboardPage(authController: _authController),
+          );
+        case SignUpPages.routeName:
+          return _buildSafeRoute(
+            settings: settings,
+            builder: (_) => SignUpPages(authController: _authController),
+          );
+        default:
+          return _buildSafeRoute(
+            settings: settings,
+            builder: (_) => const LandingPage(),
+          );
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Route generation failed for ${settings.name}: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => _RouteErrorScreen(routeName: settings.name),
+      );
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _restoreSessionFuture = _authController.restoreSession();
+    _startupFuture = _authController.restoreSession();
   }
 
   @override
   void dispose() {
     _authController.dispose();
     super.dispose();
+  }
+
+  Widget get _initialPage {
+    if (!_authController.isLoggedIn) {
+      return const LandingPage();
+    }
+    return _authController.isAdmin
+        ? AdminDashboardPage(authController: _authController)
+        : MainNavigation(authController: _authController);
   }
 
   @override
@@ -61,64 +132,59 @@ class _MyAppState extends State<MyApp> {
           create: (_) => MealController(),
         ),
       ],
-      child: MaterialApp(
-        title: 'FitTrack',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
-        home: FutureBuilder<void>(
-          future: _restoreSessionFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
-
-            if (_authController.isLoggedIn) {
-              return _authController.isAdmin
-                  ? AdminDashboardPage(authController: _authController)
-                  : MainNavigation(authController: _authController);
-            }
-
-            return const LandingPage();
-          },
-        ),
-        onGenerateRoute: (settings) {
-          switch (settings.name) {
-            case LandingPage.routeName:
-              return MaterialPageRoute<void>(
-                builder: (_) => const LandingPage(),
-                settings: settings,
-              );
-            case LoginPage.routeName:
-              return MaterialPageRoute<void>(
-                builder: (_) => LoginPage(authController: _authController),
-                settings: settings,
-              );
-            case MainNavigation.routeName:
-              return MaterialPageRoute<void>(
-                builder: (_) => MainNavigation(authController: _authController),
-                settings: settings,
-              );
-            case AdminDashboardPage.routeName:
-              return MaterialPageRoute<void>(
-                builder: (_) => AdminDashboardPage(authController: _authController),
-                settings: settings,
-              );
-            case SignUpPages.routeName:
-              return MaterialPageRoute<void>(
-                builder: (_) => SignUpPages(authController: _authController),
-                settings: settings,
-              );
-            default:
-              return MaterialPageRoute<void>(
-                builder: (_) => const LandingPage(),
-                settings: settings,
-              );
+      child: FutureBuilder<void>(
+        future: _startupFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: ThemeMode.system,
+              home: const Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            );
           }
+
+          return MaterialApp(
+            title: 'FitTrack',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: ThemeMode.system,
+            home: _initialPage,
+            onGenerateRoute: _onGenerateRoute,
+            onUnknownRoute: (settings) => MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => _RouteErrorScreen(routeName: settings.name),
+            ),
+          );
         },
+      ),
+    );
+  }
+}
+
+class _RouteErrorScreen extends StatelessWidget {
+  const _RouteErrorScreen({this.routeName});
+
+  final String? routeName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Navigation Error')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Unable to open route: ${routeName ?? '(unknown)'}',
+            textAlign: TextAlign.center,
+          ),
+        ),
       ),
     );
   }

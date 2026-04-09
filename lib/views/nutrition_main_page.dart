@@ -1324,7 +1324,7 @@ class _MealLogSectionState extends State<_MealLogSection> {
       builder: (BuildContext context, Widget? child) {
         return Theme(
           data: ThemeData.dark(),
-          child: child ?? const SizedBox.shrink(),
+          child: child!,
         );
       },
     );
