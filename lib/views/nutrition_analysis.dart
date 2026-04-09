@@ -1025,22 +1025,6 @@ class _NutritionScreenState extends State<NutritionScreen>
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (isOnTrack ? AppColors.nutritionNeonGreen : Color(0xFFFF6B6B)).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                child: Text(
-                  isOnTrack ? 'On track' : 'Off track',
-                  style: TextStyle(
-                    color: isOnTrack ? AppColors.nutritionNeonGreen : Color(0xFFFF6B6B),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 12),
