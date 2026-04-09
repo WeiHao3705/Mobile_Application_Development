@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+
 import '../controllers/auth_controller.dart';
-import '../services/user_session_service.dart';
 import 'admin_dashboard_page.dart';
 import 'main_navigation.dart';
 
@@ -19,7 +19,6 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  final SimpleSessionService _sessionService = SimpleSessionService();
 
   AuthController get _authController => widget.authController;
 
@@ -31,7 +30,8 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) {
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) {
       return;
     }
 
@@ -53,11 +53,6 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    await _sessionService.setLoggedIn(
-      true,
-      _usernameController.text.trim(),
-    );
-
     final targetRoute = _authController.isAdmin
         ? AdminDashboardPage.routeName
         : MainNavigation.routeName;
@@ -65,7 +60,7 @@ class _LoginPageState extends State<LoginPage> {
     Navigator.pushNamedAndRemoveUntil(
       context,
       targetRoute,
-      (route) => false,
+          (route) => false,
     );
   }
 
@@ -133,10 +128,10 @@ class _LoginPageState extends State<LoginPage> {
                       onPressed: _authController.isLoading ? null : _handleLogin,
                       child: _authController.isLoading
                           ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                           : const Text('Login'),
                     ),
                   ],
@@ -149,4 +144,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-
