@@ -723,15 +723,27 @@ class _RecentMealsSection extends StatelessWidget {
       children: [
         GestureDetector(
           onTap: onSeeAll,
-          child: const Row(
+          child: Row(
             children: [
-              Text(
+              const Text(
                 'Recent Meals',
                 style: TextStyle(
                   color: AppColors.white,
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.2,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: onSeeAll,
+                child: const Text(
+                  'See All',
+                  style: TextStyle(
+                    color: AppColors.lime,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -838,6 +850,15 @@ class _MealTile extends StatelessWidget {
     return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
+  String _formatTileSubtitle(DateTime dateTime) {
+    final now = DateTime.now();
+    final isToday = dateTime.year == now.year &&
+                    dateTime.month == now.month &&
+                    dateTime.day == now.day;
+    final time = _formatTime(dateTime);
+    return isToday ? time : '${dateTime.day}/${dateTime.month} · $time';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (meal == null) {
@@ -847,18 +868,17 @@ class _MealTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.lavender.withOpacity(0.7)),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(7),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                alignment: Alignment.center,
+                child: const Text('🥣', style: TextStyle(fontSize: 18)),
               ),
-              alignment: Alignment.center,
-              child: const Text('🥣', style: TextStyle(fontSize: 18)),
-            ),
             const SizedBox(width: 8),
             const Expanded(
               child: Column(
@@ -873,11 +893,11 @@ class _MealTile extends StatelessWidget {
                       height: 1.05,
                     ),
                   ),
-                  SizedBox(height: 3),
+                  const SizedBox(height: 3),
                   Text(
-                    'Breakfast - 08:30 AM',
+                    '08:30',
                     style: TextStyle(
-                      color: AppColors.white,
+                      color: AppColors.slateGray,
                       fontSize: 11,
                       fontWeight: FontWeight.w400,
                     ),
@@ -918,7 +938,6 @@ class _MealTile extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.white,
                   borderRadius: BorderRadius.circular(7),
                 ),
                 alignment: Alignment.center,
@@ -940,9 +959,9 @@ class _MealTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${meal.mealType} - $time',
+                      _formatTileSubtitle(meal.mealDate),
                       style: const TextStyle(
-                        color: AppColors.white,
+                        color: AppColors.slateGray,
                         fontSize: 11,
                         fontWeight: FontWeight.w400,
                       ),
@@ -999,13 +1018,17 @@ class _MealLogSection extends StatefulWidget {
 class _MealLogSectionState extends State<_MealLogSection> {
   String _filterMode = 'all'; // 'today' or 'all'
   DateTime? _selectedDate;
+  bool _isBatchDeleteMode = false;
+  final Set<int> _selectedForDeletion = {};
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ROW 1 — Title + action chips always in one line
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
               'Meal Log',
@@ -1016,100 +1039,75 @@ class _MealLogSectionState extends State<_MealLogSection> {
                 letterSpacing: -0.2,
               ),
             ),
-            const Spacer(),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                setState(() {
-                  _filterMode = value;
-                  if (value != 'date') {
-                    _selectedDate = null;
-                  }
-                });
-                if (value == 'date') {
-                  _showDatePicker();
-                }
-              },
-              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                const PopupMenuItem<String>(
-                  value: 'today',
-                  child: Text('Today'),
-                ),
-                const PopupMenuItem<String>(
-                  value: 'all',
-                  child: Text('All Meals'),
-                ),
-                const PopupMenuItem<String>(
-                  value: 'date',
-                  child: Text('Select Date'),
-                ),
-              ],
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.lime.withOpacity(0.15),
-                  border: Border.all(color: AppColors.lime.withOpacity(0.6)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.filter_list, color: AppColors.lime, size: 16),
-                    SizedBox(width: 4),
-                    Text(
-                      'Filter',
-                      style: TextStyle(
-                        color: AppColors.lime,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+            Row(
+              children: [
+                // Filter popup
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    setState(() {
+                      _filterMode = value;
+                      if (value != 'date') _selectedDate = null;
+                    });
+                    if (value == 'date') _showDatePicker();
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'today', child: Text('Today')),
+                    const PopupMenuItem(value: 'all', child: Text('All Meals')),
+                    const PopupMenuItem(value: 'date', child: Text('Select Date')),
                   ],
+                  child: _toolbarChip(Icons.filter_list, 'Filter', AppColors.lime),
                 ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            GestureDetector(
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AddNewMealPage(
-                      authController: widget.authController,
-                    ),
+                const SizedBox(width: 6),
+                // Toggle batch-delete mode
+                GestureDetector(
+                  onTap: () => setState(() {
+                    _isBatchDeleteMode = !_isBatchDeleteMode;
+                    if (!_isBatchDeleteMode) _selectedForDeletion.clear();
+                  }),
+                  child: _toolbarChip(Icons.delete_outline, 'Delete', AppColors.yellow),
+                ),
+                const SizedBox(width: 6),
+                // Add meal (only when not in delete mode)
+                if (!_isBatchDeleteMode)
+                  GestureDetector(
+                    onTap: () async {
+                      await Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => AddNewMealPage(authController: widget.authController),
+                      )).then((_) {
+                        context.read<MealController>().fetchUserMeals(
+                          int.parse(widget.authController.currentUser?.id?.toString() ?? '0'),
+                        );
+                      });
+                    },
+                    child: _toolbarChip(Icons.add, 'Add', AppColors.lime),
                   ),
-                ).then((_) {
-                  // Refresh meals after adding
-                  context.read<MealController>().fetchUserMeals(
-                    int.parse(widget.authController.currentUser?.id?.toString() ?? '0'),
-                  );
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.lime.withOpacity(0.15),
-                  border: Border.all(color: AppColors.lime.withOpacity(0.6)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.add, color: AppColors.lime, size: 16),
-                    SizedBox(width: 4),
-                    Text(
-                      'Add',
-                      style: TextStyle(
-                        color: AppColors.lime,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ),
           ],
         ),
+
+        // ROW 2 — Only visible in batch-delete mode with selections
+        if (_isBatchDeleteMode) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${_selectedForDeletion.length} meal(s) selected',
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (_selectedForDeletion.isNotEmpty)
+                GestureDetector(
+                  onTap: _deleteBatchMeals,
+                  child: _toolbarChip(Icons.delete, 'Confirm delete', Colors.red),
+                ),
+            ],
+          ),
+        ],
         if (_filterMode == 'date' && _selectedDate != null) ...[
           const SizedBox(height: 8),
           Padding(
@@ -1306,6 +1304,17 @@ class _MealLogSectionState extends State<_MealLogSection> {
                 return _MealLogTile(
                   meal: meal,
                   authController: widget.authController,
+                  isBatchDeleteMode: _isBatchDeleteMode,
+                  isSelectedForDelete: _selectedForDeletion.contains(meal.mealId),
+                  onSelectForDelete: () {
+                    setState(() {
+                      if (_selectedForDeletion.contains(meal.mealId)) {
+                        _selectedForDeletion.remove(meal.mealId);
+                      } else {
+                        _selectedForDeletion.add(meal.mealId ?? 0);
+                      }
+                    });
+                  },
                 );
               },
             );
@@ -1350,15 +1359,121 @@ class _MealLogSectionState extends State<_MealLogSection> {
       return '${date.day}/${date.month}/${date.year}';
     }
   }
+
+  Future<void> _deleteBatchMeals() async {
+    if (_selectedForDeletion.isEmpty) return;
+
+    final count = _selectedForDeletion.length;
+
+    // Show confirmation dialog
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        title: const Text(
+          'Delete Multiple Meals?',
+          style: TextStyle(color: AppColors.white),
+        ),
+        content: Text(
+          'Are you sure you want to delete $count selected meal(s)? This action cannot be undone.',
+          style: const TextStyle(color: AppColors.lavender),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.lime)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete All', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!shouldDelete) return;
+
+    // Delete meals
+    final mealController = context.read<MealController>();
+    int successCount = 0;
+    int failureCount = 0;
+
+    for (final mealId in _selectedForDeletion) {
+      try {
+        final success = await mealController.deleteMeal(mealId);
+        if (success) {
+          successCount++;
+        } else {
+          failureCount++;
+        }
+      } catch (e) {
+        failureCount++;
+      }
+    }
+
+    if (context.mounted) {
+      _selectedForDeletion.clear();
+      _isBatchDeleteMode = false;
+
+      // Refresh the meal list
+      final userId = widget.authController.currentUser?.id;
+      if (userId != null) {
+        await mealController.fetchUserMeals(int.parse(userId.toString()));
+      }
+
+      // Show result message
+      String message = '';
+      if (failureCount == 0) {
+        message = '✓ $successCount meal(s) deleted successfully!';
+      } else {
+        message = '⚠️ Deleted $successCount, failed $failureCount';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 2),
+          backgroundColor: failureCount == 0 ? Colors.green : Colors.orange,
+        ),
+      );
+
+      setState(() {});
+    }
+  }
+
+  Widget _toolbarChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.13),
+        border: Border.all(color: color.withOpacity(0.55)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 15),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
 }
 
 class _MealLogTile extends StatelessWidget {
   final dynamic meal;
   final AuthController authController;
+  final bool isBatchDeleteMode;
+  final bool isSelectedForDelete;
+  final VoidCallback onSelectForDelete;
 
   const _MealLogTile({
     required this.meal,
     required this.authController,
+    this.isBatchDeleteMode = false,
+    this.isSelectedForDelete = false,
+    required this.onSelectForDelete,
   });
 
   String _getMealEmoji(String mealType) {
@@ -1413,68 +1528,6 @@ class _MealLogTile extends StatelessWidget {
     }
   }
 
-  Future<void> _deleteMeal(BuildContext context, MealController mealController) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1F1F2E),
-        title: const Text(
-          'Delete Meal?',
-          style: TextStyle(color: AppColors.white),
-        ),
-        content: const Text(
-          'Are you sure you want to delete this meal? This cannot be undone.',
-          style: TextStyle(color: AppColors.lavender),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.lime)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    ) ?? false;
-
-    if (!confirmed) return;
-
-    if (!context.mounted) return;
-
-    // Show loading
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Deleting meal...'),
-        duration: Duration(seconds: 1),
-      ),
-    );
-
-    // Delete the meal
-    final success = await mealController.deleteMeal(meal.mealId ?? 0);
-
-    if (!context.mounted) return;
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✓ Meal deleted'),
-          duration: Duration(seconds: 2),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${mealController.errorMessage}'),
-          duration: const Duration(seconds: 3),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final emoji = _getMealEmoji(meal.mealType);
@@ -1485,105 +1538,158 @@ class _MealLogTile extends StatelessWidget {
         final calories = mealController.getMealCalories(meal.mealId ?? 0);
         final caloriesStr = calories > 0 ? calories.toStringAsFixed(0) : '0';
 
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.lavender.withOpacity(0.5)),
-            color: AppColors.cardBg,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+        // In batch delete mode, show checkbox
+        if (isBatchDeleteMode) {
+          return GestureDetector(
+            onTap: onSelectForDelete,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelectedForDelete ? Colors.red : AppColors.lavender.withOpacity(0.5),
                 ),
-                alignment: Alignment.center,
-                child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                color: isSelectedForDelete ? Colors.red.withOpacity(0.1) : AppColors.cardBg,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: isSelectedForDelete,
+                    onChanged: (_) => onSelectForDelete(),
+                    activeColor: Colors.red,
+                    checkColor: Colors.white,
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          meal.mealType,
+                          style: const TextStyle(
+                            color: AppColors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          dateStr,
+                          style: const TextStyle(
+                            color: AppColors.slateGray,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        caloriesStr,
+                        style: const TextStyle(
+                          color: AppColors.lime,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const Text(
+                        'kcal',
+                        style: TextStyle(
+                          color: AppColors.slateGray,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Normal mode - click to edit
+        return GestureDetector(
+          onTap: () => _editMeal(context, mealController),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.lavender.withOpacity(0.5)),
+              color: AppColors.cardBg,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        meal.mealType,
+                        style: const TextStyle(
+                          color: AppColors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        dateStr,
+                        style: const TextStyle(
+                          color: AppColors.slateGray,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      meal.mealType,
+                      caloriesStr,
                       style: const TextStyle(
-                        color: AppColors.white,
-                        fontSize: 16,
+                        color: AppColors.lime,
+                        fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      dateStr,
-                      style: const TextStyle(
+                    const Text(
+                      'kcal',
+                      style: TextStyle(
                         color: AppColors.slateGray,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    caloriesStr,
-                    style: const TextStyle(
-                      color: AppColors.lime,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const Text(
-                    'kcal',
-                    style: TextStyle(
-                      color: AppColors.slateGray,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 4),
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'edit') {
-                    _editMeal(context, mealController);
-                  } else if (value == 'delete') {
-                    _deleteMeal(context, mealController);
-                  }
-                },
-                itemBuilder: (BuildContext context) => [
-                  const PopupMenuItem<String>(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, color: AppColors.lime, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, color: Colors.red, size: 18),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
-                icon: const Icon(Icons.more_vert, color: AppColors.lime, size: 20),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
