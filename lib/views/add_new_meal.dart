@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
 import 'package:mobile_application_development/models/food.dart';
-import 'package:mobile_application_development/views/widgets/custom_bottom_nav_bar.dart';
 import 'package:provider/provider.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/food_controller.dart';
@@ -35,7 +34,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   final Map<int, _SelectedItem> _selected = {};
   final TextEditingController _searchCtrl = TextEditingController();
   bool _showToast = false;
-  int _selectedNavIndex = 2; // Diet tab (3rd item, 0-indexed)
 
   // Meal type selection - will be set in initState based on current time
   late String _selectedMealType;
@@ -203,17 +201,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
 
       setState(() {});
     }
-  }
-
-  void _onNavItemTapped(int index) {
-    if (index == 2) {
-      // Already on Diet tab, no need to navigate
-      return;
-    }
-
-    // Navigate to the selected tab
-    Navigator.of(context).pop();
-    Navigator.of(context).pushReplacementNamed('/main');
   }
 
   @override
@@ -442,10 +429,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
             );
           },
         ),
-      ),
-      bottomNavigationBar: CustomBottomNavBar(
-        selectedIndex: _selectedNavIndex,
-        onTap: _onNavItemTapped,
       ),
     );
   }
@@ -848,59 +831,6 @@ class _FoodRow extends StatelessWidget {
   final VoidCallback onSelectForDelete;
   final VoidCallback onEditFood;
 
-  void _showFoodOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                food.foodName,
-                style: const TextStyle(
-                  color: AppColors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            // Edit option
-            ListTile(
-              leading: const Icon(Icons.edit, color: AppColors.lime),
-              title: const Text(
-                'Edit Food',
-                style: TextStyle(color: AppColors.white),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _navigateToEditFood(context);
-              },
-            ),
-            // Delete option
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text(
-                'Delete Food',
-                style: TextStyle(color: Colors.red),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _showDeleteConfirmation(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   String _getCategoryEmoji(String categoryName) {
     // Map category names to their emojis
     const categoryMap = {
@@ -1054,7 +984,7 @@ class _FoodRow extends StatelessWidget {
 
     // Normal mode - show +/- buttons
     return GestureDetector(
-      onLongPress: () => _showFoodOptions(context),
+      onTap: () => _navigateToEditFood(context),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(10),
