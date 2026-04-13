@@ -575,7 +575,7 @@ class _DailyGoalItem extends StatelessWidget {
           color: theme.colorScheme.secondary.withOpacity(0.3),
         ),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(11),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -585,7 +585,7 @@ class _DailyGoalItem extends StatelessWidget {
               color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             value,
             style: theme.textTheme.titleMedium?.copyWith(

@@ -1040,6 +1040,7 @@ class _MealLogSectionState extends State<_MealLogSection> {
               ),
             ),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // Filter popup
                 PopupMenuButton<String>(
@@ -1055,7 +1056,7 @@ class _MealLogSectionState extends State<_MealLogSection> {
                     const PopupMenuItem(value: 'all', child: Text('All Meals')),
                     const PopupMenuItem(value: 'date', child: Text('Select Date')),
                   ],
-                  child: _toolbarChip(Icons.filter_list, 'Filter', AppColors.lime),
+                  child: _toolbarIconButton(Icons.filter_list, AppColors.lime),
                 ),
                 const SizedBox(width: 6),
                 // Toggle batch-delete mode
@@ -1064,7 +1065,9 @@ class _MealLogSectionState extends State<_MealLogSection> {
                     _isBatchDeleteMode = !_isBatchDeleteMode;
                     if (!_isBatchDeleteMode) _selectedForDeletion.clear();
                   }),
-                  child: _toolbarChip(Icons.delete_outline, 'Delete', AppColors.yellow),
+                  child: _isBatchDeleteMode
+                      ? _toolbarIconButton(Icons.close, Colors.red, isActive: true)
+                      : _toolbarIconButton(Icons.delete_outline, AppColors.yellow),
                 ),
                 const SizedBox(width: 6),
                 // Add meal (only when not in delete mode)
@@ -1079,7 +1082,7 @@ class _MealLogSectionState extends State<_MealLogSection> {
                         );
                       });
                     },
-                    child: _toolbarChip(Icons.add, 'Add', AppColors.lime),
+                    child: _toolbarIconButton(Icons.add, AppColors.lime),
                   ),
               ],
             ),
@@ -1441,9 +1444,24 @@ class _MealLogSectionState extends State<_MealLogSection> {
     }
   }
 
+  Widget _toolbarIconButton(IconData icon, Color color, {bool isActive = false}) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: isActive ? color.withOpacity(0.3) : color.withOpacity(0.13),
+        border: Border.all(
+          color: isActive ? color : color.withOpacity(0.55),
+          width: isActive ? 2 : 1,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, color: color, size: 18),
+    );
+  }
+
   Widget _toolbarChip(IconData icon, String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
       decoration: BoxDecoration(
         color: color.withOpacity(0.13),
         border: Border.all(color: color.withOpacity(0.55)),
@@ -1547,7 +1565,7 @@ class _MealLogTile extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isSelectedForDelete ? Colors.red : AppColors.lavender.withOpacity(0.5),
+                  color: isSelectedForDelete ? Colors.red : Colors.white.withOpacity(0.25),
                 ),
                 color: isSelectedForDelete ? Colors.red.withOpacity(0.1) : AppColors.cardBg,
               ),
@@ -1558,6 +1576,7 @@ class _MealLogTile extends StatelessWidget {
                     onChanged: (_) => onSelectForDelete(),
                     activeColor: Colors.red,
                     checkColor: Colors.white,
+                    side: const BorderSide(color: Colors.white, width: 2),
                   ),
                   const SizedBox(width: 8),
                   Container(
