@@ -35,6 +35,7 @@ class _EditMealViewState extends State<EditMealView> {
   final _formKey = GlobalKey<FormState>();
   final Map<int, _SelectedMealFood> _selected = {};
   late TextEditingController _mealTypeController;
+  late TextEditingController _mealNameController;
   late DateTime _selectedDate;
   String _searchQuery = '';
   final TextEditingController _searchCtrl = TextEditingController();
@@ -49,6 +50,7 @@ class _EditMealViewState extends State<EditMealView> {
     _selectedMealType = widget.meal.mealType;
     _selectedDate = widget.meal.mealDate;
     _mealTypeController = TextEditingController(text: _selectedMealType);
+    _mealNameController = TextEditingController(text: widget.meal.mealName ?? '');
 
     // Load meal foods on init
     _loadMealFoods();
@@ -138,6 +140,7 @@ class _EditMealViewState extends State<EditMealView> {
   @override
   void dispose() {
     _mealTypeController.dispose();
+    _mealNameController.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -227,6 +230,7 @@ class _EditMealViewState extends State<EditMealView> {
     }
 
     final mealController = context.read<MealController>();
+    final mealName = _mealNameController.text.trim().isEmpty ? null : _mealNameController.text.trim();
 
     try {
       // Update meal with new foods and recalculate nutrition
@@ -236,6 +240,7 @@ class _EditMealViewState extends State<EditMealView> {
         mealDate: _selectedDate,
         userId: widget.meal.userId,
         foodsWithQuantities: foodsWithQuantities,
+        mealName: mealName,
       );
 
       if (!mounted) return;
@@ -350,6 +355,28 @@ class _EditMealViewState extends State<EditMealView> {
                               ),
                             );
                           }).toList(),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Meal Name Input
+                        _buildLabel('MEAL NAME (OPTIONAL)'),
+                        Container(
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A2A2A),
+                            border: Border.all(color: Colors.grey.shade700),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: TextField(
+                            controller: _mealNameController,
+                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                            decoration: const InputDecoration(
+                              hintText: 'e.g., Grilled Chicken Salad',
+                              hintStyle: TextStyle(color: Color(0xFF666666), fontSize: 14),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                              border: InputBorder.none,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 24),
 
@@ -812,6 +839,7 @@ class _EditMealViewState extends State<EditMealView> {
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               ),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               controller: TextEditingController(text: value.toStringAsFixed(0))

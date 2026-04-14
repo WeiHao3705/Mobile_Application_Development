@@ -82,6 +82,7 @@ class MealController extends ChangeNotifier {
     required String mealType,
     required DateTime mealDate,
     required Map<int, Map<String, dynamic>> foodsWithQuantities,
+    String? mealName,
   }) async {
     _isLoading = true;
     _errorMessage = '';
@@ -93,12 +94,14 @@ class MealController extends ChangeNotifier {
       developer.log('👤 User ID: $userId');
       developer.log('🍽️ Meal Type: $mealType');
       developer.log('📊 Foods: ${foodsWithQuantities.length}');
+      developer.log('📝 Meal Name: $mealName');
 
       final mealId = await _service.logMeal(
         userId: userId,
         mealType: mealType,
         mealDate: mealDate,
         foodsWithQuantities: foodsWithQuantities,
+        mealName: mealName,
       );
 
       if (mealId == null || mealId == 0) {
@@ -200,6 +203,7 @@ class MealController extends ChangeNotifier {
     required DateTime mealDate,
     required int userId,
     Map<int, Map<String, dynamic>>? foodsWithQuantities,
+    String? mealName,
   }) async {
     _isLoading = true;
     _errorMessage = '';
@@ -209,6 +213,7 @@ class MealController extends ChangeNotifier {
       developer.log('🟨 MealController.updateMeal START');
       developer.log('👤 Meal ID: $mealId');
       developer.log('📊 Foods provided: ${foodsWithQuantities?.length ?? 0}');
+      developer.log('📝 Meal Name: $mealName');
 
       final updatedMeal = await _service.updateMeal(
         mealId: mealId,
@@ -216,6 +221,7 @@ class MealController extends ChangeNotifier {
         mealDate: mealDate,
         userId: userId,
         foodsWithQuantities: foodsWithQuantities,
+        mealName: mealName,
       );
 
       _currentMeal = updatedMeal;

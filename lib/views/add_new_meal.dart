@@ -244,7 +244,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   Future<void> _logMeal() async {
     if (_selected.isEmpty) return;
 
-    // Get the current user
     final authController = widget.authController;
     if (authController.currentUser == null) {
       _showErrorSnackbar('User not logged in');
@@ -257,42 +256,47 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
       return;
     }
 
-    // Prepare foods with quantities
     final foodsWithQuantities = <int, Map<String, dynamic>>{};
     for (final entry in _selected.entries) {
-      // Convert qty multiplier to grams (each increment = 100g)
       final quantityInGrams = entry.value.qty * 100.0;
-
       foodsWithQuantities[entry.key] = {
         'food_id': entry.key,
-        'quantity': quantityInGrams, // Convert to grams for calorie calculation
-        'unit': 'g', // Default unit is grams
+        'quantity': quantityInGrams,
+        'unit': 'g',
       };
     }
 
-    // Show loading state
+    if (!mounted) return;
+
+    // Show meal name sheet
+    final mealName = await _showMealNameSheet(userId, foodsWithQuantities);
+
+    // If user dismissed the sheet without choosing, return early
+    if (mealName == 'DISMISSED') {
+      return;
+    }
+
     if (!mounted) return;
     _showLoadingDialog();
 
     try {
-      // Log the meal
       final mealController = context.read<MealController>();
+
       final success = await mealController.logMeal(
         userId: userId,
-        mealType: _selectedMealType, // Use selected meal type
+        mealType: _selectedMealType,
         mealDate: DateTime.now(),
         foodsWithQuantities: foodsWithQuantities,
+        mealName: mealName,
       );
 
       if (!mounted) return;
 
-      // Close loading dialog safely
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
 
       if (success) {
-        // Show success toast and reset form
         setState(() => _showToast = true);
         _searchCtrl.clear();
         _selected.clear();
@@ -300,7 +304,6 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
         Future.delayed(const Duration(milliseconds: 2200), () {
           if (mounted) {
             setState(() => _showToast = false);
-            // Pop back to previous screen
             Navigator.of(context).pop(true);
           }
         });
@@ -310,13 +313,144 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     } catch (e) {
       if (!mounted) return;
 
-      // Close loading dialog if still open
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
 
       _showErrorSnackbar('Error saving meal: ${e.toString()}');
     }
+  }
+
+  Future<String?> _showMealNameSheet(int userId, Map<int, Map<String, dynamic>> foodsWithQuantities) async {
+    final suggested = _generateMealName();
+    late TextEditingController nameCtrl;
+
+    final result = await showModalBottomSheet<String?>(
+      context: context,
+      backgroundColor: AppColors.cardBg,
+      isScrollControlled: true,
+      isDismissible: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        nameCtrl = TextEditingController(text: suggested);
+        return SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(18, 12, 18,
+                MediaQuery.of(ctx).viewInsets.bottom + 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: AppColors.lavender.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Name this meal?',
+                  style: TextStyle(
+                    color: AppColors.lavender,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  'Makes it easier to find later. You can always skip.',
+                  style: TextStyle(
+                    color: AppColors.fatBar,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.inputBg,
+                    border: Border.all(color: AppColors.lavender.withOpacity(0.3)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: TextField(
+                    controller: nameCtrl,
+                    style: const TextStyle(color: AppColors.white, fontSize: 14),
+                    decoration: const InputDecoration(
+                      hintText: 'e.g., Grilled Chicken Salad',
+                      hintStyle: TextStyle(color: Color(0xFF5A5A7A), fontSize: 14),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 14),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.lime,
+                          foregroundColor: AppColors.nearBlack,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          final name = nameCtrl.text.trim();
+                          Navigator.pop(ctx, name.isEmpty ? null : name);
+                        },
+                        child: const Text(
+                          'Save meal',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx, null);
+                        },
+                        child: const Text(
+                          'Skip',
+                          style: TextStyle(
+                            color: AppColors.lavender,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    // If result is null, it means user dismissed the sheet (tapped outside)
+    if (result == null) {
+      return 'DISMISSED';
+    }
+
+    return result;
+  }
+
+  String _generateMealName() {
+    final foods = _selected.values.map((i) => i.food.foodName).take(2).join(' & ');
+    return foods.isEmpty ? _selectedMealType : '$_selectedMealType – $foods';
   }
 
   void _showLoadingDialog() {
@@ -643,6 +777,7 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     }
   }
 
+
   // ── Search Bar ─────────────────────────────────────────────────────────────
 
   Widget _buildSearchBar() {
@@ -773,9 +908,12 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
       height: 50,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.lime,
-          foregroundColor: AppColors.nearBlack,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: AppColors.lime.withOpacity(0.15),
+          foregroundColor: AppColors.lime,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: AppColors.lime.withOpacity(0.4), width: 1),
+          ),
         ),
         onPressed: _logMeal,
         child: const Text('Log Meal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
