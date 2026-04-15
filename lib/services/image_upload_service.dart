@@ -158,7 +158,6 @@ class ImageUploadService {
   }
 
   Future<String> _uploadImageAndGetUrl(File file) async {
-    final storage = _supabaseClient.storage;
     final objectPath = _buildObjectPath(file);
     final contentType = _detectContentType(file.path);
 
@@ -172,7 +171,11 @@ class ImageUploadService {
           file: file,
           contentType: contentType,
         );
-        final url = storage.from(_imageBucketId).getPublicUrl(objectPath);
+        
+        // Manually construct the public URL to ensure correct format
+        // Format: https://{project}.supabase.co/storage/v1/object/public/{bucket}/{path}
+        final url = '$supabaseUrl/storage/v1/object/public/$_imageBucketId/$objectPath';
+        
         developer.log('✅ Upload response: $objectPath');
         developer.log('🔗 Public URL: $url');
         developer.log('✅ Image uploaded successfully');
