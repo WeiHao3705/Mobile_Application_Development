@@ -91,8 +91,7 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
   }
 
   bool _isBodyweightExercise(Exercise exercise) {
-    final equipment = exercise.equipment.toLowerCase();
-    return equipment.contains('bodyweight') || equipment.contains('body weight');
+    return exercise.isBodyweight;
   }
 
   void _syncExerciseDrafts([List<WorkoutRoutineExerciseSeed>? seeds]) {

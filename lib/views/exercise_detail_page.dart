@@ -30,7 +30,10 @@ class ExerciseDetailPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _VideoPanel(videoUrl: exercise.videoUrl),
+            _ExerciseMediaPanel(
+              videoUrl: exercise.videoUrl,
+              imageUrl: exercise.imageUrl,
+            ),
             const SizedBox(height: 20),
             _DetailRow(label: 'Exercise Name', value: exercise.name),
             _DetailRow(label: 'Primary Muscle', value: exercise.primaryMuscle),
@@ -52,11 +55,81 @@ class _VideoPanel extends StatefulWidget {
   State<_VideoPanel> createState() => _VideoPanelState();
 }
 
+class _ExerciseMediaPanel extends StatelessWidget {
+  const _ExerciseMediaPanel({
+    required this.videoUrl,
+    required this.imageUrl,
+  });
+
+  final String? videoUrl;
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasVideo = (videoUrl ?? '').trim().isNotEmpty;
+    if (hasVideo) {
+      return _VideoPanel(videoUrl: videoUrl);
+    }
+
+    final trimmedImageUrl = imageUrl.trim();
+    if (trimmedImageUrl.isEmpty) {
+      return Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xFF111111),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.image_not_supported, size: 64, color: Colors.white54),
+              SizedBox(height: 8),
+              Text('No media available', style: TextStyle(color: Colors.white70)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: double.infinity,
+        color: const Color(0xFF111111),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Image.network(
+            trimmedImageUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) {
+              return const Center(
+                child: Text(
+                  'Failed to load media',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _VideoPanelState extends State<_VideoPanel> {
   VideoPlayerController? _controller;
   bool _isInitializing = false;
   String? _errorMessage;
+  bool _renderAsImageFallback = false;
   int _loadToken = 0;
+
+  bool _isGifUrl(String url) {
+    final uri = Uri.tryParse(url);
+    final path = (uri?.path ?? url).toLowerCase();
+    return path.endsWith('.gif');
+  }
 
   @override
   void initState() {
@@ -76,6 +149,14 @@ class _VideoPanelState extends State<_VideoPanel> {
   Future<void> _initController() async {
     final url = widget.videoUrl?.trim();
     if (url == null || url.isEmpty) return;
+    if (_isGifUrl(url)) {
+      // GIF is rendered by Image.network in build().
+      setState(() {
+        _isInitializing = false;
+        _errorMessage = null;
+      });
+      return;
+    }
 
     final token = ++_loadToken;
     var stage = 'prepare';
@@ -83,6 +164,7 @@ class _VideoPanelState extends State<_VideoPanel> {
     setState(() {
       _isInitializing = true;
       _errorMessage = null;
+      _renderAsImageFallback = false;
     });
 
     VideoPlayerController? controller;
@@ -129,6 +211,7 @@ class _VideoPanelState extends State<_VideoPanel> {
         setState(() {
           _controller = null;
           _errorMessage = 'Video timeout during $stage: $error';
+          _renderAsImageFallback = true;
         });
       }
     } catch (error) {
@@ -140,6 +223,7 @@ class _VideoPanelState extends State<_VideoPanel> {
           _errorMessage = playerError == null
               ? 'Failed during $stage: $error'
               : 'Failed during $stage: $playerError';
+          _renderAsImageFallback = true;
         });
       }
     } finally {
@@ -166,7 +250,9 @@ class _VideoPanelState extends State<_VideoPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasUrl = (widget.videoUrl ?? '').trim().isNotEmpty;
+    final url = (widget.videoUrl ?? '').trim();
+    final hasUrl = url.isNotEmpty;
+    final isGif = hasUrl && _isGifUrl(url);
     final controller = _controller;
     final isReady = controller != null && controller.value.isInitialized;
     final isPlaying = isReady && controller.value.isPlaying;
@@ -194,6 +280,52 @@ class _VideoPanelState extends State<_VideoPanel> {
                 style: TextStyle(color: Colors.white70),
               ),
             ],
+          ),
+        ),
+      );
+    }
+
+    if (isGif || _renderAsImageFallback) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          color: const Color(0xFF111111),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) {
+                      return const Center(
+                        child: Text(
+                          'Failed to load GIF',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'GIF/IMG',
+                      style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );

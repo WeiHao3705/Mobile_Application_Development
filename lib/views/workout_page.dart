@@ -116,7 +116,10 @@ class _WorkoutPageState extends State<WorkoutPage> {
         const ['exercise_name', 'name', 'title'],
         fallback: exerciseId,
       );
-      final equipment = _readFirstNonEmpty(exerciseRow, const ['equipment', 'equipment_name', 'tool']);
+      final equipment = _readFirstNonEmpty(
+        exerciseRow,
+        const ['equipment', 'equipment_name', 'tool'],
+      );
       final imageUrl = _readFirstNonEmpty(exerciseRow, const ['image', 'image_url', 'thumbnail_url']);
       final isBodyweight = _isBodyweightExercise(equipment);
       final sets = _toInt(row['sets']);

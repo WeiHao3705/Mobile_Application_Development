@@ -224,8 +224,7 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
   }
 
   bool _isBodyweightExercise(Exercise exercise) {
-    final equipment = exercise.equipment.toLowerCase();
-    return equipment.contains('bodyweight') || equipment.contains('body weight');
+    return exercise.isBodyweight;
   }
 
   void _addSetRow(String rowId) {

@@ -77,6 +77,21 @@ class _AddExercisePageState extends State<AddExercisePage> {
   static const String _videoStorageBucket = 'Exercise_Video';
   static const int _maxUploadAttempts = 3;
 
+  bool _isGifPath(String path) {
+    return path.toLowerCase().endsWith('.gif');
+  }
+
+  bool _isVideoFilePath(String path) {
+    final lower = path.toLowerCase();
+    return lower.endsWith('.mp4') ||
+        lower.endsWith('.mov') ||
+        lower.endsWith('.avi') ||
+        lower.endsWith('.mkv') ||
+        lower.endsWith('.webm') ||
+        lower.endsWith('.3gp') ||
+        lower.endsWith('.m4v');
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -277,21 +292,48 @@ class _AddExercisePageState extends State<AddExercisePage> {
     if (source == null) return;
 
     try {
-      final pickedFile = await imagePicker.pickImage(
-        source: source,
-        imageQuality: 80,
-        maxWidth: 1920,
-      );
-      if (pickedFile != null) {
-        setState(() {
-          _imageFile = File(pickedFile.path);
-          _imageUrl = null;
-        });
+      if (source == ImageSource.camera) {
+        final pickedFile = await imagePicker.pickImage(
+          source: source,
+          imageQuality: 80,
+          maxWidth: 1920,
+        );
+        if (pickedFile != null) {
+          setState(() {
+            _imageFile = File(pickedFile.path);
+            _imageUrl = null;
+          });
+        }
+        return;
       }
+
+      // pickMedia keeps GIF animation from gallery selections.
+      final pickedMedia = await imagePicker.pickMedia();
+      if (pickedMedia == null) {
+        return;
+      }
+
+      if (_isVideoFilePath(pickedMedia.path)) {
+        setState(() {
+          _videoFile = File(pickedMedia.path);
+          _videoUrl = null;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Video selected and attached as exercise video.')),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _imageFile = File(pickedMedia.path);
+        _imageUrl = null;
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick image: $e')),
+          SnackBar(content: Text('Failed to pick image or GIF: $e')),
         );
       }
     }
@@ -324,19 +366,33 @@ class _AddExercisePageState extends State<AddExercisePage> {
     if (source == null) return;
 
     try {
-      final pickedFile = await videoPicker.pickVideo(
-        source: source,
-      );
+      XFile? pickedFile;
+      if (source == ImageSource.gallery) {
+        // Allow GIF selection from gallery for exercise media.
+        pickedFile = await videoPicker.pickMedia();
+      } else {
+        pickedFile = await videoPicker.pickVideo(
+          source: source,
+        );
+      }
+
       if (pickedFile != null) {
+        final pickedPath = pickedFile.path;
         setState(() {
-          _videoFile = File(pickedFile.path);
+          _videoFile = File(pickedPath);
           _videoUrl = null;
         });
+
+        if (_isGifPath(pickedPath) && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('GIF selected for exercise media.')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick video: $e')),
+          SnackBar(content: Text('Failed to pick video/GIF: $e')),
         );
       }
     }
@@ -491,7 +547,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
     }
   }
 
-  Widget _buildEquipmentDropdown() {
+  Widget _buildEquipmentSelector() {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(
@@ -761,7 +817,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              _buildEquipmentDropdown(),
+              _buildEquipmentSelector(),
               const SizedBox(height: 14),
               const Text(
                 'Primary Muscle',
@@ -797,7 +853,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
               _buildInstructionField(_howToController, 'Instruction', maxLines: 4),
               const SizedBox(height: 16),
               const Text(
-                'Exercise Image',
+                'Exercise Image / GIF',
                 style: TextStyle(
                   color: AppColors.lavender,
                   fontSize: 14,
@@ -834,7 +890,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
                           children: [
                             Icon(Icons.image_outlined, color: Colors.white70, size: 32),
                             SizedBox(height: 8),
-                            Text('Tap to upload image', style: TextStyle(color: Colors.white70)),
+                            Text('Tap to upload image or GIF', style: TextStyle(color: Colors.white70)),
                           ],
                         )
                       : const SizedBox.shrink(),
@@ -842,7 +898,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Exercise Video',
+                'Exercise Video / GIF',
                 style: TextStyle(
                   color: AppColors.lavender,
                   fontSize: 14,
@@ -881,7 +937,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
                           children: [
                             Icon(Icons.videocam, color: Colors.white70, size: 32),
                             SizedBox(height: 8),
-                            Text('Tap to upload video', style: TextStyle(color: Colors.white70)),
+                            Text('Tap to upload video or GIF', style: TextStyle(color: Colors.white70)),
                           ],
                         ),
                 ),
