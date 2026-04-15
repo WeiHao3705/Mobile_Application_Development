@@ -7,6 +7,7 @@ import '../controllers/food_controller.dart';
 import '../controllers/meal_controller.dart';
 import 'add_new_food.dart';
 import 'edit_food.dart';
+import 'widgets/meal_image_picker_widget.dart';
 
 class _SelectedItem {
   _SelectedItem({required this.food, required this.qty});
@@ -282,12 +283,29 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
     try {
       final mealController = context.read<MealController>();
 
-      final success = await mealController.logMeal(
+      // Upload image if one is selected
+      String? imageUrl;
+      if (mealController.selectedMealImage != null) {
+        final uploadSuccess = await mealController.uploadMealImage(userId: userId);
+        if (!uploadSuccess) {
+          if (!mounted) return;
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+          _showErrorSnackbar('Failed to upload image: ${mealController.errorMessage}');
+          return;
+        }
+        imageUrl = mealController.mealImageUrl;
+      }
+
+      // Log meal with or without image
+      final success = await mealController.logMealWithImage(
         userId: userId,
         mealType: _selectedMealType,
         mealDate: DateTime.now(),
         foodsWithQuantities: foodsWithQuantities,
         mealName: mealName,
+        imageUrl: imageUrl,
       );
 
       if (!mounted) return;
@@ -300,6 +318,7 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
         setState(() => _showToast = true);
         _searchCtrl.clear();
         _selected.clear();
+        mealController.clearSelectedImage();
 
         Future.delayed(const Duration(milliseconds: 2200), () {
           if (mounted) {
@@ -548,6 +567,18 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
                         _buildCategoryChips(categoriesList),
                         const SizedBox(height: 14),
                         _buildFoodList(filtered, allFoods),
+                        if (_selected.isNotEmpty) ...[
+                          const SizedBox(height: 18),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 18.0),
+                            child: Divider(color: AppColors.lavender, height: 1),
+                          ),
+                          const SizedBox(height: 18),
+                          const Padding(
+                            padding: EdgeInsets.only(left: 18.0),
+                            child: MealImagePickerWidget(),
+                          ),
+                        ],
                         if (_selected.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           _buildSelectedSummary(),

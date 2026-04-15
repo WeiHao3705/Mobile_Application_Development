@@ -513,6 +513,56 @@ class MealService {
       rethrow;
     }
   }
+
+  /// Log a meal with image URL
+  Future<int?> logMealWithImage({
+    required int userId,
+    required String mealType,
+    required DateTime mealDate,
+    required Map<int, Map<String, dynamic>> foodsWithQuantities,
+    required String imageUrl,
+    String? mealName,
+  }) async {
+    try {
+      developer.log('🔵 MealService.logMealWithImage START');
+      developer.log('📷 Image URL: $imageUrl');
+
+      // First log the meal normally
+      final mealId = await logMeal(
+        userId: userId,
+        mealType: mealType,
+        mealDate: mealDate,
+        foodsWithQuantities: foodsWithQuantities,
+        mealName: mealName,
+      );
+
+      if (mealId == null || mealId == 0) {
+        developer.log('❌ Failed to create meal');
+        return null;
+      }
+
+      // Get the created meal and update it with image URL
+      final mealLog = await _repository.getMealById(mealId);
+      if (mealLog == null) {
+        developer.log('❌ Meal not found after creation');
+        return mealId; // Return the ID even if we can't update image
+      }
+
+      // Create updated meal with image URL
+      final updatedMeal = mealLog.copyWith(imageUrl: imageUrl);
+
+      // Update the meal in repository
+      await _repository.updateMeal(updatedMeal);
+
+      developer.log('✅ Meal logged with image successfully: $mealId');
+      developer.log('📷 Image URL saved: $imageUrl');
+
+      return mealId;
+    } catch (e) {
+      developer.log('❌ Error logging meal with image: $e');
+      rethrow;
+    }
+  }
 }
 
 

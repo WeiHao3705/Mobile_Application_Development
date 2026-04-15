@@ -8,6 +8,7 @@ class MealLog {
   final double? totalCarbs;
   final double? totalFats;
   final String? mealName;
+  final String? imageUrl;
 
   MealLog({
     this.mealId,
@@ -19,6 +20,7 @@ class MealLog {
     this.totalCarbs,
     this.totalFats,
     this.mealName,
+    this.imageUrl,
   });
 
   factory MealLog.fromJson(Map<String, dynamic> json) {
@@ -43,6 +45,7 @@ class MealLog {
       totalCarbs: (json['total_carbs'] as num?)?.toDouble(),
       totalFats: (json['total_fats'] as num?)?.toDouble(),
       mealName: json['meal_name'] as String?,
+      imageUrl: json['image_url'] as String?,
     );
   }
 
@@ -57,6 +60,7 @@ class MealLog {
       if (totalCarbs != null) 'total_carbs': totalCarbs,
       if (totalFats != null) 'total_fats': totalFats,
       if (mealName != null) 'meal_name': mealName,
+      if (imageUrl != null) 'image_url': imageUrl,
     };
   }
 
@@ -70,6 +74,7 @@ class MealLog {
     double? totalCarbs,
     double? totalFats,
     String? mealName,
+    String? imageUrl,
   }) {
     return MealLog(
       mealId: mealId ?? this.mealId,
@@ -81,6 +86,7 @@ class MealLog {
       totalCarbs: totalCarbs ?? this.totalCarbs,
       totalFats: totalFats ?? this.totalFats,
       mealName: mealName ?? this.mealName,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 
@@ -103,7 +109,7 @@ class MealLog {
   String toString() {
     return 'MealLog(mealId: $mealId, mealType: $mealType, mealDate: $mealDate, userId: $userId, '
         'totalCalories: $totalCalories, totalProteins: $totalProteins, totalCarbs: $totalCarbs, '
-        'totalFats: $totalFats, mealName: $mealName)';
+        'totalFats: $totalFats, mealName: $mealName, imageUrl: $imageUrl)';
   }
 
   @override
@@ -118,12 +124,13 @@ class MealLog {
         other.totalProteins == totalProteins &&
         other.totalCarbs == totalCarbs &&
         other.totalFats == totalFats &&
-        other.mealName == mealName;
+        other.mealName == mealName &&
+        other.imageUrl == imageUrl;
   }
 
   @override
   int get hashCode {
     return Object.hash(mealId, mealType, mealDate, userId, totalCalories,
-        totalProteins, totalCarbs, totalFats, mealName);
+        totalProteins, totalCarbs, totalFats, mealName, imageUrl);
   }
 }
