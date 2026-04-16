@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controllers/auth_controller.dart';
 import '../models/app_user.dart';
+import 'landing_page.dart';
 import 'main_navigation.dart';
 
 class SignUpPages extends StatefulWidget {
@@ -61,6 +62,18 @@ class _SignUpState extends State<SignUpPages> {
       initialDate: initialDate,
       firstDate: DateTime(1900),
       lastDate: now,
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        return Theme(
+          data: theme.copyWith(
+            colorScheme: theme.colorScheme,
+            dialogTheme: DialogThemeData(
+              backgroundColor: theme.colorScheme.surface,
+            ),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
 
     if (picked == null) {
@@ -71,16 +84,37 @@ class _SignUpState extends State<SignUpPages> {
       _selectedDateOfBirth = picked;
       _hasSelectedDateOfBirth = true;
       _dateOfBirthController.text =
-      '${picked.year}-${_twoDigits(picked.month)}-${_twoDigits(picked.day)}';
+          '${picked.year}-${_twoDigits(picked.month)}-${_twoDigits(picked.day)}';
     });
   }
 
   String _twoDigits(int value) => value.toString().padLeft(2, '0');
 
+  void _goToLanding() {
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      LandingPage.routeName,
+      (route) => false,
+    );
+  }
+
+  void _handleSystemBack() {
+    if (_authController.isLoading) {
+      return;
+    }
+    if (_stepIndex == 0) {
+      _goToLanding();
+      return;
+    }
+    setState(() {
+      _stepIndex -= 1;
+    });
+  }
+
   void _goBack() {
     FocusScope.of(context).unfocus();
     if (_stepIndex == 0) {
-      Navigator.pop(context);
+      _goToLanding();
       return;
     }
 
@@ -146,7 +180,7 @@ class _SignUpState extends State<SignUpPages> {
     Navigator.pushNamedAndRemoveUntil(
       context,
       MainNavigation.routeName,
-          (route) => false,
+      (route) => false,
     );
   }
 
@@ -158,45 +192,86 @@ class _SignUpState extends State<SignUpPages> {
     return AnimatedBuilder(
       animation: _authController,
       builder: (context, _) {
-        return Scaffold(
-          appBar: AppBar(
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: _authController.isLoading ? null : _goBack,
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) {
+              return;
+            }
+            _handleSystemBack();
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              backgroundColor: theme.colorScheme.surface,
+              foregroundColor: theme.colorScheme.onSurface,
+              title: Text('Sign Up (${_stepIndex + 1}/6)'),
             ),
-            title: Text('Sign Up (${_stepIndex + 1}/6)'),
-          ),
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    LinearProgressIndicator(value: (_stepIndex + 1) / 6),
-                    const SizedBox(height: 20),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: _buildStepFields(theme),
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Card(
+                      color: theme.colorScheme.surface,
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              LinearProgressIndicator(
+                                value: (_stepIndex + 1) / 6,
+                                backgroundColor: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.18),
+                                valueColor: AlwaysStoppedAnimation(
+                                    theme.colorScheme.primary),
+                              ),
+                              const SizedBox(height: 20),
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  child: _buildStepFields(theme),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: _authController.isLoading ? null : _goBack,
+                                      icon: const Icon(Icons.arrow_back),
+                                      label: Text(_stepIndex == 0 ? 'Quit' : 'Back'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: _authController.isLoading
+                                          ? null
+                                          : isLastStep
+                                              ? _handleSignUp
+                                              : _goNext,
+                                      child: _authController.isLoading
+                                          ? SizedBox(
+                                              height: 18,
+                                              width: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: theme.colorScheme.onPrimary,
+                                              ),
+                                            )
+                                          : Text(isLastStep ? 'Finish Sign Up' : 'Next'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _authController.isLoading
-                          ? null
-                          : isLastStep
-                          ? _handleSignUp
-                          : _goNext,
-                      child: _authController.isLoading
-                          ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                          : Text(isLastStep ? 'Finish Sign Up' : 'Next'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
