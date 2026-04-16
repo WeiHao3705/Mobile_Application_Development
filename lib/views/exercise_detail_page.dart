@@ -1,45 +1,111 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 
 import '../models/exercise.dart';
+import '../repository/exercise_repository.dart';
+import 'edit_exercise_page.dart';
 
-class ExerciseDetailPage extends StatelessWidget {
+class ExerciseDetailPage extends StatefulWidget {
   const ExerciseDetailPage({
     super.key,
     required this.exercise,
+    this.isAdmin = false,
+    this.repository,
   });
 
   final Exercise exercise;
+  final bool isAdmin;
+  final ExerciseRepository? repository;
+
+  @override
+  State<ExerciseDetailPage> createState() => _ExerciseDetailPageState();
+}
+
+class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
+  late Exercise _exercise;
+  late final ExerciseRepository _repository;
+  bool _didUpdateExercise = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _exercise = widget.exercise;
+    _repository = widget.repository ?? ExerciseRepository(supabase: Supabase.instance.client);
+  }
+
+  Future<void> _openEditPage() async {
+    final updatedExercise = await Navigator.of(context).push<Exercise>(
+      MaterialPageRoute<Exercise>(
+        builder: (_) => EditExercisePage(
+          repository: _repository,
+          exercise: _exercise,
+        ),
+      ),
+    );
+
+    if (!mounted || updatedExercise == null) {
+      return;
+    }
+
+    setState(() {
+      _exercise = updatedExercise;
+      _didUpdateExercise = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          return;
+        }
+        Navigator.of(context).pop(_didUpdateExercise ? true : null);
+      },
+      child: Scaffold(
         backgroundColor: Colors.black,
-        foregroundColor: theme.colorScheme.primary,
-        elevation: 0,
-        title: const Text('Exercise Detail'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ExerciseMediaPanel(
-              videoUrl: exercise.videoUrl,
-              imageUrl: exercise.imageUrl,
-            ),
-            const SizedBox(height: 20),
-            _DetailRow(label: 'Exercise Name', value: exercise.name),
-            _DetailRow(label: 'Primary Muscle', value: exercise.primaryMuscle),
-            _DetailRow(label: 'Secondary Muscle', value: exercise.secondaryMuscle),
-            _DetailRow(label: 'How To Do', value: exercise.howTo),
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          foregroundColor: theme.colorScheme.primary,
+          elevation: 0,
+          title: const Text('Exercise Detail'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(_didUpdateExercise ? true : null),
+          ),
+          actions: [
+            if (widget.isAdmin)
+              IconButton(
+                onPressed: _openEditPage,
+                icon: const Icon(Icons.edit),
+                tooltip: 'Edit Exercise',
+              ),
           ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ExerciseMediaPanel(
+                videoUrl: _exercise.videoUrl,
+                imageUrl: _exercise.imageUrl,
+              ),
+              const SizedBox(height: 20),
+              _DetailRow(label: 'Exercise Name', value: _exercise.name),
+              _DetailRow(label: 'Primary Muscle', value: _exercise.primaryMuscle),
+              _DetailRow(label: 'Muscle Group', value: _exercise.muscleGroup),
+              _DetailRow(label: 'Secondary Muscle', value: _exercise.secondaryMuscle),
+              _DetailRow(label: 'Equipment', value: _exercise.equipment),
+              _DetailRow(label: 'How To Do', value: _exercise.howTo),
+            ],
+          ),
         ),
       ),
     );
@@ -103,7 +169,7 @@ class _ExerciseMediaPanel extends StatelessWidget {
           child: Image.network(
             trimmedImageUrl,
             fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) {
+            errorBuilder: (_, error, stackTrace) {
               return const Center(
                 child: Text(
                   'Failed to load media',
@@ -299,7 +365,7 @@ class _VideoPanelState extends State<_VideoPanel> {
                   child: Image.network(
                     url,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) {
+                    errorBuilder: (_, error, stackTrace) {
                       return const Center(
                         child: Text(
                           'Failed to load GIF',

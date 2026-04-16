@@ -273,12 +273,18 @@ class _ExercisePageState extends State<ExercisePage> {
                         border: Border.all(color: AppColors.purple.withValues(alpha: 0.2)),
                       ),
                       child: ListTile(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => ExerciseDetailPage(exercise: exercise),
+                        onTap: () async {
+                          final didUpdate = await Navigator.of(context).push<bool>(
+                            MaterialPageRoute<bool>(
+                              builder: (_) => ExerciseDetailPage(
+                                exercise: exercise,
+                                isAdmin: widget.authController.isAdmin,
+                              ),
                             ),
                           );
+                          if (didUpdate == true) {
+                            await _loadExercises();
+                          }
                         },
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         leading: CircleAvatar(
