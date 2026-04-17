@@ -6,7 +6,6 @@ import 'package:video_player/video_player.dart';
 
 import '../models/exercise.dart';
 import '../repository/exercise_repository.dart';
-import 'edit_exercise_page.dart';
 
 class ExerciseDetailPage extends StatefulWidget {
   const ExerciseDetailPage({
@@ -27,7 +26,7 @@ class ExerciseDetailPage extends StatefulWidget {
 class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
   late Exercise _exercise;
   late final ExerciseRepository _repository;
-  bool _didUpdateExercise = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -36,76 +35,197 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
     _repository = widget.repository ?? ExerciseRepository(supabase: Supabase.instance.client);
   }
 
-  Future<void> _openEditPage() async {
-    final updatedExercise = await Navigator.of(context).push<Exercise>(
-      MaterialPageRoute<Exercise>(
-        builder: (_) => EditExercisePage(
-          repository: _repository,
-          exercise: _exercise,
-        ),
-      ),
+  Future<void> _openEditDialog() async {
+    final nameController = TextEditingController(text: _exercise.name);
+    final primaryMuscleController = TextEditingController(text: _exercise.primaryMuscle);
+    final secondaryMuscleController = TextEditingController(
+      text: _exercise.secondaryMuscles.join(', '),
+    );
+    final equipmentController = TextEditingController(text: _exercise.equipment);
+    final howToController = TextEditingController(text: _exercise.howTo);
+    final imageUrlController = TextEditingController(text: _exercise.imageUrl);
+    final videoUrlController = TextEditingController(text: _exercise.videoUrl ?? '');
+
+    try {
+      final didSave = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Exercise'),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
+                  TextField(
+                    controller: primaryMuscleController,
+                    decoration: const InputDecoration(labelText: 'Primary Muscle'),
+                  ),
+                  TextField(
+                    controller: secondaryMuscleController,
+                    decoration: const InputDecoration(labelText: 'Secondary Muscle(s) (comma-separated)'),
+                  ),
+                  TextField(
+                    controller: equipmentController,
+                    decoration: const InputDecoration(labelText: 'Equipment'),
+                  ),
+                  TextField(
+                    controller: imageUrlController,
+                    decoration: const InputDecoration(labelText: 'Image URL'),
+                  ),
+                  TextField(
+                    controller: videoUrlController,
+                    decoration: const InputDecoration(labelText: 'Video URL (optional)'),
+                  ),
+                  TextField(
+                    controller: howToController,
+                    decoration: const InputDecoration(labelText: 'How To'),
+                    minLines: 3,
+                    maxLines: 6,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
     );
 
-    if (!mounted || updatedExercise == null) {
-      return;
-    }
+      if (didSave != true) {
+        return;
+      }
 
-    setState(() {
-      _exercise = updatedExercise;
-      _didUpdateExercise = true;
-    });
+      final name = nameController.text.trim();
+      final primaryMuscle = primaryMuscleController.text.trim();
+      final equipment = equipmentController.text.trim();
+      final howTo = howToController.text.trim();
+      final imageUrl = imageUrlController.text.trim();
+      final secondaryMuscles = secondaryMuscleController.text
+          .split(',')
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList();
+
+      if (name.isEmpty ||
+          primaryMuscle.isEmpty ||
+          equipment.isEmpty ||
+          howTo.isEmpty ||
+          imageUrl.isEmpty) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please fill all required fields.')),
+        );
+        return;
+      }
+
+      setState(() {
+        _isSaving = true;
+      });
+
+      try {
+        final updated = await _repository.updateExercise(
+          exerciseId: _exercise.id,
+          name: name,
+          primaryMuscle: primaryMuscle,
+          secondaryMuscles: secondaryMuscles,
+          equipment: equipment,
+          howTo: howTo,
+          imageUrl: imageUrl,
+          videoUrl: videoUrlController.text.trim(),
+        );
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _exercise = updated;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Exercise updated successfully.')),
+        );
+        Navigator.of(context).pop(true);
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save exercise: $error')),
+        );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSaving = false;
+          });
+        }
+      }
+    } finally {
+      nameController.dispose();
+      primaryMuscleController.dispose();
+      secondaryMuscleController.dispose();
+      equipmentController.dispose();
+      howToController.dispose();
+      imageUrlController.dispose();
+      videoUrlController.dispose();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) {
-          return;
-        }
-        Navigator.of(context).pop(_didUpdateExercise ? true : null);
-      },
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
         backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          foregroundColor: theme.colorScheme.primary,
-          elevation: 0,
-          title: const Text('Exercise Detail'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(_didUpdateExercise ? true : null),
-          ),
-          actions: [
-            if (widget.isAdmin)
-              IconButton(
-                onPressed: _openEditPage,
-                icon: const Icon(Icons.edit),
-                tooltip: 'Edit Exercise',
-              ),
+        foregroundColor: theme.colorScheme.primary,
+        elevation: 0,
+        title: const Text('Exercise Detail'),
+        actions: [
+          if (widget.isAdmin)
+            IconButton(
+              onPressed: _isSaving ? null : _openEditDialog,
+              icon: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.edit),
+              tooltip: 'Edit Exercise',
+            ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _ExerciseMediaPanel(
+              videoUrl: _exercise.videoUrl,
+              imageUrl: _exercise.imageUrl,
+            ),
+            const SizedBox(height: 20),
+            _DetailRow(label: 'Exercise Name', value: _exercise.name),
+            _DetailRow(label: 'Primary Muscle', value: _exercise.primaryMuscle),
+            _DetailRow(label: 'Secondary Muscle', value: _exercise.secondaryMuscleText),
+            _DetailRow(label: 'Equipment', value: _exercise.equipment),
+            _DetailRow(label: 'How To Do', value: _exercise.howTo),
           ],
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ExerciseMediaPanel(
-                videoUrl: _exercise.videoUrl,
-                imageUrl: _exercise.imageUrl,
-              ),
-              const SizedBox(height: 20),
-              _DetailRow(label: 'Exercise Name', value: _exercise.name),
-              _DetailRow(label: 'Primary Muscle', value: _exercise.primaryMuscle),
-              _DetailRow(label: 'Muscle Group', value: _exercise.muscleGroup),
-              _DetailRow(label: 'Secondary Muscle', value: _exercise.secondaryMuscle),
-              _DetailRow(label: 'Equipment', value: _exercise.equipment),
-              _DetailRow(label: 'How To Do', value: _exercise.howTo),
-            ],
-          ),
         ),
       ),
     );

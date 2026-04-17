@@ -68,6 +68,8 @@ class _AddExercisePageState extends State<AddExercisePage> {
   final Set<String> _selectedSecondaryMuscles = {};
 
   bool _isSaving = false;
+  bool _hasUnsavedChanges = false;
+  bool _isTrackingChanges = true;
   String? _imageUrl;
   String? _videoUrl;
   File? _imageFile;
@@ -92,8 +94,49 @@ class _AddExercisePageState extends State<AddExercisePage> {
         lower.endsWith('.m4v');
   }
 
+  bool _computeHasUnsavedChanges() {
+    return _nameController.text.trim().isNotEmpty ||
+        _howToController.text.trim().isNotEmpty ||
+        _selectedEquipment != null ||
+        _selectedPrimaryMuscle != null ||
+        _selectedSecondaryMuscles.isNotEmpty ||
+        _imageFile != null ||
+        _imageUrl != null ||
+        _videoFile != null ||
+        _videoUrl != null;
+  }
+
+  void _updateUnsavedChanges() {
+    if (!_isTrackingChanges) {
+      return;
+    }
+
+    final nextHasUnsavedChanges = _computeHasUnsavedChanges();
+    if (_hasUnsavedChanges == nextHasUnsavedChanges) {
+      return;
+    }
+
+    if (!mounted) {
+      _hasUnsavedChanges = nextHasUnsavedChanges;
+      return;
+    }
+
+    setState(() {
+      _hasUnsavedChanges = nextHasUnsavedChanges;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_updateUnsavedChanges);
+    _howToController.addListener(_updateUnsavedChanges);
+  }
+
   @override
   void dispose() {
+    _nameController.removeListener(_updateUnsavedChanges);
+    _howToController.removeListener(_updateUnsavedChanges);
     _nameController.dispose();
     _howToController.dispose();
     super.dispose();
@@ -303,6 +346,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
             _imageFile = File(pickedFile.path);
             _imageUrl = null;
           });
+          _updateUnsavedChanges();
         }
         return;
       }
@@ -318,6 +362,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
           _videoFile = File(pickedMedia.path);
           _videoUrl = null;
         });
+        _updateUnsavedChanges();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Video selected and attached as exercise video.')),
@@ -330,6 +375,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
         _imageFile = File(pickedMedia.path);
         _imageUrl = null;
       });
+      _updateUnsavedChanges();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -382,6 +428,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
           _videoFile = File(pickedPath);
           _videoUrl = null;
         });
+        _updateUnsavedChanges();
 
         if (_isGifPath(pickedPath) && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -500,6 +547,8 @@ class _AddExercisePageState extends State<AddExercisePage> {
       if (!mounted) {
         return;
       }
+      _isTrackingChanges = false;
+      _hasUnsavedChanges = false;
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) {
@@ -517,7 +566,11 @@ class _AddExercisePageState extends State<AddExercisePage> {
     }
   }
 
-  Future<void> _discardExercise() async {
+  Future<bool> _confirmDiscardChanges() async {
+    if (!_hasUnsavedChanges) {
+      return true;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -542,7 +595,15 @@ class _AddExercisePageState extends State<AddExercisePage> {
       },
     );
 
+    return confirmed == true;
+  }
+
+  Future<void> _discardExercise() async {
+    final confirmed = await _confirmDiscardChanges();
+
     if (confirmed == true && mounted) {
+      _isTrackingChanges = false;
+      _hasUnsavedChanges = false;
       Navigator.of(context).pop();
     }
   }
@@ -579,6 +640,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
           setState(() {
             _selectedEquipment = value;
           });
+          _updateUnsavedChanges();
         },
       ),
     );
@@ -617,6 +679,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
             _selectedPrimaryMuscle = value;
             _selectedSecondaryMuscles.remove(value);
           });
+          _updateUnsavedChanges();
         },
       ),
     );
@@ -695,6 +758,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
                           }
                         });
                         setState(() {});
+                        _updateUnsavedChanges();
                       },
                     );
                   }).toList(),
@@ -781,7 +845,23 @@ class _AddExercisePageState extends State<AddExercisePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop || _isSaving) {
+          return;
+        }
+
+        final shouldDiscard = await _confirmDiscardChanges();
+        if (!mounted || !shouldDiscard) {
+          return;
+        }
+
+        _isTrackingChanges = false;
+        _hasUnsavedChanges = false;
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
       backgroundColor: AppColors.black,
       appBar: AppBar(
         backgroundColor: AppColors.cardBg,
@@ -965,6 +1045,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
           ),
         ),
       ),
+    ),
     );
   }
 }

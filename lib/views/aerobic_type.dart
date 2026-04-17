@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../services/location_service.dart';
+
 import 'live_map.dart';
+import '../repository/aerobic_activity_repository.dart';
+import 'aerobic_session_run.dart';
 
 import 'package:flutter_map/flutter_map.dart';
 
@@ -20,17 +21,20 @@ class AerobicStartPage extends StatefulWidget {
 class _AerobicStartPageState extends State<AerobicStartPage> {
 
   final LocationService _locationService = LocationService();
+  final AerobicRepository _aerobicActivityRepository = AerobicRepository();
 
   // used to check the map status
   LatLng? _currentLocation;
   bool _isLoadingMap = false;
   String _mapError = '';
+  int caloriesPerKM = 0;
 
   String? _selectedActivity;
   bool _isLoadingActivities = true;
 
   // Used to store the activity type from db
   List<String> _activityTypes = [];
+  List<Map<String, dynamic>> _activitiesData = [];
 
   @override
   void initState() {
@@ -60,24 +64,24 @@ class _AerobicStartPageState extends State<AerobicStartPage> {
 
   // fetch the activity type from db
   Future<void> _fetchActivityType() async {
-    try{
-      final response = await Supabase.instance.client
-          .from('Aerobic_Activity')
-          .select('aerobic_name');
+    final data = await _aerobicActivityRepository.fetchAerobicActivity();
 
-      if(response is List) {
-        setState(() {
-          _activityTypes = response.map((e) => e['aerobic_name'].toString()).toList();
-          _isLoadingActivities = false;
-        });
+    setState(() {
+      if(data.isNotEmpty) {
+        _activitiesData = data;
+        _activityTypes = data.map((item) => item['aerobic_name'] as String).toList();
+      } else {
+        _activitiesData = [
+          {'aerobic_name': 'Run', 'calories_per_km': 100},
+          {'aerobic_name': 'Walk', 'calories_per_km': 50},
+          {'aerobic_name': 'Ride', 'calories_per_km': 40},
+        ];
+        _activityTypes = ['RUNNING', 'WALKING', 'RIDING'];
       }
-    } catch(e) {
-      print('Database fetch failed, using fallback activities: $e');
-      setState(() {
-        _activityTypes = ['Run', 'Walk', 'Ride', 'Hike', 'Swim'];
-        _isLoadingActivities = false;
-      });
-    }
+      // Set default value to RUNNING if it exists
+      _selectedActivity = "RUNNING";
+      _isLoadingActivities = false;
+    });
   }
 
   void _startSession() {
@@ -92,10 +96,24 @@ class _AerobicStartPageState extends State<AerobicStartPage> {
       return;
     }
 
+    final selectedData = _activitiesData.firstWhere(
+        (activity) => activity['aerobic_name'] == _selectedActivity,
+      orElse: () => {'aerobic_name': _selectedActivity, 'calories_per_km': 60},
+    );
+
+    // The question marks (?) make it safe, and the ?? 60 provides a backup!
+    int caloriesPerKM = (selectedData['calories_per_km'] as num?)?.toInt() ?? 60;
+    print(caloriesPerKM);
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => LiveMap(userId: widget.userId),
+        builder: (context) => AerobicSessionRun(
+          userId: widget.userId,
+          activityType: _selectedActivity!,
+          startLocation: _currentLocation!,
+          caloriesPerKM: caloriesPerKM,
+        ),
       ),
     );
   }
@@ -211,9 +229,9 @@ class _AerobicStartPageState extends State<AerobicStartPage> {
     return FlutterMap(
       options: MapOptions(
         initialCenter: _currentLocation!,
-        initialZoom: 16.0,
+        initialZoom: 18.0,
         minZoom: 11.0,
-        maxZoom: 18.0,
+        maxZoom: 20.0,
       ),
       children: [
         TileLayer(
