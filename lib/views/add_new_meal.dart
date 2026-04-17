@@ -299,6 +299,7 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
       }
 
       // Log meal with or without image
+      // Add Meal
       final success = await mealController.logMealWithImage(
         userId: userId,
         mealType: _selectedMealType,

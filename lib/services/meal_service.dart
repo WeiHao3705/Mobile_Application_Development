@@ -40,8 +40,7 @@ class MealService {
     }
   }
 
-  /// Log a meal with multiple foods for a user
-  /// Returns the created meal ID or null if failed
+  /// Add Meal
   Future<int?> logMeal({
     required int userId,
     required String mealType,
@@ -134,10 +133,10 @@ class MealService {
       }
 
       developer.log('✅ Total calculated nutrition:');
-      developer.log('   ├─ Calories: ${totalCalories.toStringAsFixed(2)} kcal');
-      developer.log('   ├─ Protein: ${totalProteins.toStringAsFixed(2)} g');
-      developer.log('   ├─ Carbs: ${totalCarbs.toStringAsFixed(2)} g');
-      developer.log('   └─ Fat: ${totalFats.toStringAsFixed(2)} g');
+      developer.log('Calories: ${totalCalories.toStringAsFixed(2)} kcal');
+      developer.log('Protein: ${totalProteins.toStringAsFixed(2)} g');
+      developer.log('Carbs: ${totalCarbs.toStringAsFixed(2)} g');
+      developer.log('Fat: ${totalFats.toStringAsFixed(2)} g');
 
       // Create the meal log entry with total nutrition values
       final mealLog = MealLog(

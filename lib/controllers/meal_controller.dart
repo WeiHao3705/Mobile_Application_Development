@@ -197,7 +197,7 @@ class MealController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Log meal with optional image
+  /// Add Meal
   Future<bool> logMealWithImage({
     required int userId,
     required String mealType,
