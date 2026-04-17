@@ -66,6 +66,49 @@ class ExerciseRepository {
     }
   }
 
+  Future<Exercise> updateExercise({
+    required String exerciseId,
+    required String name,
+    required String primaryMuscle,
+    required List<String> secondaryMuscles,
+    required String equipment,
+    required String howTo,
+    required String imageUrl,
+    String? videoUrl,
+  }) async {
+    final payload = <String, dynamic>{
+      'exercise_name': name.trim(),
+      'primary_muscle': primaryMuscle.trim(),
+      'secondary_muscle': secondaryMuscles.isEmpty ? null : secondaryMuscles,
+      'equipment': equipment.trim(),
+      'instruction': howTo.trim(),
+      'image': imageUrl.trim(),
+      'video': (videoUrl ?? '').trim().isEmpty ? null : videoUrl!.trim(),
+    };
+
+    try {
+      final response = await supabase
+          .from('Exercise')
+          .update(payload)
+          .eq('id', exerciseId)
+          .select()
+          .single();
+      return Exercise.fromJson(Map<String, dynamic>.from(response));
+    } on PostgrestException catch (error) {
+      if (!_isMissingColumn(error, 'id')) {
+        rethrow;
+      }
+
+      final response = await supabase
+          .from('Exercise')
+          .update(payload)
+          .eq('exercise_id', exerciseId)
+          .select()
+          .single();
+      return Exercise.fromJson(Map<String, dynamic>.from(response));
+    }
+  }
+
   bool _isMissingColumn(PostgrestException error, String columnName) {
     final message = error.message.toLowerCase();
     return message.contains(columnName.toLowerCase()) &&

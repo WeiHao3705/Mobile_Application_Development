@@ -41,7 +41,7 @@ class AdminDashboardPage extends StatelessWidget {
 
   Future<void> _logout(BuildContext context) async {
     await SimpleSessionService().clearSession();
-    authController.logout();
+    await authController.logout();
     if (!context.mounted) {
       return;
     }
@@ -228,8 +228,4 @@ class _AdminActionCard extends StatelessWidget {
     );
   }
 }
-
-
-
-
 

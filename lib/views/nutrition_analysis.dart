@@ -523,6 +523,7 @@ class _NutritionScreenState extends State<NutritionScreen>
   }
 
   Widget _buildMealTile(MealLog meal) {
+    final displayName = meal.mealName ?? meal.mealType;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
@@ -542,7 +543,7 @@ class _NutritionScreenState extends State<NutritionScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        meal.mealType,
+                        displayName,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,

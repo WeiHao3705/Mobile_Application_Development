@@ -67,11 +67,29 @@ class _MyAppState extends State<MyApp> {
             builder: (_) => LoginPage(authController: _authController),
           );
         case MainNavigation.routeName:
+          if (!_authController.isLoggedIn) {
+            return _buildSafeRoute(
+              settings: settings,
+              builder: (_) => LoginPage(authController: _authController),
+            );
+          }
           return _buildSafeRoute(
             settings: settings,
             builder: (_) => MainNavigation(authController: _authController),
           );
         case AdminDashboardPage.routeName:
+          if (!_authController.isLoggedIn) {
+            return _buildSafeRoute(
+              settings: settings,
+              builder: (_) => LoginPage(authController: _authController),
+            );
+          }
+          if (!_authController.isAdmin) {
+            return _buildSafeRoute(
+              settings: settings,
+              builder: (_) => MainNavigation(authController: _authController),
+            );
+          }
           return _buildSafeRoute(
             settings: settings,
             builder: (_) => AdminDashboardPage(authController: _authController),
@@ -140,7 +158,7 @@ class _MyAppState extends State<MyApp> {
               debugShowCheckedModeBanner: false,
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
-              themeMode: ThemeMode.system,
+              themeMode: ThemeMode.dark,
               home: const Scaffold(
                 body: Center(
                   child: CircularProgressIndicator(),
@@ -154,7 +172,7 @@ class _MyAppState extends State<MyApp> {
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.system,
+            themeMode: ThemeMode.dark,
             home: _initialPage,
             onGenerateRoute: _onGenerateRoute,
             onUnknownRoute: (settings) => MaterialPageRoute<void>(

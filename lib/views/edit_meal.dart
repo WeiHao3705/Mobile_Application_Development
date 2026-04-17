@@ -35,6 +35,7 @@ class _EditMealViewState extends State<EditMealView> {
   final _formKey = GlobalKey<FormState>();
   final Map<int, _SelectedMealFood> _selected = {};
   late TextEditingController _mealTypeController;
+  late TextEditingController _mealNameController;
   late DateTime _selectedDate;
   String _searchQuery = '';
   final TextEditingController _searchCtrl = TextEditingController();
@@ -49,6 +50,7 @@ class _EditMealViewState extends State<EditMealView> {
     _selectedMealType = widget.meal.mealType;
     _selectedDate = widget.meal.mealDate;
     _mealTypeController = TextEditingController(text: _selectedMealType);
+    _mealNameController = TextEditingController(text: widget.meal.mealName ?? '');
 
     // Load meal foods on init
     _loadMealFoods();
@@ -138,6 +140,7 @@ class _EditMealViewState extends State<EditMealView> {
   @override
   void dispose() {
     _mealTypeController.dispose();
+    _mealNameController.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -227,6 +230,7 @@ class _EditMealViewState extends State<EditMealView> {
     }
 
     final mealController = context.read<MealController>();
+    final mealName = _mealNameController.text.trim().isEmpty ? null : _mealNameController.text.trim();
 
     try {
       // Update meal with new foods and recalculate nutrition
@@ -236,6 +240,7 @@ class _EditMealViewState extends State<EditMealView> {
         mealDate: _selectedDate,
         userId: widget.meal.userId,
         foodsWithQuantities: foodsWithQuantities,
+        mealName: mealName,
       );
 
       if (!mounted) return;
@@ -309,6 +314,10 @@ class _EditMealViewState extends State<EditMealView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Display meal image if available
+                        if (widget.meal.imageUrl != null && widget.meal.imageUrl!.isNotEmpty)
+                          _buildMealImageSection(widget.meal.imageUrl!),
+
                         // Meal Type Selection
                         _buildLabel('MEAL TYPE'),
                         Wrap(
@@ -350,6 +359,28 @@ class _EditMealViewState extends State<EditMealView> {
                               ),
                             );
                           }).toList(),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Meal Name Input
+                        _buildLabel('MEAL NAME (OPTIONAL)'),
+                        Container(
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A2A2A),
+                            border: Border.all(color: Colors.grey.shade700),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: TextField(
+                            controller: _mealNameController,
+                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                            decoration: const InputDecoration(
+                              hintText: 'e.g., Grilled Chicken Salad',
+                              hintStyle: TextStyle(color: Color(0xFF666666), fontSize: 14),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                              border: InputBorder.none,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 24),
 
@@ -718,6 +749,199 @@ class _EditMealViewState extends State<EditMealView> {
     );
   }
 
+  Widget _buildMealImageSection(String imageUrl) {
+    developer.log('🖼️ Building meal image section with URL: $imageUrl');
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Meal Photo',
+          style: TextStyle(
+            color: Colors.grey,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () {
+            _showImageFullScreen(imageUrl);
+          },
+          child: Container(
+            width: double.infinity,
+            height: 250,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.lime.withOpacity(0.5),
+                width: 1,
+              ),
+              color: const Color(0xFF2A2A2A),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) {
+                    developer.log('✅ Image loaded successfully: $imageUrl');
+                    return child;
+                  }
+                  final progress = loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                      : null;
+                  developer.log('⏳ Loading image: ${(progress ?? 0 * 100).toStringAsFixed(0)}%');
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: progress,
+                      color: AppColors.lime,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  developer.log('❌ Image load error: $error');
+                  developer.log('❌ Stack trace: $stackTrace');
+                  developer.log('❌ URL was: $imageUrl');
+                  
+                  String errorMsg = 'Failed to load image';
+                  if (error.toString().contains('404')) {
+                    errorMsg = 'Image not found (404)';
+                  } else if (error.toString().contains('Connection refused')) {
+                    errorMsg = 'Connection failed';
+                  } else if (error.toString().contains('timed out')) {
+                    errorMsg = 'Connection timeout';
+                  }
+                  
+                  return Container(
+                    color: const Color(0xFF1A1A1A),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.image_not_supported_outlined,
+                          color: Colors.grey.shade600,
+                          size: 48,
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            errorMsg,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            'Tap to view full details',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  void _showImageFullScreen(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.black.withOpacity(0.9),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                        color: AppColors.lime,
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Colors.grey.shade600,
+                            size: 64,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Failed to load image',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
   Widget _buildFoodItem({
     required Food food,
     required double quantity,
@@ -812,6 +1036,7 @@ class _EditMealViewState extends State<EditMealView> {
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               ),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               controller: TextEditingController(text: value.toStringAsFixed(0))

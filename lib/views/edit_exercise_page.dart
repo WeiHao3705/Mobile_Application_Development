@@ -1,43 +1,16 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/supabase_config.dart';
+import '../models/exercise.dart';
 import '../repository/exercise_repository.dart';
 import '../theme/app_colors.dart';
-
-const equipmentOptions = [
-  'Bodyweight',
-  'Barbell',
-  'Weight plates',
-  'Kettlebell',
-  'Equipment',
-  'Dumbbells',
-  'Resistance bands',
-];
-
-const muscleOptions = [
-  'Latissimus dorsi',
-  'Biceps',
-  'Abs',
-  'Quadriceps',
-  'Hamstrings',
-  'Shoulders',
-  'Neck',
-  'Forearms',
-  'Full body',
-  'Triceps',
-  'Upper back',
-  'Glutes',
-  'Lower back',
-  'Calves',
-  'Trapezius',
-  'Chest',
-];
+import 'add_exercise_page.dart' show equipmentOptions, muscleOptions;
 
 class _StorageHttpException implements Exception {
   const _StorageHttpException(this.statusCode, this.body);
@@ -49,27 +22,30 @@ class _StorageHttpException implements Exception {
   String toString() => 'Storage HTTP $statusCode: $body';
 }
 
-class AddExercisePage extends StatefulWidget {
-  const AddExercisePage({super.key, required this.repository});
+class EditExercisePage extends StatefulWidget {
+  const EditExercisePage({
+    super.key,
+    required this.repository,
+    required this.exercise,
+  });
 
   final ExerciseRepository repository;
+  final Exercise exercise;
 
   @override
-  State<AddExercisePage> createState() => _AddExercisePageState();
+  State<EditExercisePage> createState() => _EditExercisePageState();
 }
 
-class _AddExercisePageState extends State<AddExercisePage> {
+class _EditExercisePageState extends State<EditExercisePage> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _howToController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _howToController;
 
   String? _selectedEquipment;
   String? _selectedPrimaryMuscle;
-  final Set<String> _selectedSecondaryMuscles = {};
+  final Set<String> _selectedSecondaryMuscles = <String>{};
 
   bool _isSaving = false;
-  bool _hasUnsavedChanges = false;
-  bool _isTrackingChanges = true;
   String? _imageUrl;
   String? _videoUrl;
   File? _imageFile;
@@ -78,6 +54,29 @@ class _AddExercisePageState extends State<AddExercisePage> {
   static const String _imageStorageBucket = 'Exercise_Image';
   static const String _videoStorageBucket = 'Exercise_Video';
   static const int _maxUploadAttempts = 3;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.exercise.name);
+    _howToController = TextEditingController(text: widget.exercise.howTo);
+
+    _selectedEquipment = widget.exercise.equipment;
+    _selectedPrimaryMuscle = widget.exercise.primaryMuscle;
+    _selectedSecondaryMuscles.addAll(widget.exercise.secondaryMuscles);
+    _selectedSecondaryMuscles.remove(widget.exercise.primaryMuscle);
+
+    _imageUrl = widget.exercise.imageUrl.trim().isEmpty ? null : widget.exercise.imageUrl.trim();
+    _videoUrl = (widget.exercise.videoUrl ?? '').trim().isEmpty ? null : widget.exercise.videoUrl!.trim();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _howToController.dispose();
+    super.dispose();
+  }
+
 
   bool _isGifPath(String path) {
     return path.toLowerCase().endsWith('.gif');
@@ -92,54 +91,6 @@ class _AddExercisePageState extends State<AddExercisePage> {
         lower.endsWith('.webm') ||
         lower.endsWith('.3gp') ||
         lower.endsWith('.m4v');
-  }
-
-  bool _computeHasUnsavedChanges() {
-    return _nameController.text.trim().isNotEmpty ||
-        _howToController.text.trim().isNotEmpty ||
-        _selectedEquipment != null ||
-        _selectedPrimaryMuscle != null ||
-        _selectedSecondaryMuscles.isNotEmpty ||
-        _imageFile != null ||
-        _imageUrl != null ||
-        _videoFile != null ||
-        _videoUrl != null;
-  }
-
-  void _updateUnsavedChanges() {
-    if (!_isTrackingChanges) {
-      return;
-    }
-
-    final nextHasUnsavedChanges = _computeHasUnsavedChanges();
-    if (_hasUnsavedChanges == nextHasUnsavedChanges) {
-      return;
-    }
-
-    if (!mounted) {
-      _hasUnsavedChanges = nextHasUnsavedChanges;
-      return;
-    }
-
-    setState(() {
-      _hasUnsavedChanges = nextHasUnsavedChanges;
-    });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController.addListener(_updateUnsavedChanges);
-    _howToController.addListener(_updateUnsavedChanges);
-  }
-
-  @override
-  void dispose() {
-    _nameController.removeListener(_updateUnsavedChanges);
-    _howToController.removeListener(_updateUnsavedChanges);
-    _nameController.dispose();
-    _howToController.dispose();
-    super.dispose();
   }
 
   bool _isClientConnectionError(Object error) {
@@ -173,10 +124,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
     required File file,
     required String contentType,
   }) async {
-    final encodedPath = objectPath
-        .split('/')
-        .map(Uri.encodeComponent)
-        .join('/');
+    final encodedPath = objectPath.split('/').map(Uri.encodeComponent).join('/');
     final uri = Uri.parse('$supabaseUrl/storage/v1/object/$bucketId/$encodedPath');
     final client = HttpClient();
 
@@ -249,8 +197,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
     }
 
     throw Exception(
-      'Bucket not found (404): $bucketId. '
-      'Check Storage INSERT policy for anon/public. Last: ${lastNotFound?.body ?? 'unknown'}',
+      'Bucket not found (404): $bucketId. Check Storage INSERT policy. Last: ${lastNotFound?.body ?? 'unknown'}',
     );
   }
 
@@ -286,8 +233,8 @@ class _AddExercisePageState extends State<AddExercisePage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF111111),
-          title: Text('$fileType upload failed', style: const TextStyle(color: Colors.white)),
+          backgroundColor: AppColors.inputBg,
+          title: Text('$fileType upload failed', style: const TextStyle(color: AppColors.white)),
           content: Text(message, style: const TextStyle(color: Colors.white70)),
           actions: [
             TextButton(
@@ -312,19 +259,19 @@ class _AddExercisePageState extends State<AddExercisePage> {
     final imagePicker = ImagePicker();
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: const Color(0xFF111111),
+      backgroundColor: AppColors.inputBg,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.white),
-              title: const Text('Camera', style: TextStyle(color: Colors.white)),
+              leading: const Icon(Icons.camera_alt, color: AppColors.white),
+              title: const Text('Camera', style: TextStyle(color: AppColors.white)),
               onTap: () => Navigator.of(context).pop(ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.white),
-              title: const Text('Gallery', style: TextStyle(color: Colors.white)),
+              leading: const Icon(Icons.photo_library, color: AppColors.white),
+              title: const Text('Gallery', style: TextStyle(color: AppColors.white)),
               onTap: () => Navigator.of(context).pop(ImageSource.gallery),
             ),
           ],
@@ -344,14 +291,11 @@ class _AddExercisePageState extends State<AddExercisePage> {
         if (pickedFile != null) {
           setState(() {
             _imageFile = File(pickedFile.path);
-            _imageUrl = null;
           });
-          _updateUnsavedChanges();
         }
         return;
       }
 
-      // pickMedia keeps GIF animation from gallery selections.
       final pickedMedia = await imagePicker.pickMedia();
       if (pickedMedia == null) {
         return;
@@ -360,9 +304,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
       if (_isVideoFilePath(pickedMedia.path)) {
         setState(() {
           _videoFile = File(pickedMedia.path);
-          _videoUrl = null;
         });
-        _updateUnsavedChanges();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Video selected and attached as exercise video.')),
@@ -373,9 +315,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
 
       setState(() {
         _imageFile = File(pickedMedia.path);
-        _imageUrl = null;
       });
-      _updateUnsavedChanges();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -389,19 +329,19 @@ class _AddExercisePageState extends State<AddExercisePage> {
     final videoPicker = ImagePicker();
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: const Color(0xFF111111),
+      backgroundColor: AppColors.inputBg,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.videocam, color: Colors.white),
-              title: const Text('Record Video', style: TextStyle(color: Colors.white)),
+              leading: const Icon(Icons.videocam, color: AppColors.white),
+              title: const Text('Record Video', style: TextStyle(color: AppColors.white)),
               onTap: () => Navigator.of(context).pop(ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.library_add, color: Colors.white),
-              title: const Text('Gallery', style: TextStyle(color: Colors.white)),
+              leading: const Icon(Icons.library_add, color: AppColors.white),
+              title: const Text('Gallery', style: TextStyle(color: AppColors.white)),
               onTap: () => Navigator.of(context).pop(ImageSource.gallery),
             ),
           ],
@@ -414,21 +354,16 @@ class _AddExercisePageState extends State<AddExercisePage> {
     try {
       XFile? pickedFile;
       if (source == ImageSource.gallery) {
-        // Allow GIF selection from gallery for exercise media.
         pickedFile = await videoPicker.pickMedia();
       } else {
-        pickedFile = await videoPicker.pickVideo(
-          source: source,
-        );
+        pickedFile = await videoPicker.pickVideo(source: source);
       }
 
       if (pickedFile != null) {
         final pickedPath = pickedFile.path;
         setState(() {
           _videoFile = File(pickedPath);
-          _videoUrl = null;
         });
-        _updateUnsavedChanges();
 
         if (_isGifPath(pickedPath) && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -469,10 +404,9 @@ class _AddExercisePageState extends State<AddExercisePage> {
     });
 
     try {
-      String? finalImageUrl = _imageUrl;
-      String? finalVideoUrl = _videoUrl;
+      var finalImageUrl = _imageUrl;
+      var finalVideoUrl = _videoUrl;
 
-      // Upload image if a new file is selected
       if (_imageFile != null) {
         var uploadResolved = false;
         while (!uploadResolved) {
@@ -496,14 +430,13 @@ class _AddExercisePageState extends State<AddExercisePage> {
               return;
             }
             if (action == true) {
-              finalImageUrl = null;
+              finalImageUrl = _imageUrl;
               uploadResolved = true;
             }
           }
         }
       }
 
-      // Upload video if a new file is selected
       if (_videoFile != null) {
         var uploadResolved = false;
         while (!uploadResolved) {
@@ -527,35 +460,34 @@ class _AddExercisePageState extends State<AddExercisePage> {
               return;
             }
             if (action == true) {
-              finalVideoUrl = null;
+              finalVideoUrl = _videoUrl;
               uploadResolved = true;
             }
           }
         }
       }
 
-      await widget.repository.createExercise(
+      final updated = await widget.repository.updateExercise(
+        exerciseId: widget.exercise.id,
         name: _nameController.text.trim(),
         primaryMuscle: _selectedPrimaryMuscle!,
         secondaryMuscles: _selectedSecondaryMuscles.toList(),
         equipment: _selectedEquipment!,
-        instruction: _howToController.text.trim(),
-        imageUrl: finalImageUrl,
+        howTo: _howToController.text.trim(),
+        imageUrl: finalImageUrl ?? '',
         videoUrl: finalVideoUrl,
       );
 
       if (!mounted) {
         return;
       }
-      _isTrackingChanges = false;
-      _hasUnsavedChanges = false;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(updated);
     } catch (e) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add exercise: $e')),
+        SnackBar(content: Text('Failed to update exercise: $e')),
       );
     } finally {
       if (mounted) {
@@ -566,252 +498,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
     }
   }
 
-  Future<bool> _confirmDiscardChanges() async {
-    if (!_hasUnsavedChanges) {
-      return true;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF111111),
-          title: const Text('Discard Exercise', style: TextStyle(color: Colors.white)),
-          content: const Text(
-            'Discard this exercise?',
-            style: TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Discard', style: TextStyle(color: Colors.redAccent)),
-            ),
-          ],
-        );
-      },
-    );
-
-    return confirmed == true;
-  }
-
-  Future<void> _discardExercise() async {
-    final confirmed = await _confirmDiscardChanges();
-
-    if (confirmed == true && mounted) {
-      _isTrackingChanges = false;
-      _hasUnsavedChanges = false;
-      Navigator.of(context).pop();
-    }
-  }
-
-  Widget _buildEquipmentSelector() {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: AppColors.purple.withValues(alpha: 0.4),
-        ),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: DropdownButton<String>(
-        isExpanded: true,
-        value: _selectedEquipment,
-        hint: const Text(
-          'Select Equipment',
-          style: TextStyle(color: AppColors.lavender),
-        ),
-        dropdownColor: AppColors.cardBg,
-        underline: const SizedBox.shrink(),
-        menuMaxHeight: 200,
-        items: equipmentOptions.map((equipment) {
-          return DropdownMenuItem<String>(
-            value: equipment,
-            child: Text(
-              equipment,
-              style: const TextStyle(color: AppColors.white),
-            ),
-          );
-        }).toList(),
-        onChanged: (value) {
-          setState(() {
-            _selectedEquipment = value;
-          });
-          _updateUnsavedChanges();
-        },
-      ),
-    );
-  }
-
-  Widget _buildPrimaryMuscleSelector() {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: AppColors.purple.withValues(alpha: 0.4),
-        ),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: DropdownButton<String>(
-        isExpanded: true,
-        value: _selectedPrimaryMuscle,
-        hint: const Text(
-          'Select Primary Muscle',
-          style: TextStyle(color: AppColors.lavender),
-        ),
-        dropdownColor: AppColors.cardBg,
-        underline: const SizedBox.shrink(),
-        menuMaxHeight: 200,
-        items: muscleOptions.map((muscle) {
-          return DropdownMenuItem<String>(
-            value: muscle,
-            child: Text(
-              muscle,
-              style: const TextStyle(color: AppColors.white),
-            ),
-          );
-        }).toList(),
-        onChanged: (value) {
-          setState(() {
-            _selectedPrimaryMuscle = value;
-            _selectedSecondaryMuscles.remove(value);
-          });
-          _updateUnsavedChanges();
-        },
-      ),
-    );
-  }
-
-  Widget _buildSecondaryMuscleSelector() {
-    final availableMuscles =
-        muscleOptions.where((m) => m != _selectedPrimaryMuscle).toList();
-
-    return GestureDetector(
-      onTap: () => _showSecondaryMusclePicker(availableMuscles),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: AppColors.purple.withValues(alpha: 0.4),
-          ),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              _selectedSecondaryMuscles.isEmpty
-                  ? 'Select Secondary Muscles'
-                  : '${_selectedSecondaryMuscles.length} selected',
-              style: TextStyle(
-                color: _selectedSecondaryMuscles.isEmpty
-                    ? AppColors.lavender
-                    : AppColors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const Icon(Icons.arrow_drop_down, color: AppColors.lavender),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showSecondaryMusclePicker(List<String> availableMuscles) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: AppColors.cardBg,
-              title: const Text(
-                'Select Secondary Muscles',
-                style: TextStyle(color: AppColors.white),
-              ),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: ListView(
-                  shrinkWrap: true,
-                  children: availableMuscles.map((muscle) {
-                    return CheckboxListTile(
-                      value: _selectedSecondaryMuscles.contains(muscle),
-                      title: Text(
-                        muscle,
-                        style: const TextStyle(color: AppColors.white),
-                      ),
-                      activeColor: AppColors.purple,
-                      checkColor: AppColors.white,
-                      side: BorderSide(
-                        color: AppColors.purple.withValues(alpha: 0.5),
-                      ),
-                      onChanged: (checked) {
-                        setDialogState(() {
-                          if (checked == true) {
-                            _selectedSecondaryMuscles.add(muscle);
-                          } else {
-                            _selectedSecondaryMuscles.remove(muscle);
-                          }
-                        });
-                        setState(() {});
-                        _updateUnsavedChanges();
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Done', style: TextStyle(color: AppColors.lavender)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildInstructionField(
-    TextEditingController controller,
-    String label, {
-    int maxLines = 1,
-  }) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      style: const TextStyle(color: AppColors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: AppColors.lavender),
-        filled: true,
-        fillColor: AppColors.inputBg,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppColors.purple.withValues(alpha: 0.4)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppColors.purple.withValues(alpha: 0.4)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.lavender),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildField(
-    TextEditingController controller,
-    String label, {
-    int maxLines = 1,
-  }) {
+  Widget _buildField(TextEditingController controller, String label, {int maxLines = 1}) {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
@@ -843,30 +530,171 @@ class _AddExercisePageState extends State<AddExercisePage> {
     );
   }
 
+  Widget _buildEquipmentSelector() {
+    final allOptions = <String>{...equipmentOptions};
+    if ((_selectedEquipment ?? '').trim().isNotEmpty) {
+      allOptions.add(_selectedEquipment!.trim());
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.purple.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: DropdownButton<String>(
+        isExpanded: true,
+        value: _selectedEquipment,
+        hint: const Text('Select Equipment', style: TextStyle(color: AppColors.lavender)),
+        dropdownColor: AppColors.cardBg,
+        underline: const SizedBox.shrink(),
+        menuMaxHeight: 220,
+        items: allOptions
+            .map(
+              (equipment) => DropdownMenuItem<String>(
+                value: equipment,
+                child: Text(equipment, style: const TextStyle(color: AppColors.white)),
+              ),
+            )
+            .toList(),
+        onChanged: (value) {
+          setState(() {
+            _selectedEquipment = value;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildPrimaryMuscleSelector() {
+    final allOptions = <String>{...muscleOptions};
+    if ((_selectedPrimaryMuscle ?? '').trim().isNotEmpty) {
+      allOptions.add(_selectedPrimaryMuscle!.trim());
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.purple.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: DropdownButton<String>(
+        isExpanded: true,
+        value: _selectedPrimaryMuscle,
+        hint: const Text('Select Primary Muscle', style: TextStyle(color: AppColors.lavender)),
+        dropdownColor: AppColors.cardBg,
+        underline: const SizedBox.shrink(),
+        menuMaxHeight: 220,
+        items: allOptions
+            .map(
+              (muscle) => DropdownMenuItem<String>(
+                value: muscle,
+                child: Text(muscle, style: const TextStyle(color: AppColors.white)),
+              ),
+            )
+            .toList(),
+        onChanged: (value) {
+          setState(() {
+            _selectedPrimaryMuscle = value;
+            if (value != null) {
+              _selectedSecondaryMuscles.remove(value);
+            }
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildSecondaryMuscleSelector() {
+    final availableMuscles = <String>{...muscleOptions, ..._selectedSecondaryMuscles};
+    availableMuscles.remove(_selectedPrimaryMuscle);
+
+    return GestureDetector(
+      onTap: () => _showSecondaryMusclePicker(availableMuscles.toList()..sort()),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.purple.withValues(alpha: 0.4)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              _selectedSecondaryMuscles.isEmpty
+                  ? 'Select Secondary Muscles'
+                  : _selectedSecondaryMuscles.join(', '),
+              style: TextStyle(
+                color: _selectedSecondaryMuscles.isEmpty ? AppColors.lavender : AppColors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down, color: AppColors.lavender),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSecondaryMusclePicker(List<String> availableMuscles) {
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppColors.cardBg,
+              title: const Text(
+                'Select Secondary Muscles',
+                style: TextStyle(color: AppColors.white),
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView(
+                  shrinkWrap: true,
+                  children: availableMuscles.map((muscle) {
+                    return CheckboxListTile(
+                      value: _selectedSecondaryMuscles.contains(muscle),
+                      title: Text(muscle, style: const TextStyle(color: AppColors.white)),
+                      activeColor: AppColors.purple,
+                      checkColor: AppColors.white,
+                      side: BorderSide(color: AppColors.purple.withValues(alpha: 0.5)),
+                      onChanged: (checked) {
+                        setDialogState(() {
+                          if (checked == true) {
+                            _selectedSecondaryMuscles.add(muscle);
+                          } else {
+                            _selectedSecondaryMuscles.remove(muscle);
+                          }
+                        });
+                        setState(() {});
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Done', style: TextStyle(color: AppColors.lavender)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: !_hasUnsavedChanges,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop || _isSaving) {
-          return;
-        }
-
-        final shouldDiscard = await _confirmDiscardChanges();
-        if (!mounted || !shouldDiscard) {
-          return;
-        }
-
-        _isTrackingChanges = false;
-        _hasUnsavedChanges = false;
-        Navigator.of(context).pop();
-      },
-      child: Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.black,
       appBar: AppBar(
         backgroundColor: AppColors.cardBg,
         foregroundColor: AppColors.white,
-        title: const Text('Add Exercise'),
+        title: const Text('Edit Exercise'),
         actions: [
           TextButton(
             onPressed: _isSaving ? null : _saveExercise,
@@ -890,55 +718,30 @@ class _AddExercisePageState extends State<AddExercisePage> {
               const SizedBox(height: 14),
               const Text(
                 'Equipment',
-                style: TextStyle(
-                  color: AppColors.lavender,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(color: AppColors.lavender, fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               _buildEquipmentSelector(),
               const SizedBox(height: 14),
               const Text(
                 'Primary Muscle',
-                style: TextStyle(
-                  color: AppColors.lavender,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(color: AppColors.lavender, fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               _buildPrimaryMuscleSelector(),
               const SizedBox(height: 14),
               const Text(
                 'Secondary Muscles',
-                style: TextStyle(
-                  color: AppColors.lavender,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(color: AppColors.lavender, fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               _buildSecondaryMuscleSelector(),
               const SizedBox(height: 14),
-              const Text(
-                'Instruction (Optional)',
-                style: TextStyle(
-                  color: AppColors.lavender,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildInstructionField(_howToController, 'Instruction', maxLines: 4),
+              _buildField(_howToController, 'Instruction', maxLines: 4),
               const SizedBox(height: 16),
               const Text(
                 'Exercise Image / GIF',
-                style: TextStyle(
-                  color: AppColors.lavender,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(color: AppColors.lavender, fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               GestureDetector(
@@ -949,19 +752,11 @@ class _AddExercisePageState extends State<AddExercisePage> {
                   decoration: BoxDecoration(
                     color: AppColors.inputBg,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.purple.withValues(alpha: 0.4),
-                    ),
+                    border: Border.all(color: AppColors.purple.withValues(alpha: 0.4)),
                     image: _imageFile != null
-                        ? DecorationImage(
-                            image: FileImage(_imageFile!),
-                            fit: BoxFit.cover,
-                          )
+                        ? DecorationImage(image: FileImage(_imageFile!), fit: BoxFit.cover)
                         : _imageUrl != null
-                            ? DecorationImage(
-                                image: NetworkImage(_imageUrl!),
-                                fit: BoxFit.cover,
-                              )
+                            ? DecorationImage(image: NetworkImage(_imageUrl!), fit: BoxFit.cover)
                             : null,
                   ),
                   child: _imageFile == null && _imageUrl == null
@@ -973,17 +768,19 @@ class _AddExercisePageState extends State<AddExercisePage> {
                             Text('Tap to upload image or GIF', style: TextStyle(color: Colors.white70)),
                           ],
                         )
-                      : const SizedBox.shrink(),
+                      : const Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Padding(
+                            padding: EdgeInsets.only(bottom: 8),
+                            child: Text('Tap to replace image', style: TextStyle(color: Colors.white70)),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 16),
               const Text(
                 'Exercise Video / GIF',
-                style: TextStyle(
-                  color: AppColors.lavender,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(color: AppColors.lavender, fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               GestureDetector(
@@ -994,9 +791,7 @@ class _AddExercisePageState extends State<AddExercisePage> {
                   decoration: BoxDecoration(
                     color: AppColors.inputBg,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.purple.withValues(alpha: 0.4),
-                    ),
+                    border: Border.all(color: AppColors.purple.withValues(alpha: 0.4)),
                   ),
                   child: _videoFile != null || _videoUrl != null
                       ? Column(
@@ -1005,11 +800,11 @@ class _AddExercisePageState extends State<AddExercisePage> {
                             const Icon(Icons.check_circle, color: Colors.green, size: 32),
                             const SizedBox(height: 8),
                             Text(
-                              _videoFile != null
-                                  ? 'Video selected'
-                                  : 'Video uploaded',
+                              _videoFile != null ? 'New video selected' : 'Current video attached',
                               style: const TextStyle(color: Colors.white70),
                             ),
+                            const SizedBox(height: 6),
+                            const Text('Tap to replace video', style: TextStyle(color: Colors.white54)),
                           ],
                         )
                       : const Column(
@@ -1023,49 +818,12 @@ class _AddExercisePageState extends State<AddExercisePage> {
                 ),
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _isSaving ? null : _discardExercise,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.redAccent,
-                    disabledForegroundColor: Colors.redAccent.withValues(alpha: 0.5),
-                    side: BorderSide(
-                      color: _isSaving ? Colors.redAccent.withValues(alpha: 0.5) : Colors.redAccent,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Discard'),
-                ),
-              ),
-              const SizedBox(height: 16),
             ],
           ),
         ),
       ),
-    ),
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

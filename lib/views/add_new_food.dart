@@ -3,10 +3,8 @@ import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../controllers/food_controller.dart';
 import '../controllers/auth_controller.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 import 'package:provider/provider.dart';
-import 'widgets/custom_bottom_nav_bar.dart';
 
 class AddNewFoodView extends StatefulWidget {
   final AuthController authController;
@@ -23,7 +21,6 @@ class AddNewFoodView extends StatefulWidget {
 class _AddNewFoodViewState extends State<AddNewFoodView> {
   final _formKey = GlobalKey<FormState>();
   String? _selectedCategory;
-  int _selectedNavIndex = 2; // Diet tab (3rd item, 0-indexed)
 
   final TextEditingController _foodNameController = TextEditingController();
   final TextEditingController _servingSizeController = TextEditingController();
@@ -48,73 +45,76 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(8),
-          child: GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: _iconBtn(
-              child: const Icon(Icons.chevron_left, color: AppColors.lime, size: 18),
-            ),
-          ),
-        ),
-        title: const Text(
-          'Add New Food',
-          style: TextStyle(
-            color: AppColors.lavender,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.3,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Food Name
-              _buildLabel('FOOD NAME'),
-              _buildTextField(
-                controller: _foodNameController,
-                hint: 'e.g. Homemade Granola',
-              ),
-              const SizedBox(height: 24),
-
-              // Serving Size
-              _buildLabel('SERVING SIZE'),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _servingSizeController,
-                      hint: '100',
-                      isNumeric: true,
-                      allowDecimal: true,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 80,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade700),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'g',
-                        style: TextStyle(color: Colors.white, fontSize: 14),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Custom Header
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: _iconBtn(
+                        child: const Icon(Icons.chevron_left, color: AppColors.lime, size: 18),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Add New Food',
+                        style: TextStyle(
+                          color: AppColors.lavender,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Food Name
+                _buildLabel('FOOD NAME'),
+                _buildTextField(
+                  controller: _foodNameController,
+                  hint: 'e.g. Homemade Granola',
+                ),
+                const SizedBox(height: 24),
+
+                // Serving Size
+                _buildLabel('SERVING SIZE'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _servingSizeController,
+                        hint: '100',
+                        isNumeric: true,
+                        allowDecimal: true,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 80,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade700),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'g',
+                          style: TextStyle(color: Colors.white, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
 
               // Nutrition per Serving
               const Text(
@@ -208,7 +208,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
                         ),
                         borderRadius: BorderRadius.circular(6),
                         color: isSelected
-                            ? AppColors.yellow.withOpacity(0.1)
+                            ? AppColors.yellow.withValues(alpha: 0.1)
                             : Colors.transparent,
                       ),
                       child: Row(
@@ -272,22 +272,8 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
           ),
         ),
       ),
-      bottomNavigationBar: CustomBottomNavBar(
-        selectedIndex: _selectedNavIndex,
-        onTap: _onNavItemTapped,
-      ),
+    )
     );
-  }
-
-  void _onNavItemTapped(int index) {
-    if (index == 2) {
-      // Already on Diet tab, no need to navigate
-      return;
-    }
-
-    // Navigate to the selected tab
-    Navigator.of(context).pop();
-    Navigator.of(context).pushReplacementNamed('/main');
   }
 
   Widget _buildLabel(String label) {
@@ -405,7 +391,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
       width: 28,
       height: 28,
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.lavender.withOpacity(0.55)),
+        border: Border.all(color: AppColors.lavender.withValues(alpha: 0.55)),
         borderRadius: BorderRadius.circular(14),
       ),
       alignment: Alignment.center,
@@ -413,28 +399,6 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
     );
   }
 
-  String _getCategoryEmoji(String categoryName) {
-    // Map category names to their emojis
-    const categoryMap = {
-      'Grains': '🌾',
-      'Protein': '🍗',
-      'Dairy': '🥛',
-      'Fruits': '🍎',
-      'Veggies': '🥬',
-      'Snacks': '🍿',
-      'Drinks': '🥤',
-    };
-
-    // Check if it's a predefined category
-    for (var entry in categoryMap.entries) {
-      if (categoryName.toLowerCase().contains(entry.key.toLowerCase())) {
-        return entry.value;
-      }
-    }
-
-    // For "Other" or custom categories, use a generic icon
-    return '➕';
-  }
 
 
   void _saveFoodData() async {

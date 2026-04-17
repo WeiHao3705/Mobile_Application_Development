@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_application_development/models/daily_goals.dart';
 import 'package:mobile_application_development/services/daily_goals_service.dart';
+import 'package:mobile_application_development/theme/app_colors.dart';
 
 class EditDailyGoalsDialog extends StatefulWidget {
   final DailyGoals currentGoals;
@@ -195,19 +196,185 @@ class _EditDailyGoalsDialogState extends State<EditDailyGoalsDialog> {
     Navigator.pop(context);
   }
 
+  Widget _buildFieldLabel(String label) {
+    return Text(
+      label,
+      style: TextStyle(
+        fontSize: 12,
+        color: AppColors.nutritionSubtleText,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Widget _buildSegmentedControl(
+    String id,
+    String selectedValue,
+    List<String> values,
+    List<String> labels,
+    Function(String) onChanged,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.nutritionCardBg),
+        borderRadius: BorderRadius.circular(99),
+        color: AppColors.nutritionDarkBg,
+      ),
+      child: Row(
+        children: List.generate(
+          values.length,
+          (index) => Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(values[index]),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: selectedValue == values[index]
+                      ? AppColors.nutritionPurple
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                alignment: Alignment.center,
+                child: Text(
+                  labels[index],
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: selectedValue == values[index]
+                        ? AppColors.white
+                        : AppColors.nutritionSubtleText,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputField(
+    TextEditingController controller,
+    String unit,
+    String placeholder,
+  ) {
+    bool allowDecimal = unit == 'kg';
+
+    return TextField(
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [
+        allowDecimal
+            ? FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*'))
+            : FilteringTextInputFormatter.allow(RegExp(r'^\d+'))
+      ],
+      style: const TextStyle(
+        fontSize: 14,
+        color: AppColors.white,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.nutritionCardBg),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.nutritionCardBg, width: 0.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.nutritionPurple, width: 1),
+        ),
+        filled: true,
+        fillColor: AppColors.nutritionCardBg,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        hintText: placeholder,
+        hintStyle: const TextStyle(color: AppColors.nutritionSubtleText),
+        suffixText: unit,
+        suffixStyle: const TextStyle(color: AppColors.nutritionSubtleText, fontSize: 12),
+      ),
+    );
+  }
+
+  Widget _buildDropdownField(
+    String selectedValue,
+    List<String> values,
+    Function(String) onChanged,
+  ) {
+    return DropdownButtonFormField<String>(
+      value: selectedValue,
+      style: const TextStyle(
+        fontSize: 13,
+        color: AppColors.white,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.nutritionCardBg),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.nutritionCardBg, width: 0.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppColors.nutritionPurple, width: 1),
+        ),
+        filled: true,
+        fillColor: AppColors.nutritionCardBg,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+      items: values
+          .map((value) => DropdownMenuItem(
+                value: value,
+                child: Text(
+                  value.replaceAll('_', ' ').toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.white,
+                  ),
+                ),
+              ))
+          .toList(),
+      onChanged: (value) {
+        if (value != null) onChanged(value);
+      },
+      isExpanded: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: AppColors.nutritionDarkBg,
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '🎯 Daily Nutrition Goals',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              Text(
+                'Daily nutrition goals',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.white,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _showCalculator
+                    ? "We'll use these to estimate your targets"
+                    : 'Tap any value to edit',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.nutritionSubtleText,
+                ),
               ),
               const SizedBox(height: 20),
               if (!_showCalculator) ...[
@@ -225,13 +392,29 @@ class _EditDailyGoalsDialogState extends State<EditDailyGoalsDialog> {
   Widget _buildEditMode() {
     return Column(
       children: [
-        _buildGoalInput('🔥 Calories', _caloriesController, 'kcal'),
-        const SizedBox(height: 12),
-        _buildGoalInput('🥚 Protein', _proteinController, 'g'),
-        const SizedBox(height: 12),
-        _buildGoalInput('🌾 Carbs', _carbsController, 'g'),
-        const SizedBox(height: 12),
-        _buildGoalInput('🧈 Fat', _fatController, 'g'),
+        // Macro Cards Grid
+        Column(
+          children: [
+            // Calories (spans full width)
+            _buildMacroCard('CALORIES', _caloriesController, 'kcal / day', true),
+            const SizedBox(height: 10),
+            // Protein and Carbs in a row
+            Row(
+              children: [
+                Expanded(
+                  child: _buildMacroCard('PROTEIN', _proteinController, 'g', false),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildMacroCard('CARBS', _carbsController, 'g', false),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // Fat (spans full width)
+            _buildMacroCard('FAT', _fatController, 'g / day', true),
+          ],
+        ),
         const SizedBox(height: 24),
         Row(
           children: [
@@ -239,12 +422,15 @@ class _EditDailyGoalsDialogState extends State<EditDailyGoalsDialog> {
               child: OutlinedButton(
                 onPressed: () => setState(() => _showCalculator = true),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF7F77DD), width: 1.5),
-                  foregroundColor: const Color(0xFFAFA9EC),
+                  side: BorderSide(color: AppColors.nutritionPurple, width: 1.5),
+                  foregroundColor: AppColors.nutritionPurple,
                   shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('Auto Calculate'),
+                child: const Text(
+                  'Auto-calculate',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -252,173 +438,190 @@ class _EditDailyGoalsDialogState extends State<EditDailyGoalsDialog> {
               child: ElevatedButton(
                 onPressed: _saveGoals,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7F77DD),
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.nutritionPurple,
+                  foregroundColor: AppColors.white,
                   shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('Save'),
+                child: const Text(
+                  'Save',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildMacroCard(String label, TextEditingController controller, String unit, bool isLarge) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.nutritionCardBg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.nutritionSubtleText,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.03,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    label == 'CALORIES'
+                        ? FilteringTextInputFormatter.allow(RegExp(r'^\d+'))
+                        : FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*'))
+                  ],
+                  style: TextStyle(
+                    fontSize: isLarge ? 28 : 20,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.white,
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    hintText: isLarge ? '2000' : '150',
+                    hintStyle: TextStyle(color: AppColors.nutritionSubtleText),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                unit,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.nutritionSubtleText,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildCalculatorMode() {
     return Column(
       children: [
-        const Text(
-          'Enter your details to calculate optimal goals',
-          style: TextStyle(fontSize: 14, color: Colors.grey),
-        ),
-        const SizedBox(height: 16),
-        _buildInputField('Age', _ageController, 'years'),
-        const SizedBox(height: 12),
-        _buildInputField('Weight', _weightController, 'kg'),
-        const SizedBox(height: 12),
-        _buildInputField('Height', _heightController, 'cm'),
-        const SizedBox(height: 12),
-        _buildDropdown(
-          'Gender',
+        // Gender Selector
+        _buildFieldLabel('Gender'),
+        const SizedBox(height: 8),
+        _buildSegmentedControl(
+          'gender',
           _gender,
           ['male', 'female'],
+          ['Male', 'Female'],
           (value) => setState(() => _gender = value),
         ),
-        const SizedBox(height: 12),
-        _buildDropdown(
-          'Activity Level',
+        const SizedBox(height: 16),
+
+        // Age, Weight, Height in 2x2 grid
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel('Age'),
+                  const SizedBox(height: 5),
+                  _buildInputField(_ageController, 'years', '25'),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel('Weight (kg)'),
+                  const SizedBox(height: 5),
+                  _buildInputField(_weightController, 'kg', '70'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildFieldLabel('Height (cm)'),
+        const SizedBox(height: 5),
+        _buildInputField(_heightController, 'cm', '170'),
+        const SizedBox(height: 16),
+
+        // Activity Level Dropdown
+        _buildFieldLabel('Activity level'),
+        const SizedBox(height: 5),
+        _buildDropdownField(
           _activityLevel,
           ['sedentary', 'lightly_active', 'moderately_active', 'very_active', 'extremely_active'],
           (value) => setState(() => _activityLevel = value),
         ),
-        const SizedBox(height: 12),
-        _buildDropdown(
-          'Fitness Goal',
+        const SizedBox(height: 16),
+
+        // Fitness Goal Selector
+        _buildFieldLabel('Goal'),
+        const SizedBox(height: 8),
+        _buildSegmentedControl(
+          'goal',
           _fitnessGoal,
           ['lose_weight', 'maintain', 'gain_muscle'],
+          ['Lose weight', 'Maintain', 'Gain muscle'],
           (value) => setState(() => _fitnessGoal = value),
         ),
         const SizedBox(height: 24),
+
         Row(
           children: [
-            // Back button — outline style
             Expanded(
               child: OutlinedButton(
                 onPressed: () => setState(() => _showCalculator = false),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF7F77DD), width: 1.5),
-                  foregroundColor: const Color(0xFFAFA9EC),
+                  side: BorderSide(color: AppColors.nutritionPurple, width: 1.5),
+                  foregroundColor: AppColors.nutritionPurple,
                   shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 child: const Text(
                   'Back',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                 ),
               ),
             ),
             const SizedBox(width: 12),
-            // Calculate button — filled style
             Expanded(
               child: ElevatedButton(
                 onPressed: _calculateGoals,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7F77DD),
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.nutritionPurple,
+                  foregroundColor: AppColors.white,
                   shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                   elevation: 0,
                 ),
                 child: const Text(
                   'Calculate',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                 ),
               ),
             ),
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildGoalInput(
-    String label,
-    TextEditingController controller,
-    String unit,
-  ) {
-    // Calories are integers, others are decimals
-    bool isCalories = unit == 'kcal';
-
-    return TextField(
-      controller: controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        // Only allow digits and decimal point (except for calories)
-        isCalories
-            ? FilteringTextInputFormatter.allow(RegExp(r'^\d+'))
-            : FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*'))
-      ],
-      decoration: InputDecoration(
-        labelText: label,
-        suffixText: unit,
-        hintText: isCalories ? 'e.g., 2000' : 'e.g., 150.5',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      ),
-    );
-  }
-
-  Widget _buildInputField(
-    String label,
-    TextEditingController controller,
-    String unit,
-  ) {
-    // Determine if decimal is allowed based on field type
-    bool allowDecimal = unit == 'kg'; // Only weight allows decimals
-
-    return TextField(
-      controller: controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        // Only allow digits and decimal point (for weight)
-        allowDecimal
-            ? FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*'))
-            : FilteringTextInputFormatter.allow(RegExp(r'^\d+'))
-      ],
-      decoration: InputDecoration(
-        labelText: label,
-        suffixText: unit,
-        hintText: allowDecimal ? 'e.g., 75.5' : 'e.g., 30',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      ),
-    );
-  }
-
-  Widget _buildDropdown(
-    String label,
-    String value,
-    List<String> items,
-    Function(String) onChanged,
-  ) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      ),
-      items: items
-          .map((item) => DropdownMenuItem(
-                value: item,
-                child: Text(item.replaceAll('_', ' ')),
-              ))
-          .toList(),
-      onChanged: (newValue) {
-        if (newValue != null) onChanged(newValue);
-      },
     );
   }
 }

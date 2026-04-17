@@ -51,8 +51,12 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
   late final ExerciseRepository _exerciseRepository;
   bool _isSaving = false;
   bool _isInitializing = false;
+  bool _hasUnsavedChanges = false;
+  bool _isTrackingChanges = false;
   int _setRowCounter = 0;
   int _exerciseRowCounter = 0;
+  String _initialPlanName = '';
+  List<String> _initialExerciseOrder = const <String>[];
 
   String _nextSetRowId() {
     final seconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -77,9 +81,80 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
       _planNameController.text = widget.initialPlanName!.trim();
     }
 
+    _planNameController.addListener(_updateUnsavedChanges);
+
     if (widget.isEditMode || widget.initialExerciseIds.isNotEmpty) {
       _initializeFromExistingPlan();
+    } else {
+      _captureInitialSnapshot();
     }
+  }
+
+  void _captureInitialSnapshot() {
+    _initialPlanName = _planNameController.text.trim();
+    _initialExerciseOrder = _selectedExerciseEntries
+        .map((entry) => entry.exercise.id)
+        .toList(growable: false);
+    _hasUnsavedChanges = false;
+    _isTrackingChanges = true;
+  }
+
+  void _updateUnsavedChanges() {
+    if (!_isTrackingChanges) {
+      return;
+    }
+
+    final currentPlanName = _planNameController.text.trim();
+    final currentExerciseOrder = _selectedExerciseEntries
+        .map((entry) => entry.exercise.id)
+        .toList(growable: false);
+
+    final hasPlanNameChange = currentPlanName != _initialPlanName;
+    final hasExerciseSelectionChange =
+        currentExerciseOrder.length != _initialExerciseOrder.length ||
+            currentExerciseOrder.asMap().entries.any(
+              (entry) => entry.value != _initialExerciseOrder[entry.key],
+            );
+
+    _hasUnsavedChanges = hasPlanNameChange || hasExerciseSelectionChange;
+  }
+
+  Future<bool> _confirmDiscardChanges() async {
+    if (!_hasUnsavedChanges) {
+      return true;
+    }
+
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          title: const Text(
+            'Discard changes?',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'You have unsaved changes. Do you want to discard them and leave this page?',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Keep editing'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(
+                'Discard',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    return discard == true;
   }
 
   Future<void> _initializeFromExistingPlan() async {
@@ -141,11 +216,15 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
           ..addAll(selectedEntries);
         _syncExerciseDrafts(_selectedExerciseEntries);
       });
+      _captureInitialSnapshot();
     } catch (_) {
       // Keep edit page usable even when initial hydrate fails.
     } finally {
       if (mounted) {
         setState(() => _isInitializing = false);
+        if (!_isTrackingChanges) {
+          _captureInitialSnapshot();
+        }
       }
     }
   }
@@ -187,6 +266,7 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
 
   @override
   void dispose() {
+    _planNameController.removeListener(_updateUnsavedChanges);
     _planNameController.dispose();
     for (final draft in _exerciseDrafts.values) {
       draft.dispose();
@@ -220,12 +300,12 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
           );
         _syncExerciseDrafts(_selectedExerciseEntries);
       });
+      _updateUnsavedChanges();
     }
   }
 
   bool _isBodyweightExercise(Exercise exercise) {
-    final equipment = exercise.equipment.toLowerCase();
-    return equipment.contains('bodyweight') || equipment.contains('body weight');
+    return exercise.isBodyweight;
   }
 
   void _addSetRow(String rowId) {
@@ -303,6 +383,7 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
           }),
         );
     });
+    _updateUnsavedChanges();
   }
 
   void _deleteExerciseAt(int index) {
@@ -313,6 +394,7 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
     final entry = _selectedExerciseEntries.removeAt(index);
     _exerciseDrafts.remove(entry.rowId)?.dispose();
     setState(() {});
+    _updateUnsavedChanges();
   }
 
   Future<void> _changeExerciseAt(int index) async {
@@ -352,6 +434,7 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
         initialNotes: '',
       );
     });
+    _updateUnsavedChanges();
   }
 
   void _syncExerciseDrafts(List<_ExercisePlanEntry> selectedEntries) {
@@ -445,6 +528,8 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
       if (!mounted) {
         return;
       }
+      _isTrackingChanges = false;
+      _hasUnsavedChanges = false;
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) {
@@ -538,33 +623,46 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop || _isSaving) {
+          return;
+        }
+        final shouldDiscard = await _confirmDiscardChanges();
+        if (!mounted || !shouldDiscard) {
+          return;
+        }
+        _isTrackingChanges = false;
+        Navigator.of(this.context).pop();
+      },
+      child: Scaffold(
         backgroundColor: Colors.black,
-        foregroundColor: theme.colorScheme.primary,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(widget.isEditMode ? 'Edit Plan' : 'Create Plan'),
-        actions: [
-          TextButton(
-            onPressed: (_isSaving || _isInitializing) ? null : _savePlan,
-            child: Text(
-              _isSaving ? 'Saving...' : 'Save',
-              style: TextStyle(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w700,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          foregroundColor: theme.colorScheme.primary,
+          elevation: 0,
+          centerTitle: true,
+          title: Text(widget.isEditMode ? 'Edit Plan' : 'Create Plan'),
+          actions: [
+            TextButton(
+              onPressed: (_isSaving || _isInitializing) ? null : _savePlan,
+              child: Text(
+                _isSaving ? 'Saving...' : 'Save',
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          ],
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Text(
                 'Plan Name',
                 style: theme.textTheme.titleMedium?.copyWith(
@@ -613,65 +711,67 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              Expanded(
-                child: _isInitializing
-                    ? Center(
-                        child: CircularProgressIndicator(
-                          color: theme.colorScheme.primary,
-                        ),
-                      )
-                    : _selectedExerciseEntries.isEmpty
-                    ? Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF111111),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'No exercise selected yet.',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                      )
-                    : ReorderableListView.builder(
-                        buildDefaultDragHandles: false,
-                        padding: EdgeInsets.zero,
-                        itemCount: _selectedExerciseEntries.length,
-                        onReorder: (oldIndex, newIndex) {
-                          setState(() {
-                            if (newIndex > oldIndex) {
-                              newIndex -= 1;
-                            }
-                            final item = _selectedExerciseEntries.removeAt(oldIndex);
-                            _selectedExerciseEntries.insert(newIndex, item);
-                          });
-                        },
-                        itemBuilder: (context, index) {
-                          final entry = _selectedExerciseEntries[index];
-                          final draft = _exerciseDrafts[entry.rowId]!;
+                Expanded(
+                  child: _isInitializing
+                      ? Center(
+                          child: CircularProgressIndicator(
+                            color: theme.colorScheme.primary,
+                          ),
+                        )
+                      : _selectedExerciseEntries.isEmpty
+                      ? Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF111111),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'No exercise selected yet.',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        )
+                      : ReorderableListView.builder(
+                          buildDefaultDragHandles: false,
+                          padding: EdgeInsets.zero,
+                          itemCount: _selectedExerciseEntries.length,
+                          onReorder: (oldIndex, newIndex) {
+                            setState(() {
+                              if (newIndex > oldIndex) {
+                                newIndex -= 1;
+                              }
+                              final item = _selectedExerciseEntries.removeAt(oldIndex);
+                              _selectedExerciseEntries.insert(newIndex, item);
+                            });
+                            _updateUnsavedChanges();
+                          },
+                          itemBuilder: (context, index) {
+                            final entry = _selectedExerciseEntries[index];
+                            final draft = _exerciseDrafts[entry.rowId]!;
 
-                          return Padding(
-                            key: ValueKey(entry.rowId),
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _ExerciseEditorCard(
-                              exercise: entry.exercise,
-                              draft: draft,
-                              orderIndex: index + 1,
-                              listIndex: index,
-                              totalExercises: _selectedExerciseEntries.length,
-                              isBodyweight: _isBodyweightExercise(entry.exercise),
-                              onAddSet: () => _addSetRow(entry.rowId),
-                              onRearrange: _rearrangeExercises,
-                              onChangeExercise: () => _changeExerciseAt(index),
-                              onDeleteExercise: () => _deleteExerciseAt(index),
-                              onPickRestTime: () => _pickRestTime(entry.rowId),
-                              onRemoveSet: (rowId) => _removeSetRow(entry.rowId, rowId),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
+                            return Padding(
+                              key: ValueKey(entry.rowId),
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _ExerciseEditorCard(
+                                exercise: entry.exercise,
+                                draft: draft,
+                                orderIndex: index + 1,
+                                listIndex: index,
+                                totalExercises: _selectedExerciseEntries.length,
+                                isBodyweight: _isBodyweightExercise(entry.exercise),
+                                onAddSet: () => _addSetRow(entry.rowId),
+                                onRearrange: _rearrangeExercises,
+                                onChangeExercise: () => _changeExerciseAt(index),
+                                onDeleteExercise: () => _deleteExerciseAt(index),
+                                onPickRestTime: () => _pickRestTime(entry.rowId),
+                                onRemoveSet: (rowId) => _removeSetRow(entry.rowId, rowId),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

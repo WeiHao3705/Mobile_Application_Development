@@ -5,6 +5,7 @@ import 'home_page.dart';
 import 'profile_page.dart';
 import 'nutrition_main_page.dart';
 import 'exercise_hub_page.dart';
+import 'login_page.dart';
 
 class MainNavigation extends StatefulWidget {
   static const routeName = '/main';
@@ -19,6 +20,13 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
+  bool _isRedirectingToLanding = false;
+
+  // Dark purple palette used by the bottom navigation.
+  static const Color _navBackground = Color(0xFF1C1330);
+  static const Color _navSelected = Color(0xFFC8A2FF);
+  static const Color _navUnselected = Color(0xFF8A78A8);
+  static const Color _navShadow = Color(0xFF120B1F);
 
   late final List<Widget> _pages = [
     HomePage(authController: widget.authController),
@@ -33,9 +41,54 @@ class _MainNavigationState extends State<MainNavigation> {
     });
   }
 
+  void _handleAuthStateChange() {
+    if (!mounted || _isRedirectingToLanding || widget.authController.isLoggedIn) {
+      return;
+    }
+
+    _isRedirectingToLanding = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        LoginPage.routeName,
+        (route) => false,
+      );
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.authController.addListener(_handleAuthStateChange);
+    _handleAuthStateChange();
+  }
+
+  @override
+  void didUpdateWidget(covariant MainNavigation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.authController != widget.authController) {
+      oldWidget.authController.removeListener(_handleAuthStateChange);
+      widget.authController.addListener(_handleAuthStateChange);
+      _handleAuthStateChange();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.authController.removeListener(_handleAuthStateChange);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    if (!widget.authController.isLoggedIn) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       body: _pages[_selectedIndex],
@@ -43,7 +96,7 @@ class _MainNavigationState extends State<MainNavigation> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: _navShadow.withValues(alpha: 0.45),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
@@ -53,11 +106,9 @@ class _MainNavigationState extends State<MainNavigation> {
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
-          backgroundColor: theme.brightness == Brightness.light
-              ? Colors.white
-              : theme.scaffoldBackgroundColor,
-          selectedItemColor: theme.colorScheme.secondary,
-          unselectedItemColor: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+          backgroundColor: _navBackground,
+          selectedItemColor: _navSelected,
+          unselectedItemColor: _navUnselected,
           selectedFontSize: 12,
           unselectedFontSize: 12,
           elevation: 0,
@@ -65,26 +116,26 @@ class _MainNavigationState extends State<MainNavigation> {
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 0 ? Icons.home : Icons.home_outlined),
               label: 'Home',
-              backgroundColor: theme.colorScheme.primary,
+              backgroundColor: _navBackground,
             ),
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 1
                   ? Icons.fitness_center
                   : Icons.fitness_center_outlined),
               label: 'Exercise',
-              backgroundColor: theme.colorScheme.primary,
+              backgroundColor: _navBackground,
             ),
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 2
                   ? Icons.restaurant
                   : Icons.restaurant_outlined),
               label: 'Diet',
-              backgroundColor: theme.colorScheme.primary,
+              backgroundColor: _navBackground,
             ),
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 3 ? Icons.person : Icons.person_outlined),
               label: 'Profile',
-              backgroundColor: theme.colorScheme.primary,
+              backgroundColor: _navBackground,
             ),
           ],
         ),

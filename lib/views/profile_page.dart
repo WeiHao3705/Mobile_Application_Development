@@ -143,13 +143,14 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final user = widget.authController.currentUser;
+    final mutedColor = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
         centerTitle: true,
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: Colors.black,
+        backgroundColor: theme.colorScheme.surface,
+        foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
         actions: [
           IconButton(
@@ -165,7 +166,7 @@ class _ProfilePageState extends State<ProfilePage> {
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
+                color: theme.colorScheme.surfaceContainerHighest,
               ),
               child: Column(
                 children: [
@@ -173,42 +174,44 @@ class _ProfilePageState extends State<ProfilePage> {
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: theme.colorScheme.secondary,
-                    child: const Icon(
+                    child: Icon(
                       Icons.person,
                       size: 50,
-                      color: Colors.white,
+                      color: theme.colorScheme.onSecondary,
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     _displayName(user),
-                    style: const TextStyle(
+                    style: theme.textTheme.headlineSmall?.copyWith(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _displayEmail(user),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black.withOpacity(0.7),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: mutedColor,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.25),
+                      ),
                     ),
                     child: Text(
                       user?.isAdmin == true ? 'Admin' : 'Member',
-                      style: const TextStyle(
+                      style: theme.textTheme.bodySmall?.copyWith(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -227,11 +230,13 @@ class _ProfilePageState extends State<ProfilePage> {
                     'My Stats',
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 12),
                   Card(
                     elevation: 2,
+                    color: theme.colorScheme.surfaceContainerHighest,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -269,6 +274,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     'Fitness Goals',
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -278,6 +284,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     onTap: _editDailyGoals,
                     child: Card(
                       elevation: 2,
+                      color: theme.colorScheme.surfaceContainerHighest,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -293,6 +300,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                   'Daily Nutrition Goals',
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.onSurface,
                                   ),
                                 ),
                                 Icon(
@@ -342,7 +350,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             Text(
                               'Tap to edit or auto-calculate',
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                                color: mutedColor,
                               ),
                             ),
                           ],
@@ -372,6 +380,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     'Account',
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -400,7 +409,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     icon: Icons.logout,
                     onTap: () async {
                       await _sessionService.clearSession();
-                      widget.authController.logout();
+                      await widget.authController.logout();
                       if (!context.mounted) {
                         return;
                       }
@@ -447,12 +456,13 @@ class _ProfileStat extends StatelessWidget {
           value,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         Text(
           label,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
           ),
         ),
       ],
@@ -479,6 +489,7 @@ class _GoalItem extends StatelessWidget {
 
     return Card(
       elevation: 1,
+      color: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -486,7 +497,7 @@ class _GoalItem extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.2),
+            color: iconColor.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: iconColor),
@@ -495,6 +506,7 @@ class _GoalItem extends StatelessWidget {
           title,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w500,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         trailing: Text(
@@ -525,10 +537,11 @@ class _OptionItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = isDestructive ? Colors.red : null;
+    final color = isDestructive ? Colors.red : theme.colorScheme.onSurface;
 
     return Card(
       elevation: 1,
+      color: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -544,7 +557,9 @@ class _OptionItem extends StatelessWidget {
         trailing: Icon(
           Icons.arrow_forward_ios,
           size: 16,
-          color: color ?? theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+          color: isDestructive
+              ? Colors.red
+              : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
         ),
         onTap: onTap,
       ),
@@ -569,27 +584,28 @@ class _DailyGoalItem extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withOpacity(0.1),
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: theme.colorScheme.secondary.withOpacity(0.3),
+          color: theme.colorScheme.primary.withValues(alpha: 0.25),
         ),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(11),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             label,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             value,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 2),

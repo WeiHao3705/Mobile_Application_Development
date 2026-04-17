@@ -3,7 +3,7 @@ import 'package:mobile_application_development/views/login_page.dart';
 import 'package:mobile_application_development/views/sign_up_pages.dart';
 
 class LandingPage extends StatelessWidget {
-  static const routeName = '/';
+  static const routeName = '/landing';
 
   const LandingPage({super.key});
 

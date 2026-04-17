@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controllers/auth_controller.dart';
 import 'admin_dashboard_page.dart';
+import 'landing_page.dart';
 import 'main_navigation.dart';
 
 class LoginPage extends StatefulWidget {
@@ -64,6 +65,14 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  void _goToLanding() {
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      LandingPage.routeName,
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -73,68 +82,89 @@ class _LoginPageState extends State<LoginPage> {
       builder: (context, _) {
         return Scaffold(
           appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: _authController.isLoading ? null : _goToLanding,
+            ),
             title: const Text('Login'),
             centerTitle: true,
+            backgroundColor: theme.colorScheme.surface,
+            foregroundColor: theme.colorScheme.onSurface,
           ),
           body: SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Sign in to continue',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Card(
+                    color: theme.colorScheme.surface,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Sign in to continue',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: _usernameController,
+                              decoration: const InputDecoration(
+                                labelText: 'Username',
+                                border: OutlineInputBorder(),
+                              ),
+                              textInputAction: TextInputAction.next,
+                              enabled: !_authController.isLoading,
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter your username';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _passwordController,
+                              decoration: const InputDecoration(
+                                labelText: 'Password',
+                                border: OutlineInputBorder(),
+                              ),
+                              obscureText: true,
+                              enabled: !_authController.isLoading,
+                              onFieldSubmitted: (_) => _handleLogin(),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your password';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton(
+                              onPressed: _authController.isLoading ? null : _handleLogin,
+                              child: _authController.isLoading
+                                  ? SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: theme.colorScheme.onPrimary,
+                                      ),
+                                    )
+                                  : const Text('Login'),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      controller: _usernameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Username',
-                        border: OutlineInputBorder(),
-                      ),
-                      textInputAction: TextInputAction.next,
-                      enabled: !_authController.isLoading,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your username';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordController,
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        border: OutlineInputBorder(),
-                      ),
-                      obscureText: true,
-                      enabled: !_authController.isLoading,
-                      onFieldSubmitted: (_) => _handleLogin(),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your password';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: _authController.isLoading ? null : _handleLogin,
-                      child: _authController.isLoading
-                          ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                          : const Text('Login'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

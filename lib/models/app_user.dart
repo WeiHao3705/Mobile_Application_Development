@@ -1,3 +1,5 @@
+import '../services/password_hasher.dart';
+
 class AppUser {
   AppUser({required this.data});
 
@@ -53,20 +55,20 @@ class SignUpProfileData {
 
   Map<String, dynamic> toInsertMap({bool includePhoneNumber = true}) {
     final payload = <String, dynamic>{
-      'gender': gender,
+      'gender': gender.trim(),
       'date_of_birth': dateOfBirth.toIso8601String().split('T').first,
       'height': height,
       'current_weight': currentWeight,
       'target_weight': targetWeight,
-      'username': username,
-      'password': password,
-      'email': email,
-      'full_name': fullName,
+      'username': username.trim(),
+      'password': PasswordHasher.hash(password),
+      'email': email.trim(),
+      'full_name': fullName.trim(),
       'is_admin': isAdmin,
     };
 
-    if (includePhoneNumber && phoneNumber.isNotEmpty) {
-      payload['phone_number'] = phoneNumber;
+    if (includePhoneNumber && phoneNumber.trim().isNotEmpty) {
+      payload['phone_number'] = phoneNumber.trim();
     }
 
     return payload;
