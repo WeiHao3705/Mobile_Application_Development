@@ -409,7 +409,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     icon: Icons.logout,
                     onTap: () async {
                       await _sessionService.clearSession();
-                      widget.authController.logout();
+                      await widget.authController.logout();
                       if (!context.mounted) {
                         return;
                       }

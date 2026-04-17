@@ -98,20 +98,12 @@ class _SignUpState extends State<SignUpPages> {
     );
   }
 
-  void _handleSystemBack() {
-    if (_authController.isLoading) {
-      return;
-    }
-    if (_stepIndex == 0) {
-      _goToLanding();
-      return;
-    }
-    setState(() {
-      _stepIndex -= 1;
-    });
+  void _quitSignUp() {
+    FocusScope.of(context).unfocus();
+    _goToLanding();
   }
 
-  void _goBack() {
+  void _goBackStep() {
     FocusScope.of(context).unfocus();
     if (_stepIndex == 0) {
       _goToLanding();
@@ -198,10 +190,14 @@ class _SignUpState extends State<SignUpPages> {
             if (didPop) {
               return;
             }
-            _handleSystemBack();
+            _goBackStep();
           },
           child: Scaffold(
             appBar: AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _authController.isLoading ? null : _goBackStep,
+              ),
               backgroundColor: theme.colorScheme.surface,
               foregroundColor: theme.colorScheme.onSurface,
               title: Text('Sign Up (${_stepIndex + 1}/6)'),
@@ -239,9 +235,9 @@ class _SignUpState extends State<SignUpPages> {
                                 children: [
                                   Expanded(
                                     child: OutlinedButton.icon(
-                                      onPressed: _authController.isLoading ? null : _goBack,
-                                      icon: const Icon(Icons.arrow_back),
-                                      label: Text(_stepIndex == 0 ? 'Quit' : 'Back'),
+                                      onPressed: _authController.isLoading ? null : _quitSignUp,
+                                      icon: const Icon(Icons.close),
+                                      label: const Text('Quit'),
                                     ),
                                   ),
                                   const SizedBox(width: 12),

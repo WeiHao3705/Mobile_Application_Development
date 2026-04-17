@@ -5,6 +5,7 @@ import 'home_page.dart';
 import 'profile_page.dart';
 import 'nutrition_main_page.dart';
 import 'exercise_hub_page.dart';
+import 'landing_page.dart';
 
 class MainNavigation extends StatefulWidget {
   static const routeName = '/main';
@@ -19,6 +20,7 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
+  bool _isRedirectingToLanding = false;
 
   // Dark purple palette used by the bottom navigation.
   static const Color _navBackground = Color(0xFF1C1330);
@@ -39,8 +41,55 @@ class _MainNavigationState extends State<MainNavigation> {
     });
   }
 
+  void _handleAuthStateChange() {
+    if (!mounted || _isRedirectingToLanding || widget.authController.isLoggedIn) {
+      return;
+    }
+
+    _isRedirectingToLanding = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        LandingPage.routeName,
+        (route) => false,
+      );
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.authController.addListener(_handleAuthStateChange);
+    _handleAuthStateChange();
+  }
+
+  @override
+  void didUpdateWidget(covariant MainNavigation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.authController != widget.authController) {
+      oldWidget.authController.removeListener(_handleAuthStateChange);
+      widget.authController.addListener(_handleAuthStateChange);
+      _handleAuthStateChange();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.authController.removeListener(_handleAuthStateChange);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!widget.authController.isLoggedIn) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       body: _pages[_selectedIndex],
       bottomNavigationBar: Container(

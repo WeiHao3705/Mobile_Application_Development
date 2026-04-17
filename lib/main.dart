@@ -67,11 +67,29 @@ class _MyAppState extends State<MyApp> {
             builder: (_) => LoginPage(authController: _authController),
           );
         case MainNavigation.routeName:
+          if (!_authController.isLoggedIn) {
+            return _buildSafeRoute(
+              settings: settings,
+              builder: (_) => const LandingPage(),
+            );
+          }
           return _buildSafeRoute(
             settings: settings,
             builder: (_) => MainNavigation(authController: _authController),
           );
         case AdminDashboardPage.routeName:
+          if (!_authController.isLoggedIn) {
+            return _buildSafeRoute(
+              settings: settings,
+              builder: (_) => const LandingPage(),
+            );
+          }
+          if (!_authController.isAdmin) {
+            return _buildSafeRoute(
+              settings: settings,
+              builder: (_) => MainNavigation(authController: _authController),
+            );
+          }
           return _buildSafeRoute(
             settings: settings,
             builder: (_) => AdminDashboardPage(authController: _authController),
