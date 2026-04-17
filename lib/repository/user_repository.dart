@@ -45,9 +45,8 @@ class UserRepository {
     } on PostgrestException catch (error) {
       if (_isMissingColumn(error, 'phoneNumber')) {
         // Last fallback for schemas that do not yet include a phone column.
-        await client
-            .from('User')
-            .insert(profile.toInsertMap(includePhoneNumber: false));
+        final noPhonePayload = profile.toInsertMap(includePhoneNumber: false);
+        await client.from('User').insert(noPhonePayload);
         return;
       }
       rethrow;

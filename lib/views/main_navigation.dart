@@ -5,7 +5,7 @@ import 'home_page.dart';
 import 'profile_page.dart';
 import 'nutrition_main_page.dart';
 import 'exercise_hub_page.dart';
-import 'landing_page.dart';
+import 'login_page.dart';
 
 class MainNavigation extends StatefulWidget {
   static const routeName = '/main';
@@ -53,7 +53,7 @@ class _MainNavigationState extends State<MainNavigation> {
       }
       Navigator.pushNamedAndRemoveUntil(
         context,
-        LandingPage.routeName,
+        LoginPage.routeName,
         (route) => false,
       );
     });

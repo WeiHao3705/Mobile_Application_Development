@@ -70,7 +70,7 @@ class _MyAppState extends State<MyApp> {
           if (!_authController.isLoggedIn) {
             return _buildSafeRoute(
               settings: settings,
-              builder: (_) => const LandingPage(),
+              builder: (_) => LoginPage(authController: _authController),
             );
           }
           return _buildSafeRoute(
@@ -81,7 +81,7 @@ class _MyAppState extends State<MyApp> {
           if (!_authController.isLoggedIn) {
             return _buildSafeRoute(
               settings: settings,
-              builder: (_) => const LandingPage(),
+              builder: (_) => LoginPage(authController: _authController),
             );
           }
           if (!_authController.isAdmin) {
