@@ -20,6 +20,12 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
 
+  // Dark purple palette used by the bottom navigation.
+  static const Color _navBackground = Color(0xFF1C1330);
+  static const Color _navSelected = Color(0xFFC8A2FF);
+  static const Color _navUnselected = Color(0xFF8A78A8);
+  static const Color _navShadow = Color(0xFF120B1F);
+
   late final List<Widget> _pages = [
     HomePage(authController: widget.authController),
     ExerciseHubPage(authController: widget.authController),
@@ -35,15 +41,13 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       body: _pages[_selectedIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: _navShadow.withValues(alpha: 0.45),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
@@ -53,11 +57,9 @@ class _MainNavigationState extends State<MainNavigation> {
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
-          backgroundColor: theme.brightness == Brightness.light
-              ? Colors.white
-              : theme.scaffoldBackgroundColor,
-          selectedItemColor: theme.colorScheme.secondary,
-          unselectedItemColor: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+          backgroundColor: _navBackground,
+          selectedItemColor: _navSelected,
+          unselectedItemColor: _navUnselected,
           selectedFontSize: 12,
           unselectedFontSize: 12,
           elevation: 0,
@@ -65,26 +67,26 @@ class _MainNavigationState extends State<MainNavigation> {
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 0 ? Icons.home : Icons.home_outlined),
               label: 'Home',
-              backgroundColor: theme.colorScheme.primary,
+              backgroundColor: _navBackground,
             ),
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 1
                   ? Icons.fitness_center
                   : Icons.fitness_center_outlined),
               label: 'Exercise',
-              backgroundColor: theme.colorScheme.primary,
+              backgroundColor: _navBackground,
             ),
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 2
                   ? Icons.restaurant
                   : Icons.restaurant_outlined),
               label: 'Diet',
-              backgroundColor: theme.colorScheme.primary,
+              backgroundColor: _navBackground,
             ),
             BottomNavigationBarItem(
               icon: Icon(_selectedIndex == 3 ? Icons.person : Icons.person_outlined),
               label: 'Profile',
-              backgroundColor: theme.colorScheme.primary,
+              backgroundColor: _navBackground,
             ),
           ],
         ),

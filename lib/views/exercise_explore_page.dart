@@ -262,12 +262,13 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
 
     return source.where((exercise) {
       final matchEquipment = _selectedEquipment == 'All Equipment' ||
-          exercise.equipment == _selectedEquipment;
+          exercise.hasEquipment(_selectedEquipment);
       final matchMuscle =
           _selectedMuscle == 'All Muscles' || exercise.primaryMuscle == _selectedMuscle;
       final matchSearch = query.isEmpty ||
           exercise.name.toLowerCase().contains(query) ||
-          exercise.primaryMuscle.toLowerCase().contains(query);
+          exercise.primaryMuscle.toLowerCase().contains(query) ||
+          exercise.equipment.toLowerCase().contains(query);
 
       return matchEquipment && matchMuscle && matchSearch;
     }).toList();

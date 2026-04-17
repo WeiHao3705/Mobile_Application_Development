@@ -140,7 +140,7 @@ class _MyAppState extends State<MyApp> {
               debugShowCheckedModeBanner: false,
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
-              themeMode: ThemeMode.system,
+              themeMode: ThemeMode.dark,
               home: const Scaffold(
                 body: Center(
                   child: CircularProgressIndicator(),
@@ -154,7 +154,7 @@ class _MyAppState extends State<MyApp> {
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.system,
+            themeMode: ThemeMode.dark,
             home: _initialPage,
             onGenerateRoute: _onGenerateRoute,
             onUnknownRoute: (settings) => MaterialPageRoute<void>(

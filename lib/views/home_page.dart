@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../controllers/auth_controller.dart';
 import '../repository/workout_record_repository.dart';
-import 'workout_record_detail_page.dart';
 import 'workout_record_list_page.dart';
 
 class HomePage extends StatelessWidget {
@@ -49,13 +48,14 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final mutedTextColor = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('FitTrack'),
         centerTitle: false,
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: Colors.black,
+        backgroundColor: theme.colorScheme.surface,
+        foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -69,13 +69,14 @@ class HomePage extends StatelessWidget {
                 'Welcome Back!',
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Let\'s crush your fitness goals today',
                 style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                  color: mutedTextColor,
                 ),
               ),
               const SizedBox(height: 24),
@@ -83,6 +84,7 @@ class HomePage extends StatelessWidget {
               // Daily Stats Card
               Card(
                 elevation: 2,
+                color: theme.colorScheme.surfaceContainerHighest,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -95,6 +97,7 @@ class HomePage extends StatelessWidget {
                         'Today\'s Activity',
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -132,6 +135,7 @@ class HomePage extends StatelessWidget {
                 'Quick Actions',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 12),
@@ -161,6 +165,7 @@ class HomePage extends StatelessWidget {
                 'Recent Workouts',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 12),
@@ -228,7 +233,7 @@ class _StatItem extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.2),
+            color: theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: color, size: 28),
@@ -238,12 +243,13 @@ class _StatItem extends StatelessWidget {
           value,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         Text(
           label,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
           ),
         ),
       ],
@@ -268,6 +274,7 @@ class _ActionCard extends StatelessWidget {
 
     return Card(
       elevation: 2,
+      color: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -285,6 +292,7 @@ class _ActionCard extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
             ],
@@ -316,6 +324,7 @@ class _WorkoutItem extends StatelessWidget {
 
     return Card(
       elevation: 1,
+      color: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
       ),
@@ -344,13 +353,14 @@ class _WorkoutItem extends StatelessWidget {
                       title,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.65),
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                       ),
                     ),
                   ],
@@ -359,7 +369,7 @@ class _WorkoutItem extends StatelessWidget {
               if (onTap != null)
                 Icon(
                   Icons.chevron_right,
-                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.4),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                 ),
             ],
           ),
