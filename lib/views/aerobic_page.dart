@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
 import 'aerobic_type.dart';
+import 'aerobic_detail.dart';
 
 // --- IMPORTANT NEW IMPORTS ---
 // Make sure these paths match where you saved your files!
@@ -138,13 +139,76 @@ class _TabSection extends StatelessWidget {
   }
 }
 
-class _AerobicRecord extends StatelessWidget{
-
-  // 1. Initialize your repository here!
-  final AerobicRepository _repository = AerobicRepository();
+class _AerobicRecord extends StatefulWidget{
   final int userId;
 
-  _AerobicRecord({required this.userId});
+  const _AerobicRecord({required this.userId});
+
+  @override
+  State<_AerobicRecord> createState() => _AerobicRecordState();
+}
+
+class _AerobicRecordState extends State<_AerobicRecord> {
+  final AerobicRepository _repository = AerobicRepository();
+  late Future<List<Aerobic>> _recordsFuture;
+  DateTime? _selectedFilterDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _recordsFuture = _repository.fetchUserRecords(widget.userId.toString());
+  }
+
+  void _refreshRecords() {
+    setState(() {
+      _recordsFuture = _repository.fetchUserRecords(widget.userId.toString());
+    });
+  }
+
+  Future<void> _selectFilterDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedFilterDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AppColors.primary,
+              surface: AppColors.nearBlack,
+              onSurface: AppColors.lavender,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null) {
+      setState(() {
+        _selectedFilterDate = pickedDate;
+      });
+    }
+  }
+
+  void _clearFilter() {
+    setState(() {
+      _selectedFilterDate = null;
+    });
+  }
+
+  List<Aerobic> _filterRecordsByDate(List<Aerobic> records) {
+    if (_selectedFilterDate == null) {
+      return records;
+    }
+
+    return records.where((record) {
+      return record.start_at.year == _selectedFilterDate!.year &&
+          record.start_at.month == _selectedFilterDate!.month &&
+          record.start_at.day == _selectedFilterDate!.day;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +223,7 @@ class _AerobicRecord extends StatelessWidget{
               onPressed: () async {
                 final result = await Navigator.push(
                     context, MaterialPageRoute(
-                    builder: (context) => AerobicStartPage(userId: userId))
+                    builder: (context) => AerobicStartPage(userId: widget.userId))
                 );
                 if(result == true) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -169,6 +233,8 @@ class _AerobicRecord extends StatelessWidget{
                       duration: Duration(seconds: 2),
                     ),
                   );
+                  // ✅ REFRESH THE RECORDS
+                  _refreshRecords();
                 }
               },
               icon: const Icon(Icons.add),
@@ -185,24 +251,83 @@ class _AerobicRecord extends StatelessWidget{
           ),
         ),
 
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 10.0),
-          child: Text(
-            'Previous Record',
-            style: TextStyle(
-              color: AppColors.lime,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Previous Record',
+                style: TextStyle(
+                  color: AppColors.lime,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              GestureDetector(
+                onTap: _selectFilterDate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.primary),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.calendar_today, color: AppColors.primary, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Filter',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
 
-        const SizedBox(height: 10),
+        // Selected date filter display
+        if (_selectedFilterDate != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primary),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Filtered: ${_selectedFilterDate!.day}/${_selectedFilterDate!.month}/${_selectedFilterDate!.year}',
+                    style: const TextStyle(
+                      color: AppColors.lime,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _clearFilter,
+                    child: const Icon(Icons.close, color: AppColors.primary, size: 18),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
-        // 2. Change the FutureBuilder to use your Repository and Aerobic model
+        const SizedBox(height: 12),
+
+        // ✅ NOW USES STATE VARIABLE FOR FUTURE WITH FILTERING
         FutureBuilder<List<Aerobic>>(
-          // Just call the repository method here!
-            future: _repository.fetchUserRecords(userId.toString()), // Converting int to String if your repository expects a String
+            future: _recordsFuture,
             builder: (context, snapshot) {
               if(snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator(color: AppColors.lime));
@@ -214,12 +339,20 @@ class _AerobicRecord extends StatelessWidget{
                 );
               }
 
-              final records = snapshot.data ?? [];
-              if(records.isEmpty) {
-                return const Center(
+              final allRecords = snapshot.data ?? [];
+              final filteredRecords = _filterRecordsByDate(allRecords);
+              
+              if(filteredRecords.isEmpty) {
+                return Center(
                     child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Text('No Aerobic Records Found.', style: TextStyle(color: AppColors.lavender)),
+                      padding: const EdgeInsets.all(20.0),
+                      child: Text(
+                        _selectedFilterDate != null 
+                          ? 'No Aerobic Records Found for ${_selectedFilterDate!.day}/${_selectedFilterDate!.month}/${_selectedFilterDate!.year}.' 
+                          : 'No Aerobic Records Found.', 
+                        style: const TextStyle(color: AppColors.lavender),
+                        textAlign: TextAlign.center,
+                      ),
                     )
                 );
               }
@@ -227,9 +360,13 @@ class _AerobicRecord extends StatelessWidget{
               return ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: records.length,
+                  itemCount: filteredRecords.length,
                   itemBuilder: (context, index) {
-                    return _ActivityCard(record: records[index]);
+                    return _ActivityCard(
+                      record: filteredRecords[index],
+                      resolveRouteImageUrl: _repository.resolveRouteImageUrl,
+
+                    );
                   }
               );
             }
@@ -242,12 +379,25 @@ class _AerobicRecord extends StatelessWidget{
 class _ActivityCard extends StatelessWidget{
   // 3. Update this to use your official Aerobic model
   final Aerobic record;
+  final String Function(String rawValue) resolveRouteImageUrl;
 
-  const _ActivityCard({required this.record});
+  const _ActivityCard({
+    required this.record,
+    required this.resolveRouteImageUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AerobicDetailPage(record: record),
+          ),
+        );
+      },
+      child: Container(
         margin: const EdgeInsets.only(bottom: 16.0),
         height: 125,
         decoration: BoxDecoration(
@@ -320,26 +470,79 @@ class _ActivityCard extends StatelessWidget{
               ),
               Expanded(
                 flex: 2,
-                child: record.route_image.isNotEmpty
-                    ? Image.network(
-                  record.route_image, // Updated to match your model's variable name
-                  fit: BoxFit.cover,
-                  height: double.infinity,
-                  errorBuilder: (context, error, stackTrace) => _buildPlaceholderMap(),
-                )
-                    : _buildPlaceholderMap(),
+                child: _buildImageSection(),
               ),
             ],
           ),
-        )
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageSection() {
+    final resolvedImageUrl = resolveRouteImageUrl(record.route_image);
+
+    if (resolvedImageUrl.isEmpty) {
+      print('⚠️  [AEROBIC-PAGE] Image URL is empty for: ${record.route_image}');
+      return _buildPlaceholderMap();
+    }
+
+    print('✅ [AEROBIC-PAGE] Loading image from: $resolvedImageUrl');
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.network(
+        resolvedImageUrl,
+        fit: BoxFit.cover,
+        height: double.infinity,
+        width: double.infinity,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            return child;
+          }
+
+          return Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                  : null,
+              color: AppColors.lime,
+              strokeWidth: 2,
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          print('❌ Error loading route image: $error | raw=${record.route_image} | resolved=$resolvedImageUrl');
+          return _buildPlaceholderMap();
+        },
+      ),
     );
   }
 
   Widget _buildPlaceholderMap() {
-    return Container (
-      color: Colors.grey[400],
-      child: const Center(
-        child: Icon(Icons.map, size: 48, color: Colors.white),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[800],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.map,
+              size: 40,
+              color: Colors.grey[600],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Route',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

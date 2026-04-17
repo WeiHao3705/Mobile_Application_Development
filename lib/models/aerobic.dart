@@ -73,7 +73,7 @@ class Aerobic {
   String get formattedDuration {
     int minutes = moving_time ~/ 60;
     int seconds = moving_time % 60;
-    return "${minutes}m:${seconds}s";
+    return "${minutes}m ${seconds}s";
   }
 
   String get formattedDate {
