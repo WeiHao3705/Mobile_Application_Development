@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controllers/auth_controller.dart';
 import 'admin_dashboard_page.dart';
+import 'forgot_password_page.dart';
 import 'landing_page.dart';
 import 'main_navigation.dart';
 
@@ -70,6 +71,14 @@ class _LoginPageState extends State<LoginPage> {
       context,
       LandingPage.routeName,
       (route) => false,
+    );
+  }
+
+  Future<void> _openForgotPasswordPage() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ForgotPasswordPage(authController: _authController),
+      ),
     );
   }
 
@@ -146,7 +155,17 @@ class _LoginPageState extends State<LoginPage> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _authController.isLoading
+                                    ? null
+                                    : _openForgotPasswordPage,
+                                child: const Text('Forgot password?'),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
                             ElevatedButton(
                               onPressed: _authController.isLoading ? null : _handleLogin,
                               child: _authController.isLoading
@@ -174,3 +193,4 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
+

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,9 +10,11 @@ import 'controllers/food_controller.dart';
 import 'controllers/meal_controller.dart';
 import 'theme/app_theme.dart';
 import 'views/admin_dashboard_page.dart';
+import 'views/forgot_password_page.dart';
 import 'views/landing_page.dart';
 import 'views/login_page.dart';
 import 'views/main_navigation.dart';
+import 'views/reset_password_page.dart';
 import 'views/sign_up_pages.dart';
 
 Future<void> main() async {
@@ -33,7 +37,9 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final AuthController _authController = AuthController();
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   late final Future<void> _startupFuture;
+  StreamSubscription<AuthState>? _authStateSubscription;
 
   Route<dynamic> _buildSafeRoute({
     required RouteSettings settings,
@@ -65,6 +71,16 @@ class _MyAppState extends State<MyApp> {
           return _buildSafeRoute(
             settings: settings,
             builder: (_) => LoginPage(authController: _authController),
+          );
+        case ForgotPasswordPage.routeName:
+          return _buildSafeRoute(
+            settings: settings,
+            builder: (_) => ForgotPasswordPage(authController: _authController),
+          );
+        case ResetPasswordPage.routeName:
+          return _buildSafeRoute(
+            settings: settings,
+            builder: (_) => ResetPasswordPage(authController: _authController),
           );
         case MainNavigation.routeName:
           if (!_authController.isLoggedIn) {
@@ -119,10 +135,26 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _startupFuture = _authController.restoreSession();
+    _authStateSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((authState) {
+      if (authState.event != AuthChangeEvent.passwordRecovery) {
+        return;
+      }
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+          ResetPasswordPage.routeName,
+          (route) => false,
+        );
+      });
+    });
   }
 
   @override
   void dispose() {
+    _authStateSubscription?.cancel();
     _authController.dispose();
     super.dispose();
   }
@@ -140,8 +172,8 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider<AuthController>(
-          create: (_) => _authController,
+        ChangeNotifierProvider<AuthController>.value(
+          value: _authController,
         ),
         ChangeNotifierProvider(
           create: (_) => FoodController(),
@@ -173,6 +205,7 @@ class _MyAppState extends State<MyApp> {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: ThemeMode.dark,
+            navigatorKey: _navigatorKey,
             home: _initialPage,
             onGenerateRoute: _onGenerateRoute,
             onUnknownRoute: (settings) => MaterialPageRoute<void>(

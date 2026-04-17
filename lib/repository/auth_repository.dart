@@ -73,4 +73,51 @@ class AuthRepository {
       // Keep login successful even if migration update is blocked by policy.
     }
   }
+
+  Future<void> ensureAuthIdentity({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      await client.auth.signUp(
+        email: email.trim(),
+        password: password.trim(),
+        emailRedirectTo: null,
+      );
+    } on AuthException catch (error) {
+      final message = error.message.toLowerCase();
+      if (message.contains('already registered')) {
+        return;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> sendPasswordResetEmail({
+    required String email,
+    required String redirectTo,
+  }) async {
+    // Only send reset email if the account exists in Supabase Auth
+    // (which means they signed up through the app)
+    await client.auth.resetPasswordForEmail(
+      email.trim(),
+      redirectTo: redirectTo,
+    );
+  }
+
+  Future<void> completePasswordReset({required String newPassword}) async {
+    final email = client.auth.currentUser?.email?.trim();
+    if (email == null || email.isEmpty) {
+      throw AuthException('Recovery session is missing. Please open the reset link again.');
+    }
+
+    final trimmedPassword = newPassword.trim();
+    final hashedPassword = PasswordHasher.hash(trimmedPassword);
+
+    await client.auth.updateUser(UserAttributes(password: trimmedPassword));
+    await client
+        .from('User')
+        .update({'password': hashedPassword})
+        .eq('email', email);
+  }
 }
