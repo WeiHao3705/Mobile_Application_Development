@@ -89,8 +89,7 @@ class _WorkoutPlanDetailPageState extends State<WorkoutPlanDetailPage> {
         imageUrl: imageUrl,
         equipment: equipment,
         primaryMuscle: '',
-        muscleGroup: '',
-        secondaryMuscle: '',
+        secondaryMuscles: const <String>[],
         howTo: '',
       );
 
@@ -187,10 +186,9 @@ class _WorkoutPlanDetailPageState extends State<WorkoutPlanDetailPage> {
                 id: detail.exerciseId,
                 name: detail.exerciseName,
                 primaryMuscle: detail.isBodyweight ? 'Bodyweight' : 'Unknown Muscle',
-                muscleGroup: detail.isBodyweight ? 'Bodyweight' : 'Unknown Muscle',
                 equipment: detail.isBodyweight ? 'Bodyweight' : 'Unknown Equipment',
                 imageUrl: detail.imageUrl,
-                secondaryMuscle: 'Not provided',
+                secondaryMuscles: const <String>[],
                 howTo: 'No instructions provided.',
               ),
               setCount: detail.sets <= 0 ? 1 : detail.sets,

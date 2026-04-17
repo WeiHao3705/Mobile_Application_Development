@@ -116,19 +116,7 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
               (entry) => entry.value != _initialExerciseOrder[entry.key],
             );
 
-    final nextHasUnsavedChanges = hasPlanNameChange || hasExerciseSelectionChange;
-    if (_hasUnsavedChanges == nextHasUnsavedChanges) {
-      return;
-    }
-
-    if (!mounted) {
-      _hasUnsavedChanges = nextHasUnsavedChanges;
-      return;
-    }
-
-    setState(() {
-      _hasUnsavedChanges = nextHasUnsavedChanges;
-    });
+    _hasUnsavedChanges = hasPlanNameChange || hasExerciseSelectionChange;
   }
 
   Future<bool> _confirmDiscardChanges() async {
@@ -152,7 +140,7 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: const Text('Keep editing'),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),

@@ -63,7 +63,7 @@ class _EditExercisePageState extends State<EditExercisePage> {
 
     _selectedEquipment = widget.exercise.equipment;
     _selectedPrimaryMuscle = widget.exercise.primaryMuscle;
-    _selectedSecondaryMuscles.addAll(_parseSecondaryMuscles(widget.exercise.secondaryMuscle));
+    _selectedSecondaryMuscles.addAll(widget.exercise.secondaryMuscles);
     _selectedSecondaryMuscles.remove(widget.exercise.primaryMuscle);
 
     _imageUrl = widget.exercise.imageUrl.trim().isEmpty ? null : widget.exercise.imageUrl.trim();
@@ -77,18 +77,6 @@ class _EditExercisePageState extends State<EditExercisePage> {
     super.dispose();
   }
 
-  Set<String> _parseSecondaryMuscles(String value) {
-    final normalized = value.trim().toLowerCase();
-    if (normalized.isEmpty || normalized == 'not provided') {
-      return <String>{};
-    }
-
-    return value
-        .split(',')
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toSet();
-  }
 
   bool _isGifPath(String path) {
     return path.toLowerCase().endsWith('.gif');

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../models/exercise.dart';
 import '../repository/workout_record_repository.dart';
+import '../services/rest_timer_sound_service.dart';
 import 'exercise_detail_page.dart';
 import 'exercise_explore_page.dart';
 import 'save_workout_page.dart';
@@ -47,9 +48,11 @@ class WorkoutRoutinePage extends StatefulWidget {
 }
 
 class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
-  late final DateTime _startedAt;
+  late DateTime _startedAt;
   Timer? _ticker;
   Duration _elapsed = Duration.zero;
+  bool _allowProgrammaticPop = false;
+  final RestTimerSoundService _restTimerSoundService = RestTimerSoundService();
 
   final List<Exercise> _selectedExercises = <Exercise>[];
   final Map<int, _RoutineExerciseDraft> _exerciseDrafts = <int, _RoutineExerciseDraft>{};
@@ -62,23 +65,60 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
     if (widget.initialExercises.isNotEmpty) {
       _selectedExercises.addAll(widget.initialExercises.map((seed) => seed.exercise));
     }
+    unawaited(_restTimerSoundService.preload());
     _syncExerciseDrafts(widget.initialExercises);
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) {
         return;
       }
+      var shouldPlayRestCompleteSound = false;
       setState(() {
         _elapsed = DateTime.now().difference(_startedAt);
         for (final draft in _exerciseDrafts.values) {
-          draft.tickRestTimer();
+          if (draft.tickRestTimer()) {
+            shouldPlayRestCompleteSound = true;
+          }
         }
       });
+
+      if (shouldPlayRestCompleteSound) {
+        unawaited(_restTimerSoundService.playOnce());
+      }
     });
+  }
+
+  Future<bool> _confirmDiscardWorkout() async {
+    final shouldDiscard = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          title: const Text('Discard workout?', style: TextStyle(color: Colors.white)),
+          content: const Text(
+            'Your current routine progress is not saved. Do you want to discard and leave this page?',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Discard', style: TextStyle(color: Colors.redAccent)),
+            ),
+          ],
+        );
+      },
+    );
+
+    return shouldDiscard == true;
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    unawaited(_restTimerSoundService.dispose());
     for (final draft in _exerciseDrafts.values) {
       draft.dispose();
     }
@@ -412,6 +452,7 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
     );
 
     if (saved == true && mounted) {
+      _allowProgrammaticPop = true;
       Navigator.of(context).pop(true);
     }
   }
@@ -421,7 +462,22 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
     final theme = Theme.of(context);
     final hasExercises = _selectedExercises.isNotEmpty;
 
-    return Scaffold(
+    return PopScope(
+      canPop: _allowProgrammaticPop,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          return;
+        }
+
+        final shouldDiscard = await _confirmDiscardWorkout();
+        if (!mounted || !shouldDiscard) {
+          return;
+        }
+
+        _allowProgrammaticPop = true;
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text('Workout Routine'),
@@ -527,6 +583,7 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -937,21 +994,24 @@ class _RoutineExerciseDraft {
     isRestRunning = false;
   }
 
-  void tickRestTimer() {
+  bool tickRestTimer() {
     if (!isRestRunning) {
-      return;
+      return false;
     }
     if (restRemaining.inSeconds <= 0) {
       restRemaining = Duration.zero;
       isRestRunning = false;
-      return;
+      return false;
     }
 
     restRemaining -= const Duration(seconds: 1);
     if (restRemaining.inSeconds <= 0) {
       restRemaining = Duration.zero;
       isRestRunning = false;
+      return true;
     }
+
+    return false;
   }
 
   void dispose() {
