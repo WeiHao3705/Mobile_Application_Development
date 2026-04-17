@@ -1415,6 +1415,13 @@ class _MealLogSectionState extends State<_MealLogSection> {
                               ),
                             ),
                           );
+                          // Refresh meals after returning from AddNewMealPage
+                          if (mounted) {
+                            final userId = widget.authController.currentUser?.id;
+                            if (userId != null) {
+                              context.read<MealController>().fetchUserMeals(int.parse(userId.toString()));
+                            }
+                          }
                         },
                         icon: const Icon(Icons.add_circle_outline, size: 18),
                         label: const Text(
@@ -1514,6 +1521,13 @@ class _MealLogSectionState extends State<_MealLogSection> {
                               ),
                             ),
                           );
+                          // Refresh meals after returning from AddNewMealPage
+                          if (mounted) {
+                            final userId = widget.authController.currentUser?.id;
+                            if (userId != null) {
+                              context.read<MealController>().fetchUserMeals(int.parse(userId.toString()));
+                            }
+                          }
                         },
                         icon: const Icon(Icons.add_circle_outline, size: 18),
                         label: const Text(

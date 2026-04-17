@@ -321,10 +321,16 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
         _selected.clear();
         mealController.clearSelectedImage();
 
+        // Refresh meals in the controller so they display when user navigates back
+        final userId = int.tryParse(authController.currentUser?.id?.toString() ?? '');
+        if (userId != null) {
+          mealController.fetchUserMeals(userId);
+        }
+
+        // Hide snackbar after a brief delay
         Future.delayed(const Duration(milliseconds: 2200), () {
           if (mounted) {
             setState(() => _showToast = false);
-            Navigator.of(context).pop(true);
           }
         });
       } else {
