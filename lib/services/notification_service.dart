@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer' as developer;
 
 class NotificationService {
@@ -44,13 +45,79 @@ class NotificationService {
     developer.log('Notification tapped: ${response.payload}');
   }
 
-  static Future<void> scheduleDailyNotifications() async {
+  static Future<void> scheduleDailyNotifications(String? userId) async {
     try {
-      await _scheduleDaily(0, 20, 53, 'Morning Reminder', 'Good morning! Time to check in.');
-      await _scheduleDaily(1, 13, 0, 'Afternoon Reminder', 'Afternoon check-in time!');
-      await _scheduleDaily(2, 18, 0, 'Evening Reminder', 'Evening reminder — don\'t forget!');
+      // If no userId provided, user is not logged in - skip notifications
+      if (userId == null) {
+        developer.log('User not logged in, skipping notification scheduling');
+        return;
+      }
+
+      // Check which meals have NOT been logged today
+      final missingMeals = await _getMissingMeals(userId);
+      developer.log('Missing meals for user $userId: $missingMeals');
+
+      if (missingMeals.isEmpty) {
+        // All meals logged
+        developer.log('User $userId has already logged all meals today, skipping notifications');
+        return;
+      }
+
+      // Send notifications only for missing meals
+      if (missingMeals.contains('breakfast')) {
+        await _scheduleDaily(0, 9, 0, 'Breakfast Reminder', '🥣 Good morning! Don\'t forget your breakfast.');
+      }
+
+      if (missingMeals.contains('lunch')) {
+        await _scheduleDaily(1, 13, 00, 'Lunch Reminder', '🍽️ Lunch time! Have you logged your meal yet?');
+      }
+
+      if (missingMeals.contains('dinner')) {
+        await _scheduleDaily(2, 19, 0, 'Dinner Reminder', '🍖 Dinner time! Don\'t forget to log your meal.');
+      }
+
+      developer.log('Notifications scheduled for missing meals: $missingMeals');
     } catch (e) {
       developer.log('Error scheduling notifications: $e');
+    }
+  }
+
+  static Future<List<String>> _getMissingMeals(String userId) async {
+    try {
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final startOfDayIso = startOfDay.toIso8601String();
+      final endOfDayIso = startOfDay.add(const Duration(days: 1)).toIso8601String();
+
+      // Fetch all meals logged by user today
+      final response = await Supabase.instance.client
+          .from('MealLog')
+          .select('meal_type')
+          .eq('user_id', userId)
+          .gte('meal_date', startOfDayIso)
+          .lt('meal_date', endOfDayIso);
+
+      // Extract meal types that were logged
+      final loggedMealTypes = (response as List)
+          .map((meal) => (meal['meal_type'] as String).toLowerCase())
+          .toList();
+
+      developer.log('Meals logged today for user $userId: $loggedMealTypes');
+
+      // Define meals to track
+      final mealsToTrack = ['breakfast', 'lunch', 'dinner'];
+
+      // Find missing meals
+      final missing = mealsToTrack
+          .where((meal) => !loggedMealTypes.contains(meal))
+          .toList();
+
+      developer.log('Missing meals for user $userId: $missing');
+      return missing;
+    } catch (e) {
+      developer.log('Error checking missing meals: $e');
+      // Default to all meals if there's an error (pessimistic approach - send all notifications)
+      return ['breakfast', 'lunch', 'dinner'];
     }
   }
 
