@@ -309,7 +309,7 @@ class _SignUpState extends State<SignUpPages> {
           items: const [
             DropdownMenuItem(value: 'male', child: Text('Male')),
             DropdownMenuItem(value: 'female', child: Text('Female')),
-            DropdownMenuItem(value: 'other', child: Text('Other')),
+            // DropdownMenuItem(value: 'other', child: Text('Other')),
           ],
           validator: (value) => value == null ? 'Please select your gender' : null,
           onChanged: (value) {

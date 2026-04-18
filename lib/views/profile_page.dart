@@ -665,12 +665,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const SizedBox(height: 12),
 
-                  _GoalItem(
-                    title: 'Daily Steps Goal',
-                    value: '10,000 steps',
-                    icon: Icons.directions_walk,
-                    iconColor: theme.colorScheme.tertiary,
-                  ),
+                  // _GoalItem(
+                  //   title: 'Daily Steps Goal',
+                  //   value: '10,000 steps',
+                  //   icon: Icons.directions_walk,
+                  //   iconColor: theme.colorScheme.tertiary,
+                  // ),
                   const SizedBox(height: 8),
                   _GoalItem(
                     title: 'Target Weight',
@@ -702,21 +702,21 @@ class _ProfilePageState extends State<ProfilePage> {
                       );
                     },
                   ),
-                  _OptionItem(
-                    title: 'Notifications',
-                    icon: Icons.notifications,
-                    onTap: () {},
-                  ),
-                  _OptionItem(
-                    title: 'Privacy & Security',
-                    icon: Icons.privacy_tip,
-                    onTap: () {},
-                  ),
-                  _OptionItem(
-                    title: 'Help & Support',
-                    icon: Icons.help,
-                    onTap: () {},
-                  ),
+                  // _OptionItem(
+                  //   title: 'Notifications',
+                  //   icon: Icons.notifications,
+                  //   onTap: () {},
+                  // ),
+                  // _OptionItem(
+                  //   title: 'Privacy & Security',
+                  //   icon: Icons.privacy_tip,
+                  //   onTap: () {},
+                  // ),
+                  // _OptionItem(
+                  //   title: 'Help & Support',
+                  //   icon: Icons.help,
+                  //   onTap: () {},
+                  // ),
                   _OptionItem(
                     title: 'Logout',
                     icon: Icons.logout,
