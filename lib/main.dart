@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
+import 'package:mobile_application_development/services/notification_service.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -20,10 +22,17 @@ import 'views/sign_up_pages.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: supabaseUrl,
-    anonKey: supabaseAnonKey,
-  );
+  try {
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseAnonKey,
+    );
+
+    await NotificationService.init();
+    // Don't schedule notifications here - will be done in _MyAppState after auth restore
+  } catch (e, stackTrace) {
+    developer.log('Error during initialization: $e\nStack trace: $stackTrace');
+  }
 
   runApp(const MyApp());
 }
@@ -134,7 +143,17 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    _startupFuture = _authController.restoreSession();
+    _startupFuture = _authController.restoreSession().then((_) {
+      // Schedule notifications after session is restored with userId
+      final userId = _authController.currentUser?.id?.toString();
+      NotificationService.scheduleDailyNotifications(userId);
+    });
+
+    // Reschedule notifications whenever app comes to foreground
+    WidgetsBinding.instance.addObserver(
+      AppLifecycleObserver(_authController),
+    );
+
     _authStateSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((authState) {
       if (authState.event != AuthChangeEvent.passwordRecovery) {
         return;
@@ -238,5 +257,24 @@ class _RouteErrorScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class AppLifecycleObserver extends WidgetsBindingObserver {
+  final AuthController _authController;
+
+  AppLifecycleObserver(this._authController);
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Reschedule notifications when app comes to foreground
+      // This checks meal status on each app resume
+      developer.log('App resumed - rescheduling notifications to check meal status');
+      final userId = _authController.currentUser?.id?.toString();
+      NotificationService.cancelAllNotifications().then((_) {
+        NotificationService.scheduleDailyNotifications(userId);
+      });
+    }
   }
 }

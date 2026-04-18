@@ -68,38 +68,40 @@ class ExerciseHubPage extends StatelessWidget {
         centerTitle: true,
         elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Choose Activity',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                color: AppColors.lavender,
-                fontWeight: FontWeight.w800,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Choose Activity',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: AppColors.lavender,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Pick a training mode to continue.',
-              style: TextStyle(color: AppColors.lightGray, fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            _ExerciseHubCard(
-              icon: Icons.directions_run,
-              title: 'Aerobic',
-              subtitle: 'Track running, walking and other cardio sessions.',
-              onTap: () => _openAerobic(context),
-            ),
-            const SizedBox(height: 12),
-            _ExerciseHubCard(
-              icon: Icons.fitness_center,
-              title: 'Workout',
-              subtitle: 'Strength workouts, plans and exercise routines.',
-              onTap: () => _openWorkout(context),
-            ),
-          ],
+              const SizedBox(height: 4),
+              const Text(
+                'Pick a training mode to continue.',
+                style: TextStyle(color: AppColors.lightGray, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              _ExerciseHubCard(
+                icon: Icons.directions_run,
+                title: 'Aerobic',
+                subtitle: 'Track running, walking and other cardio sessions.',
+                onTap: () => _openAerobic(context),
+              ),
+              const SizedBox(height: 12),
+              _ExerciseHubCard(
+                icon: Icons.fitness_center,
+                title: 'Workout',
+                subtitle: 'Strength workouts, plans and exercise routines.',
+                onTap: () => _openWorkout(context),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -160,6 +162,8 @@ class _ExerciseHubCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.black,
                         fontSize: 13,

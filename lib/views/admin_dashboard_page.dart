@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
 import '../services/user_session_service.dart';
 import '../theme/app_colors.dart';
-import 'aerobic_page.dart';
+import 'admin_aerobic_type_page.dart';
 import 'exercise_page.dart';
 import 'login_page.dart';
 import 'main_navigation.dart';
@@ -15,18 +15,10 @@ class AdminDashboardPage extends StatelessWidget {
 
   final AuthController authController;
 
-  void _openAerobic(BuildContext context) {
-    final userId = authController.currentUser?.id;
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User not authenticated')),
-      );
-      return;
-    }
-
+  void _openAerobicTypeManagement(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => AerobicPage(userId: userId),
+        builder: (_) => const AdminAerobicTypePage(),
       ),
     );
   }
@@ -163,10 +155,10 @@ class AdminDashboardPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _AdminActionCard(
-            title: 'Aerobic',
-            subtitle: 'Open aerobic workout section',
+            title: 'Aerobic Management',
+            subtitle: 'Create, update, delete aerobic activity types',
             icon: Icons.directions_run,
-            onTap: () => _openAerobic(context),
+            onTap: () => _openAerobicTypeManagement(context),
           ),
           const SizedBox(height: 12),
           _AdminActionCard(

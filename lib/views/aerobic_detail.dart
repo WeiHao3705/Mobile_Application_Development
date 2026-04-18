@@ -1,15 +1,200 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import '../models/aerobic.dart';
 import '../repository/aerobic_repository.dart';
 
-class AerobicDetailPage extends StatelessWidget {
+class AerobicDetailPage extends StatefulWidget {
   final Aerobic record;
 
   const AerobicDetailPage({super.key, required this.record});
 
   @override
+  State<AerobicDetailPage> createState() => _AerobicDetailPageState();
+}
+
+class _AerobicDetailPageState extends State<AerobicDetailPage> {
+  final AerobicRepository _repository = AerobicRepository();
+  late Aerobic currentRecord;
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    currentRecord = widget.record;
+  }
+
+  Future<void> _toggleArchiveRecord() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final updatedRecord = await _repository.updateAerobicArchiveStatus(
+        currentRecord.id,
+        !currentRecord.is_archived,
+      );
+      
+      setState(() {
+        currentRecord = updatedRecord;
+        isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              currentRecord.is_archived 
+                  ? '✅ Record archived successfully' 
+                  : '✅ Record restored successfully',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  // ✅ NEW: Share the workout details
+  Future<void> _shareWorkout() async {
+    try {
+      final shareText = _formatShareText();
+      print('📤 [SHARE] Preparing to share workout details');
+      
+      // Try to download and share the route image
+      List<XFile> files = [];
+      
+      if (currentRecord.route_image.isNotEmpty) {
+        try {
+          print('📤 [SHARE] Downloading route image...');
+          final imageFile = await _downloadRouteImage();
+          if (imageFile != null) {
+            files.add(imageFile);
+            print('✅ [SHARE] Route image downloaded successfully');
+          }
+        } catch (e) {
+          print('⚠️  [SHARE] Could not download image, will share text only: $e');
+        }
+      }
+      
+      // Share with or without image
+      if (files.isNotEmpty) {
+        await Share.shareXFiles(
+          files,
+          text: shareText,
+          subject: '${currentRecord.activity_type} Workout - ${currentRecord.formattedDate}',
+        );
+      } else {
+        await Share.share(
+          shareText,
+          subject: '${currentRecord.activity_type} Workout - ${currentRecord.formattedDate}',
+        );
+      }
+      
+      print('✅ [SHARE] Workout shared successfully');
+    } catch (e) {
+      print('❌ [SHARE] Error sharing workout: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sharing: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  // ✅ NEW: Download route image from URL
+  Future<XFile?> _downloadRouteImage() async {
+    try {
+      final resolver = AerobicRepository();
+      final imageUrl = resolver.resolveRouteImageUrl(currentRecord.route_image);
+      
+      if (imageUrl.isEmpty) {
+        print('⚠️  [SHARE] Image URL is empty');
+        return null;
+      }
+
+      print('📥 [SHARE] Downloading image from: $imageUrl');
+      
+      // Download the image
+      final response = await http.get(Uri.parse(imageUrl)).timeout(
+        const Duration(seconds: 10),
+      );
+
+      if (response.statusCode == 200) {
+        // Get temporary directory
+        final tempDir = await getTemporaryDirectory();
+        final fileName = 'route_${currentRecord.id}_${DateTime.now().millisecondsSinceEpoch}.png';
+        final file = File('${tempDir.path}/$fileName');
+
+        // Write the image bytes to file
+        await file.writeAsBytes(response.bodyBytes);
+        print('✅ [SHARE] Image saved to: ${file.path}');
+
+        return XFile(file.path, mimeType: 'image/png');
+      } else {
+        print('❌ [SHARE] Failed to download image: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('❌ [SHARE] Error downloading image: $e');
+      return null;
+    }
+  }
+
+  // ✅ NEW: Format workout data for sharing
+  String _formatShareText() {
+    final duration = currentRecord.formattedDuration;
+    final pace = _formatPace(currentRecord.average_pace);
+    
+    return '''
+🏃 ${currentRecord.activity_type.toUpperCase()} WORKOUT
+
+📍 Location: ${currentRecord.location}
+📅 Date: ${currentRecord.formattedDate}
+
+📊 PERFORMANCE METRICS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Distance: ${currentRecord.total_distance.toStringAsFixed(2)} km
+Duration: $duration
+Average Pace: $pace
+Calories Burned: ${currentRecord.calories_burned} kcal
+Steps: ${currentRecord.total_step}
+Elevation Gain: ${currentRecord.elevation_gain} m
+
+👟 Footwear: ${currentRecord.footwear}
+⏱️ Moving Time: ${currentRecord.moving_time} seconds
+
+🕐 Start Time: ${currentRecord.start_at.hour.toString().padLeft(2, '0')}:${currentRecord.start_at.minute.toString().padLeft(2, '0')}
+🕐 End Time: ${currentRecord.end_at.hour.toString().padLeft(2, '0')}:${currentRecord.end_at.minute.toString().padLeft(2, '0')}
+
+${currentRecord.is_archived ? '🗂️ [ARCHIVED]' : '✅ [ACTIVE]'}
+    '''.trim();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final record = currentRecord;
     return Scaffold(
       backgroundColor: AppColors.black,
       body: SafeArea(
@@ -49,6 +234,56 @@ class AerobicDetailPage extends StatelessWidget {
                           color: AppColors.lavender,
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    // ✅ Archive/Unarchive Button
+                    GestureDetector(
+                      onTap: isLoading ? null : _toggleArchiveRecord,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: record.is_archived ? AppColors.lime : AppColors.lavender.withValues(alpha: 0.55),
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        alignment: Alignment.center,
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.lime),
+                                ),
+                              )
+                            : Icon(
+                                record.is_archived ? Icons.unarchive : Icons.archive,
+                                color: record.is_archived ? AppColors.lime : AppColors.lavender,
+                                size: 18,
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // ✅ NEW: Share Button
+                    GestureDetector(
+                      onTap: _shareWorkout,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: AppColors.primary,
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.share,
+                          color: AppColors.primary,
+                          size: 18,
                         ),
                       ),
                     ),
@@ -93,10 +328,10 @@ class AerobicDetailPage extends StatelessWidget {
 
   Widget _buildImageSection() {
     final resolver = AerobicRepository();
-    final resolvedImageUrl = resolver.resolveRouteImageUrl(record.route_image);
+    final resolvedImageUrl = resolver.resolveRouteImageUrl(currentRecord.route_image);
 
     if (resolvedImageUrl.isEmpty) {
-      print('⚠️  [AEROBIC-DETAIL] Image URL is empty for: ${record.route_image}');
+      print('⚠️  [AEROBIC-DETAIL] Image URL is empty for: ${currentRecord.route_image}');
     } else {
       print('✅ [AEROBIC-DETAIL] Loading image from: $resolvedImageUrl');
     }
@@ -129,7 +364,7 @@ class AerobicDetailPage extends StatelessWidget {
                   );
                 },
                 errorBuilder: (context, error, stackTrace) {
-                  print('❌ Error loading detail route image: $error | raw=${record.route_image} | resolved=$resolvedImageUrl');
+                  print('❌ Error loading detail route image: $error | raw=${currentRecord.route_image} | resolved=$resolvedImageUrl');
                   return _buildPlaceholderImage();
                 },
               ),
@@ -166,7 +401,7 @@ class AerobicDetailPage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          record.activity_type.toUpperCase(),
+          currentRecord.activity_type.toUpperCase(),
           style: const TextStyle(
             color: AppColors.lime,
             fontSize: 24,
@@ -176,7 +411,7 @@ class AerobicDetailPage extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          record.location,
+          currentRecord.location,
           style: const TextStyle(
             color: AppColors.lavender,
             fontSize: 14,
@@ -187,7 +422,7 @@ class AerobicDetailPage extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          record.formattedDate,
+          currentRecord.formattedDate,
           style: const TextStyle(
             color: AppColors.lavender,
             fontSize: 12,
@@ -202,32 +437,32 @@ class AerobicDetailPage extends StatelessWidget {
     final metrics = [
       {
         'label': 'Distance',
-        'value': '${record.total_distance.toStringAsFixed(2)} km',
+        'value': '${currentRecord.total_distance.toStringAsFixed(2)} km',
         'icon': Icons.directions_run,
       },
       {
         'label': 'Duration',
-        'value': record.formattedDuration,
+        'value': currentRecord.formattedDuration,
         'icon': Icons.timer,
       },
       {
         'label': 'Average Pace',
-        'value': _formatPace(record.average_pace),
+        'value': _formatPace(currentRecord.average_pace),
         'icon': Icons.speed,
       },
       {
         'label': 'Calories Burned',
-        'value': '${record.calories_burned} kcal',
+        'value': '${currentRecord.calories_burned} kcal',
         'icon': Icons.local_fire_department,
       },
       {
         'label': 'Steps',
-        'value': record.total_step.toString(),
+        'value': currentRecord.total_step.toString(),
         'icon': Icons.terrain,
       },
       {
         'label': 'Elevation Gain',
-        'value': '${record.elevation_gain} m',
+        'value': '${currentRecord.elevation_gain} m',
         'icon': Icons.terrain,
       },
     ];
@@ -315,18 +550,18 @@ class AerobicDetailPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _buildDetailRow('Footwear', record.footwear),
+        _buildDetailRow('Footwear', currentRecord.footwear),
         const SizedBox(height: 8),
-        _buildDetailRow('Moving Time', '${record.moving_time} seconds'),
+        _buildDetailRow('Moving Time', '${currentRecord.moving_time} seconds'),
         const SizedBox(height: 8),
         _buildDetailRow(
           'Start Time',
-          '${record.start_at.hour.toString().padLeft(2, '0')}:${record.start_at.minute.toString().padLeft(2, '0')}',
+          '${currentRecord.start_at.hour.toString().padLeft(2, '0')}:${currentRecord.start_at.minute.toString().padLeft(2, '0')}',
         ),
         const SizedBox(height: 8),
         _buildDetailRow(
           'End Time',
-          '${record.end_at.hour.toString().padLeft(2, '0')}:${record.end_at.minute.toString().padLeft(2, '0')}',
+          '${currentRecord.end_at.hour.toString().padLeft(2, '0')}:${currentRecord.end_at.minute.toString().padLeft(2, '0')}',
         ),
       ],
     );

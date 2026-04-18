@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
-import 'package:mobile_application_development/views/widgets/custom_bottom_nav_bar.dart';
 import 'package:mobile_application_development/controllers/meal_controller.dart';
 import 'package:mobile_application_development/controllers/auth_controller.dart';
 import 'package:mobile_application_development/services/nutrition_aggregation_service.dart';
@@ -200,10 +199,6 @@ class _NutritionScreenState extends State<NutritionScreen>
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: CustomBottomNavBar(
-        selectedIndex: _selectedNavIndex,
-        onTap: _onNavTapped,
       ),
     );
   }
