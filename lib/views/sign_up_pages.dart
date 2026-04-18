@@ -27,7 +27,6 @@ class _SignUpState extends State<SignUpPages> {
   final _passwordController = TextEditingController();
   final _emailController = TextEditingController();
   final _fullNameController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _dateOfBirthController = TextEditingController();
 
   int _stepIndex = 0;
@@ -38,6 +37,7 @@ class _SignUpState extends State<SignUpPages> {
   AuthController get _authController => widget.authController;
 
   @override
+  @override
   void dispose() {
     _heightController.dispose();
     _weightController.dispose();
@@ -46,7 +46,6 @@ class _SignUpState extends State<SignUpPages> {
     _passwordController.dispose();
     _emailController.dispose();
     _fullNameController.dispose();
-    _phoneController.dispose();
     _dateOfBirthController.dispose();
     super.dispose();
   }
@@ -153,7 +152,6 @@ class _SignUpState extends State<SignUpPages> {
       password: _passwordController.text,
       email: _emailController.text.trim(),
       fullName: _fullNameController.text.trim(),
-      phoneNumber: _phoneController.text.trim(),
     );
 
     final success = await _authController.signUp(profile: profile);
@@ -494,25 +492,6 @@ class _SignUpState extends State<SignUpPages> {
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
               return 'Please enter your full name';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(
-            labelText: 'Phone Number',
-            border: OutlineInputBorder(),
-          ),
-          validator: (value) {
-            final text = value?.trim() ?? '';
-            if (text.isEmpty) {
-              return 'Please enter your phone number';
-            }
-            if (text.length < 8) {
-              return 'Phone number is too short';
             }
             return null;
           },

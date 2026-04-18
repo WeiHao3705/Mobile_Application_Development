@@ -37,7 +37,6 @@ class SignUpProfileData {
     required this.password,
     required this.email,
     required this.fullName,
-    required this.phoneNumber,
     this.isAdmin = false,
   });
 
@@ -50,11 +49,10 @@ class SignUpProfileData {
   final String password;
   final String email;
   final String fullName;
-  final String phoneNumber;
   final bool isAdmin;
 
-  Map<String, dynamic> toInsertMap({bool includePhoneNumber = true}) {
-    final payload = <String, dynamic>{
+  Map<String, dynamic> toInsertMap() {
+    return <String, dynamic>{
       'gender': gender.trim(),
       'date_of_birth': dateOfBirth.toIso8601String().split('T').first,
       'height': height,
@@ -66,11 +64,5 @@ class SignUpProfileData {
       'full_name': fullName.trim(),
       'is_admin': isAdmin,
     };
-
-    if (includePhoneNumber && phoneNumber.trim().isNotEmpty) {
-      payload['phone_number'] = phoneNumber.trim();
-    }
-
-    return payload;
   }
 }

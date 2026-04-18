@@ -219,6 +219,12 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  Future<void> updateSessionUser(LoginUser updatedUser) async {
+    _currentUser = updatedUser;
+    await _sessionStorage.save(updatedUser);
+    notifyListeners();
+  }
+
   bool _isRlsInsertError(PostgrestException error) {
     final message = error.message.toLowerCase();
     return message.contains('row-level security') ||
