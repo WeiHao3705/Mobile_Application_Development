@@ -15,6 +15,25 @@ class UserRepository {
     return rows.map(AppUser.fromMap).toList();
   }
 
+  Future<AppUser?> fetchUserByEmail(String email) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) {
+      return null;
+    }
+
+    final response = await client
+        .from('User')
+        .select()
+        .ilike('email', normalizedEmail)
+        .maybeSingle();
+
+    if (response == null) {
+      return null;
+    }
+
+    return AppUser.fromMap(Map<String, dynamic>.from(response));
+  }
+
   Future<void> createUserProfile(SignUpProfileData profile) async {
     final snakeCasePayload = profile.toInsertMap();
 

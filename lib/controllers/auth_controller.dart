@@ -84,6 +84,10 @@ class AuthController extends ChangeNotifier {
 
     try {
       await _userRepository.createUserProfile(profile);
+      await _repository.ensureAuthIdentity(
+        email: profile.email,
+        password: profile.password,
+      );
 
       // Reuse login query so we always keep the same user shape as normal login.
       final signedUpUser = await _repository.login(
@@ -109,8 +113,11 @@ class AuthController extends ChangeNotifier {
         _errorMessage = 'Sign up failed: ${e.message}';
       }
       return false;
-    } catch (_) {
-      _errorMessage = 'Unable to sign up right now. Please retry.';
+    } on AuthException catch (e) {
+      _errorMessage = 'Auth error: ${e.message}';
+      return false;
+    } catch (e) {
+      _errorMessage = 'Sign up error: ${e.toString()}';
       return false;
     } finally {
       _isLoading = false;
@@ -123,6 +130,58 @@ class AuthController extends ChangeNotifier {
     _errorMessage = '';
     await _sessionStorage.clear();
     notifyListeners();
+  }
+
+  Future<AppUser?> fetchUserByEmail(String email) {
+    return _userRepository.fetchUserByEmail(email);
+  }
+
+  Future<bool> sendPasswordResetEmail({
+    required String email,
+    required String redirectTo,
+  }) async {
+    // Keep forgot-password flow isolated from page-level rebuilds.
+    _errorMessage = '';
+
+    try {
+      await _repository.sendPasswordResetEmail(
+        email: email,
+        redirectTo: redirectTo,
+      );
+      return true;
+    } on AuthException catch (e) {
+      _errorMessage = e.message;
+      return false;
+    } catch (_) {
+      _errorMessage = 'Unable to send reset email right now. Please retry.';
+      return false;
+    }
+  }
+
+  Future<bool> completePasswordReset({
+    required String newPassword,
+    String? email,
+  }) async {
+    _isLoading = true;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      await _repository.completePasswordReset(
+        newPassword: newPassword,
+        email: email,
+      );
+      return true;
+    } on AuthException catch (e) {
+      _errorMessage = e.message;
+      return false;
+    } catch (_) {
+      _errorMessage = 'Unable to reset password right now. Please retry.';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   bool _isRlsInsertError(PostgrestException error) {
