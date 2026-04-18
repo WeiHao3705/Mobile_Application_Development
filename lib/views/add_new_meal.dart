@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/food_controller.dart';
 import '../controllers/meal_controller.dart';
+import '../services/search_history_service.dart';
 import 'add_new_food.dart';
 import 'edit_food.dart';
 import 'widgets/meal_image_picker_widget.dart';
@@ -43,6 +44,11 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   // Batch deletion state
   bool _isBatchDeleteMode = false;
   final Set<int> _selectedForDeletion = {};
+  
+  // Search history
+  List<String> _searchHistory = [];
+  bool _showSearchHistory = false;
+  final SearchHistoryService _searchHistoryService = SearchHistoryService();
 
   @override
   void initState() {
@@ -54,6 +60,37 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
 
     // Auto-assign meal type based on current time
     _selectedMealType = _getDefaultMealType();
+    
+    // Load search history
+    _loadSearchHistory();
+    
+    // Listen to search field changes
+    _searchCtrl.addListener(_onSearchChanged);
+  }
+  
+  Future<void> _loadSearchHistory() async {
+    final history = await _searchHistoryService.getSearchHistory();
+    setState(() {
+      _searchHistory = history;
+    });
+  }
+  
+  void _onSearchChanged() {
+    setState(() {
+      _showSearchHistory = _searchCtrl.text.isEmpty && _searchHistory.isNotEmpty;
+    });
+  }
+  
+  Future<void> _selectSearchHistoryItem(String query) async {
+    setState(() {
+      _searchCtrl.text = query;
+      _searchQuery = query;
+      _showSearchHistory = false;
+    });
+    
+    // Save this search to history
+    await _searchHistoryService.addSearchQuery(query);
+    await _loadSearchHistory();
   }
 
   String _getDefaultMealType() {
@@ -206,6 +243,7 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
 
   @override
   void dispose() {
+    _searchCtrl.removeListener(_onSearchChanged);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -819,24 +857,93 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   // ── Search Bar ─────────────────────────────────────────────────────────────
 
   Widget _buildSearchBar() {
-    return Container(
-      height: 42,
-      decoration: BoxDecoration(
-        color: AppColors.inputBg,
-        border: Border.all(color: AppColors.lavender.withOpacity(0.3)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TextField(
-        controller: _searchCtrl,
-        onChanged: (v) => setState(() => _searchQuery = v),
-        style: const TextStyle(color: AppColors.white, fontSize: 14),
-        decoration: const InputDecoration(
-          hintText: 'Search foods or meals...',
-          hintStyle: TextStyle(color: Color(0xFF5A5A7A), fontSize: 14),
-          contentPadding: EdgeInsets.symmetric(horizontal: 14),
-          border: InputBorder.none,
+    return Column(
+      children: [
+        Container(
+          height: 42,
+          decoration: BoxDecoration(
+            color: AppColors.inputBg,
+            border: Border.all(color: AppColors.lavender.withOpacity(0.3)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (v) {
+              setState(() {
+                _searchQuery = v;
+                _showSearchHistory = v.isEmpty && _searchHistory.isNotEmpty;
+              });
+            },
+            onSubmitted: (value) async {
+              if (value.trim().isNotEmpty) {
+                await _searchHistoryService.addSearchQuery(value.trim());
+                await _loadSearchHistory();
+              }
+            },
+            style: const TextStyle(color: AppColors.white, fontSize: 14),
+            decoration: const InputDecoration(
+              hintText: 'Search foods or meals...',
+              hintStyle: TextStyle(color: Color(0xFF5A5A7A), fontSize: 14),
+              contentPadding: EdgeInsets.symmetric(horizontal: 14),
+              border: InputBorder.none,
+            ),
+          ),
         ),
-      ),
+        // Search history dropdown
+        if (_showSearchHistory && _searchHistory.isNotEmpty)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 4),
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              border: Border.all(color: AppColors.lavender.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _searchHistory.length,
+              itemBuilder: (context, index) {
+                final query = _searchHistory[index];
+                return GestureDetector(
+                  onTap: () => _selectSearchHistoryItem(query),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      border: index < _searchHistory.length - 1
+                          ? Border(bottom: BorderSide(color: AppColors.lavender.withOpacity(0.15)))
+                          : null,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.history, size: 14, color: AppColors.lavender),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            query,
+                            style: const TextStyle(
+                              color: AppColors.lavender,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () async {
+                            await _searchHistoryService.removeSearchQuery(query);
+                            await _loadSearchHistory();
+                          },
+                          child: const Icon(Icons.close, size: 14, color: AppColors.slateGray),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 
