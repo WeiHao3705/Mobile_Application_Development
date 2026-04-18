@@ -98,7 +98,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       gmailInboxUri,
       mode: LaunchMode.externalApplication,
     );
-
+//
     if (!openedGmailWeb && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
