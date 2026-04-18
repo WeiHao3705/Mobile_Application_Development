@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
+import 'package:mobile_application_development/services/notification_service.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -20,10 +22,17 @@ import 'views/sign_up_pages.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: supabaseUrl,
-    anonKey: supabaseAnonKey,
-  );
+  try {
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseAnonKey,
+    );
+
+    await NotificationService.init();
+    await NotificationService.scheduleDailyNotifications();
+  } catch (e, stackTrace) {
+    developer.log('Error during initialization: $e\nStack trace: $stackTrace');
+  }
 
   runApp(const MyApp());
 }
