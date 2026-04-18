@@ -12,6 +12,7 @@ import '../services/image_picker_service.dart';
 import '../services/image_upload_service.dart';
 import '../services/user_session_service.dart';
 import '../views/dialogs/edit_daily_goals_dialog.dart';
+import '../views/edit_profile_page.dart';
 import 'login_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -691,7 +692,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   _OptionItem(
                     title: 'Edit Profile',
                     icon: Icons.edit,
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => EditProfilePage(
+                            authController: widget.authController,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   _OptionItem(
                     title: 'Notifications',
