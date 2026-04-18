@@ -105,19 +105,76 @@ class AuthRepository {
     );
   }
 
-  Future<void> completePasswordReset({required String newPassword}) async {
-    final email = client.auth.currentUser?.email?.trim();
-    if (email == null || email.isEmpty) {
-      throw AuthException('Recovery session is missing. Please open the reset link again.');
+  Future<void> completePasswordReset({
+    required String newPassword,
+    String? email,
+  }) async {
+    final resolvedEmail = _normalizeEmail(
+      email ?? client.auth.currentUser?.email ?? '',
+    );
+    if (resolvedEmail.isEmpty) {
+      throw AuthException(
+        'Recovery session is missing. Please open the reset link again.',
+      );
+    }
+
+    final profileRow = await client
+        .from('User')
+        .select('user_id, username, email')
+        .ilike('email', resolvedEmail)
+        .maybeSingle();
+
+    if (profileRow == null) {
+      throw AuthException(
+        'No matching account was found for this recovery email.',
+      );
     }
 
     final trimmedPassword = newPassword.trim();
     final hashedPassword = PasswordHasher.hash(trimmedPassword);
+    final row = Map<String, dynamic>.from(profileRow);
+    final userId = row['user_id'];
 
-    await client.auth.updateUser(UserAttributes(password: trimmedPassword));
-    await client
-        .from('User')
-        .update({'password': hashedPassword})
-        .eq('email', email);
+    await _updateAuthPasswordAllowSame(trimmedPassword);
+
+    try {
+      await client
+          .from('User')
+          .update({'password': hashedPassword})
+          .eq('email', resolvedEmail);
+      return;
+    } on PostgrestException {
+      if (userId != null) {
+        await client
+            .from('User')
+            .update({'password': hashedPassword})
+            .eq('user_id', userId);
+        return;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _updateAuthPasswordAllowSame(String password) async {
+    try {
+      await client.auth.updateUser(UserAttributes(password: password));
+    } on AuthException catch (error) {
+      if (_isSamePasswordError(error)) {
+        return;
+      }
+      rethrow;
+    }
+  }
+
+  bool _isSamePasswordError(AuthException error) {
+    final message = error.message.toLowerCase();
+    return message.contains('same as the old password') ||
+        message.contains('same as the current password') ||
+        message.contains('must be different from the old password') ||
+        message.contains('new password should be different');
+  }
+
+  String _normalizeEmail(String email) {
+    return email.trim().toLowerCase();
   }
 }

@@ -132,6 +132,10 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<AppUser?> fetchUserByEmail(String email) {
+    return _userRepository.fetchUserByEmail(email);
+  }
+
   Future<bool> sendPasswordResetEmail({
     required String email,
     required String redirectTo,
@@ -154,13 +158,19 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  Future<bool> completePasswordReset({required String newPassword}) async {
+  Future<bool> completePasswordReset({
+    required String newPassword,
+    String? email,
+  }) async {
     _isLoading = true;
     _errorMessage = '';
     notifyListeners();
 
     try {
-      await _repository.completePasswordReset(newPassword: newPassword);
+      await _repository.completePasswordReset(
+        newPassword: newPassword,
+        email: email,
+      );
       return true;
     } on AuthException catch (e) {
       _errorMessage = e.message;

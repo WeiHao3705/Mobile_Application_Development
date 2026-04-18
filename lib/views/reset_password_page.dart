@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../controllers/auth_controller.dart';
+import '../models/app_user.dart';
 import 'login_page.dart';
 
 class ResetPasswordPage extends StatefulWidget {
@@ -19,7 +20,18 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  AppUser? _recoveredAccount;
+  String? _recoveryEmail;
+  String? _accountError;
+  bool _isLoadingAccount = true;
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecoveredAccount();
+  }
 
   @override
   void dispose() {
@@ -28,9 +40,75 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     super.dispose();
   }
 
+  String? _readText(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? null : text;
+  }
+
+  String get _displayAccountLabel {
+    final username = _readText(_recoveredAccount?.data['username']);
+    if (username != null) {
+      return username;
+    }
+
+    return _recoveryEmail ?? 'your account';
+  }
+
+  Future<void> _loadRecoveredAccount() async {
+    final auth = Supabase.instance.client.auth;
+    final email = _readText(auth.currentUser?.email ?? auth.currentSession?.user.email);
+
+    if (!mounted) {
+      return;
+    }
+
+    if (email == null) {
+      setState(() {
+        _isLoadingAccount = false;
+        _accountError = 'Recovery session is missing. Please open the reset link again.';
+      });
+      return;
+    }
+
+    try {
+      final account = await widget.authController.fetchUserByEmail(email);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _recoveryEmail = email;
+        _recoveredAccount = account;
+        _isLoadingAccount = false;
+        _accountError = account == null
+            ? 'We could not match this reset link to a saved profile. Please request a new reset link.'
+            : null;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _recoveryEmail = email;
+        _isLoadingAccount = false;
+        _accountError = 'Unable to load the account details right now. Please retry.';
+      });
+    }
+  }
+
   Future<void> _submit() async {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) {
+      return;
+    }
+
+    if (_isLoadingAccount || _accountError != null || _recoveryEmail == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_accountError ?? 'Recovery session is still loading. Please wait.'),
+        ),
+      );
       return;
     }
 
@@ -40,6 +118,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
     final success = await widget.authController.completePasswordReset(
       newPassword: _passwordController.text,
+      email: _recoveryEmail,
     );
 
     if (!mounted) {
@@ -54,7 +133,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       SnackBar(
         content: Text(
           success
-              ? 'Password updated successfully.'
+              ? 'Password updated successfully for $_displayAccountLabel.'
               : widget.authController.errorMessage,
         ),
       ),
@@ -80,6 +159,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final accountName = _displayAccountLabel;
 
     return Scaffold(
       appBar: AppBar(
@@ -110,10 +190,52 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        if (_isLoadingAccount) ...[
+                          Row(
+                            children: [
+                              SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Text('Loading account details...'),
+                              ),
+                            ],
+                          ),
+                        ] else ...[
+                          Text(
+                            'You are changing the password for $accountName.',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                          if (_recoveryEmail != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              _recoveryEmail!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
+                        if (_accountError != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            _accountError!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.error,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         TextFormField(
                           controller: _passwordController,
-                          enabled: !_isSubmitting,
+                          enabled: !_isSubmitting && !_isLoadingAccount && _accountError == null,
                           obscureText: true,
                           decoration: const InputDecoration(
                             labelText: 'New Password',
@@ -132,7 +254,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: _confirmPasswordController,
-                          enabled: !_isSubmitting,
+                          enabled: !_isSubmitting && !_isLoadingAccount && _accountError == null,
                           obscureText: true,
                           decoration: const InputDecoration(
                             labelText: 'Confirm Password',
@@ -150,7 +272,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         ),
                         const SizedBox(height: 20),
                         ElevatedButton(
-                          onPressed: _isSubmitting ? null : _submit,
+                          onPressed: (_isSubmitting || _isLoadingAccount || _accountError != null)
+                              ? null
+                              : _submit,
                           child: _isSubmitting
                               ? SizedBox(
                                   height: 18,

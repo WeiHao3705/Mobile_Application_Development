@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../config/supabase_config.dart';
 import '../controllers/auth_controller.dart';
+import '../models/app_user.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   static const routeName = '/forgot-password';
@@ -30,6 +31,16 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     return email.contains('@') && email.contains('.');
   }
 
+  String? _readText(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? null : text;
+  }
+
+  String _displayAccountLabel(AppUser? account, String fallbackEmail) {
+    final username = _readText(account?.data['username']);
+    return username ?? fallbackEmail;
+  }
+
   Future<void> _sendResetLink() async {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) {
@@ -41,28 +52,41 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       _isSending = true;
     });
 
-    final success = await widget.authController.sendPasswordResetEmail(
-      email: _emailController.text.trim(),
-      redirectTo: passwordResetRedirectUrl,
-    );
+    final email = _emailController.text.trim();
+    AppUser? account;
+    String message = 'Unable to send reset email right now.';
+
+    try {
+      account = await widget.authController.fetchUserByEmail(email);
+      final success = await widget.authController.sendPasswordResetEmail(
+        email: email,
+        redirectTo: passwordResetRedirectUrl,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      message = success
+          ? 'Reset link sent for ${_displayAccountLabel(account, email)}. Check your email inbox.'
+          : widget.authController.errorMessage;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
+    }
 
     if (!mounted) {
       return;
     }
 
-    setState(() {
-      _isSending = false;
-    });
-
-    final message = success
-        ? 'Reset link sent. Check your email inbox.'
-        : widget.authController.errorMessage;
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
 
-    if (success) {
+    if (message.startsWith('Reset link sent')) {
       Navigator.of(context).pop();
     }
   }
