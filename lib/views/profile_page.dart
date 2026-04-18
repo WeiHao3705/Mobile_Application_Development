@@ -1,10 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../controllers/auth_controller.dart';
 import '../models/auth_user.dart';
 import '../models/daily_goals.dart';
 import '../repository/daily_goals_repository.dart';
+import '../services/image_picker_service.dart';
+import '../services/image_upload_service.dart';
 import '../services/user_session_service.dart';
 import '../views/dialogs/edit_daily_goals_dialog.dart';
 import 'login_page.dart';
@@ -21,8 +26,11 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   late DailyGoalsRepository _dailyGoalsRepository;
   final SimpleSessionService _sessionService = SimpleSessionService();
+  final ImagePickerService _imagePickerService = ImagePickerService();
+  final ImageUploadService _imageUploadService = ImageUploadService();
   DailyGoals? _dailyGoals;
   bool _isLoadingGoals = false;
+  bool _isUploadingProfilePhoto = false;
 
   @override
   void initState() {
@@ -111,6 +119,243 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  int? _toUserId(dynamic id) {
+    if (id is int) {
+      return id;
+    }
+    return int.tryParse((id ?? '').toString());
+  }
+
+  Future<bool> _ensurePhotoPermission() async {
+    PermissionStatus status;
+    if (Platform.isIOS) {
+      status = await Permission.photos.request();
+    } else if (Platform.isAndroid) {
+      status = await Permission.photos.request();
+      if (!status.isGranted && !status.isLimited) {
+        status = await Permission.storage.request();
+      }
+    } else {
+      return true;
+    }
+
+    if (status.isGranted || status.isLimited) {
+      return true;
+    }
+
+    if (!mounted) {
+      return false;
+    }
+
+    if (status.isPermanentlyDenied || status.isRestricted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Photo permission is blocked. Open app settings to allow access.'),
+          action: SnackBarAction(
+            label: 'Settings',
+            onPressed: openAppSettings,
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Photo permission is required to upload a profile picture.')),
+      );
+    }
+
+    return false;
+  }
+
+  Future<void> _pickAndUploadProfilePhoto() async {
+    if (_isUploadingProfilePhoto) {
+      return;
+    }
+
+    final hasPermission = await _ensurePhotoPermission();
+    if (!hasPermission) {
+      return;
+    }
+
+    final userId = _toUserId(widget.authController.currentUser?.id);
+    if (userId == null || userId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to identify this account. Please login again.')),
+      );
+      return;
+    }
+
+    try {
+      final pickedFile = await _imagePickerService.pickImageFromGallery();
+      if (pickedFile == null) {
+        return;
+      }
+
+      if (!ImagePickerService.validateImageFile(file: pickedFile)) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid image. Use JPG/PNG/WEBP/GIF under 10MB.'),
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isUploadingProfilePhoto = true;
+      });
+
+      final photoPath = await _imageUploadService.uploadProfileImage(
+        imageFile: pickedFile,
+        userId: userId,
+      );
+
+      final saved = await widget.authController.updateProfilePhoto(
+        userId: userId,
+        profilePhotoPath: photoPath,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            saved
+                ? 'Profile photo updated successfully.'
+                : widget.authController.errorMessage,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to upload profile photo: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingProfilePhoto = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _showAvatarActions() async {
+    if (_isUploadingProfilePhoto) {
+      return;
+    }
+
+    final user = widget.authController.currentUser;
+    final storedPath = user?.profilePhotoUrl?.trim() ?? '';
+    final hasPhoto = storedPath.isNotEmpty;
+
+    final selectedAction = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image_outlined),
+                title: const Text('View profile photo'),
+                enabled: hasPhoto,
+                onTap: () => Navigator.of(context).pop('view'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('Change profile photo'),
+                onTap: () => Navigator.of(context).pop('change'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selectedAction == null) {
+      return;
+    }
+
+    if (selectedAction == 'view') {
+      if (!hasPhoto) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No profile photo yet.')),
+        );
+        return;
+      }
+      _showProfilePhotoPreview(storedPath);
+      return;
+    }
+
+    if (selectedAction == 'change') {
+      await _pickAndUploadProfilePhoto();
+    }
+  }
+
+  Future<void> _showProfilePhotoPreview(String storedPath) async {
+    final imageUrl = _imageUploadService.resolveProfilePhotoUrl(storedPath);
+    if (imageUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No profile photo available.')),
+      );
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: const EdgeInsets.all(12),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 4,
+                  child: Center(
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) {
+                        return const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'Unable to load profile photo.',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   String _displayName(LoginUser? user) {
     return user?.fullName ?? user?.username ?? 'User';
   }
@@ -137,6 +382,43 @@ class _ProfilePageState extends State<ProfilePage> {
     final heightM = heightCm / 100;
     final bmi = weightKg / (heightM * heightM);
     return bmi.toStringAsFixed(1);
+  }
+
+  Widget _buildAvatar(LoginUser? user, ThemeData theme) {
+    final storedPath = user?.profilePhotoUrl?.trim() ?? '';
+    final photoUrl = _imageUploadService.resolveProfilePhotoUrl(storedPath);
+
+    if (photoUrl.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          photoUrl,
+          width: 100,
+          height: 100,
+          fit: BoxFit.cover,
+          errorBuilder: (_, error, stackTrace) {
+            return CircleAvatar(
+              radius: 50,
+              backgroundColor: theme.colorScheme.secondary,
+              child: Icon(
+                Icons.person,
+                size: 50,
+                color: theme.colorScheme.onSecondary,
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 50,
+      backgroundColor: theme.colorScheme.secondary,
+      child: Icon(
+        Icons.person,
+        size: 50,
+        color: theme.colorScheme.onSecondary,
+      ),
+    );
   }
 
   @override
@@ -171,14 +453,36 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Column(
                 children: [
                   const SizedBox(height: 20),
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: theme.colorScheme.secondary,
-                    child: Icon(
-                      Icons.person,
-                      size: 50,
-                      color: theme.colorScheme.onSecondary,
-                    ),
+                  Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      GestureDetector(
+                        onTap: _isUploadingProfilePhoto ? null : _showAvatarActions,
+                        child: _buildAvatar(user, theme),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: theme.colorScheme.surface, width: 2),
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        child: _isUploadingProfilePhoto
+                            ? SizedBox(
+                                height: 14,
+                                width: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.colorScheme.onPrimary,
+                                ),
+                              )
+                            : Icon(
+                                Icons.camera_alt,
+                                size: 14,
+                                color: theme.colorScheme.onPrimary,
+                              ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   Text(

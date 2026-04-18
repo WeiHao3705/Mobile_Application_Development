@@ -9,7 +9,7 @@ class AuthRepository {
   final SupabaseClient? _client;
 
   static const String _loginSelectFields =
-      'user_id, username, full_name, email, height, current_weight, target_weight, is_admin, password';
+      'user_id, username, full_name, email, height, current_weight, target_weight, is_admin, password, profile_photo';
 
   SupabaseClient get client => _client ?? Supabase.instance.client;
 
@@ -42,6 +42,12 @@ class AuthRepository {
       return null;
     }
 
+    // Establish Supabase Auth session so RLS-protected updates are allowed.
+    await _ensureAuthSession(
+      email: row['email']?.toString(),
+      password: normalizedPassword,
+    );
+
     if (storedPassword.isNotEmpty && storedPassword != hashedPassword) {
       await _upgradePasswordHash(
         userId: row['user_id'],
@@ -50,6 +56,49 @@ class AuthRepository {
     }
 
     return LoginUser.fromMap(row);
+  }
+
+  Future<void> _ensureAuthSession({
+    required String? email,
+    required String password,
+  }) async {
+    final normalizedEmail = email?.trim() ?? '';
+    if (normalizedEmail.isEmpty) {
+      return;
+    }
+
+    try {
+      await client.auth.signInWithPassword(
+        email: normalizedEmail,
+        password: password,
+      );
+      return;
+    } on AuthException catch (error) {
+      final message = error.message.toLowerCase();
+      final shouldTryCreate = message.contains('invalid login credentials') ||
+          message.contains('email not confirmed') ||
+          message.contains('user not found') ||
+          message.contains('invalid credentials');
+
+      if (!shouldTryCreate) {
+        return;
+      }
+    } catch (_) {
+      return;
+    }
+
+    try {
+      await ensureAuthIdentity(
+        email: normalizedEmail,
+        password: password,
+      );
+      await client.auth.signInWithPassword(
+        email: normalizedEmail,
+        password: password,
+      );
+    } catch (_) {
+      // Keep app login compatible even if auth session cannot be established.
+    }
   }
 
   bool _passwordMatches({
@@ -176,5 +225,67 @@ class AuthRepository {
 
   String _normalizeEmail(String email) {
     return email.trim().toLowerCase();
+  }
+
+  Future<void> updateProfilePhoto({
+    required int userId,
+    required String profilePhotoPath,
+    String? email,
+  }) async {
+    final normalizedPath = profilePhotoPath.trim();
+    if (normalizedPath.isEmpty) {
+      throw AuthException('Profile photo path cannot be empty.');
+    }
+
+    final updatedById = await _updateProfilePhotoByUserId(
+      userId: userId,
+      profilePhotoPath: normalizedPath,
+    );
+    if (updatedById) {
+      return;
+    }
+
+    final normalizedEmail = email?.trim().toLowerCase() ?? '';
+    if (normalizedEmail.isNotEmpty) {
+      final updatedByEmail = await _updateProfilePhotoByEmail(
+        email: normalizedEmail,
+        profilePhotoPath: normalizedPath,
+      );
+      if (updatedByEmail) {
+        return;
+      }
+    }
+
+    throw AuthException(
+      'Profile photo uploaded, but no user row was updated. Check RLS UPDATE policy for table "User".',
+    );
+  }
+
+  Future<bool> _updateProfilePhotoByUserId({
+    required int userId,
+    required String profilePhotoPath,
+  }) async {
+    final response = await client
+        .from('User')
+        .update({'profile_photo': profilePhotoPath})
+        .eq('user_id', userId)
+        .select('user_id');
+
+    final rows = List<Map<String, dynamic>>.from(response as List);
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _updateProfilePhotoByEmail({
+    required String email,
+    required String profilePhotoPath,
+  }) async {
+    final response = await client
+        .from('User')
+        .update({'profile_photo': profilePhotoPath})
+        .ilike('email', email)
+        .select('user_id');
+
+    final rows = List<Map<String, dynamic>>.from(response as List);
+    return rows.isNotEmpty;
   }
 }

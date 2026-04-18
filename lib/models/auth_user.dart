@@ -8,6 +8,7 @@ class LoginUser {
     required this.currentWeight,
     required this.targetWeight,
     required this.isAdmin,
+    required this.profilePhotoUrl,
   });
 
   final dynamic id;
@@ -18,6 +19,7 @@ class LoginUser {
   final num? currentWeight;
   final num? targetWeight;
   final bool isAdmin;
+  final String? profilePhotoUrl;
 
   factory LoginUser.fromMap(Map<String, dynamic> map) {
     return LoginUser(
@@ -29,6 +31,33 @@ class LoginUser {
       currentWeight: _toNullableNum(map['current_weight'] ?? map['currentWeight']),
       targetWeight: _toNullableNum(map['target_weight'] ?? map['targetWeight']),
       isAdmin: _toBool(map['is_admin'] ?? map['isAdmin']),
+      profilePhotoUrl: _toNullableString(
+        map['profile_photo'] ?? map['profilePhotoUrl'],
+      ),
+    );
+  }
+
+  LoginUser copyWith({
+    dynamic id,
+    String? username,
+    String? fullName,
+    String? email,
+    num? height,
+    num? currentWeight,
+    num? targetWeight,
+    bool? isAdmin,
+    String? profilePhotoUrl,
+  }) {
+    return LoginUser(
+      id: id ?? this.id,
+      username: username ?? this.username,
+      fullName: fullName ?? this.fullName,
+      email: email ?? this.email,
+      height: height ?? this.height,
+      currentWeight: currentWeight ?? this.currentWeight,
+      targetWeight: targetWeight ?? this.targetWeight,
+      isAdmin: isAdmin ?? this.isAdmin,
+      profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
     );
   }
 
@@ -42,6 +71,7 @@ class LoginUser {
       'currentWeight': currentWeight,
       'targetWeight': targetWeight,
       'isAdmin': isAdmin,
+      'profilePhotoUrl': profilePhotoUrl,
     };
   }
 
@@ -76,4 +106,3 @@ class LoginUser {
     return text == 'true' || text == '1' || text == 't';
   }
 }
-

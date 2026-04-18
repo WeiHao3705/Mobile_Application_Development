@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:async';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mobile_application_development/config/supabase_config.dart';
 import 'dart:developer' as developer;
 
@@ -16,9 +15,8 @@ class _StorageHttpException implements Exception {
 
 class ImageUploadService {
   static const String _imageBucketId = 'meal_photo';
+  static const String _profileBucketId = 'profile_photo';
   static const int _maxUploadAttempts = 3;
-
-  SupabaseClient get _supabaseClient => Supabase.instance.client;
 
   String _buildObjectPath(File file) {
     final rawName = file.path.split(Platform.pathSeparator).last;
@@ -37,6 +35,7 @@ class ImageUploadService {
   }
 
   Future<void> _uploadViaRest({
+    required String bucketId,
     required String objectPath,
     required File file,
     required String contentType,
@@ -45,7 +44,7 @@ class ImageUploadService {
         .split('/')
         .map(Uri.encodeComponent)
         .join('/');
-    final uri = Uri.parse('$supabaseUrl/storage/v1/object/$_imageBucketId/$encodedPath');
+    final uri = Uri.parse('$supabaseUrl/storage/v1/object/$bucketId/$encodedPath');
     final client = HttpClient();
 
     try {
@@ -67,6 +66,141 @@ class ImageUploadService {
     } finally {
       client.close(force: true);
     }
+  }
+
+  /// Resolve a value stored in `User.profile_photo` into a display URL.
+  /// Supports both full URL values and raw storage object paths.
+  String resolveProfilePhotoUrl(String storedValue) {
+    final normalized = storedValue.trim();
+    if (normalized.isEmpty) {
+      return '';
+    }
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      return normalized;
+    }
+    return '$supabaseUrl/storage/v1/object/public/$_profileBucketId/$normalized';
+  }
+
+  /// Upload profile photo and return the object path to store in DB.
+  Future<String> uploadProfileImage({
+    required File imageFile,
+    required int userId,
+  }) async {
+    try {
+      developer.log('🔵 ImageUploadService.uploadProfileImage START');
+      developer.log('📤 Uploading profile photo from: ${imageFile.path}');
+      developer.log('👤 User ID: $userId');
+
+      if (!imageFile.existsSync()) {
+        throw Exception('❌ File does not exist: ${imageFile.path}');
+      }
+
+      if (userId <= 0) {
+        throw Exception('❌ INVALID USER ID: User ID must be greater than 0');
+      }
+
+      final imageBytes = await imageFile.readAsBytes();
+      if (imageBytes.isEmpty) {
+        throw Exception('❌ Image file is empty');
+      }
+
+      final objectPath = await _uploadImageAndGetPath(
+        file: imageFile,
+        bucketId: _profileBucketId,
+        pathPrefix: 'profiles/$userId',
+      );
+      developer.log('🗂️ Stored object path: $objectPath');
+      return objectPath;
+    } on _StorageHttpException catch (e) {
+      developer.log('❌ StorageException: HTTP ${e.statusCode}');
+      developer.log('❌ Response: ${e.body}');
+      if (e.statusCode == 404) {
+        developer.log('⚠️  404 Error - Bucket may not exist or not PUBLIC');
+        developer.log('⚠️  Check: Storage → profile_photo → Make it public');
+      } else if (e.statusCode == 401 || e.statusCode == 403) {
+        developer.log('⚠️  Permission Error - Check Storage policies');
+      }
+      rethrow;
+    }
+  }
+
+  Future<String> _uploadImageAndGetPath({
+    required File file,
+    required String bucketId,
+    required String pathPrefix,
+  }) async {
+    final fileName = _buildObjectPath(file).split('/').last;
+    final objectPath = '$pathPrefix/$fileName';
+    final contentType = _detectContentType(file.path);
+
+    Object? lastTransientError;
+
+    for (var attempt = 1; attempt <= _maxUploadAttempts; attempt++) {
+      try {
+        developer.log('⏳ Upload attempt $attempt/$_maxUploadAttempts...');
+        await _uploadViaRest(
+          bucketId: bucketId,
+          objectPath: objectPath,
+          file: file,
+          contentType: contentType,
+        );
+
+        final url = '$supabaseUrl/storage/v1/object/public/$bucketId/$objectPath';
+        developer.log('✅ Upload response: $objectPath');
+        developer.log('🔗 Public URL: $url');
+        developer.log('✅ Image uploaded successfully');
+        return objectPath;
+      } on _StorageHttpException catch (error) {
+        final code = error.statusCode;
+        if (code == 404) {
+          developer.log('⚠️  404 Error on attempt $attempt - bucket issue');
+          break;
+        }
+        developer.log('⚠️  HTTP $code on attempt $attempt');
+        rethrow;
+      } on SocketException catch (error) {
+        lastTransientError = error;
+        developer.log('⚠️  Network error on attempt $attempt: $error');
+      } on TimeoutException catch (error) {
+        lastTransientError = error;
+        developer.log('⚠️  Timeout on attempt $attempt');
+      } catch (error) {
+        if (error.toString().contains('ClientException') && error.toString().contains('Connection')) {
+          lastTransientError = error;
+          developer.log('⚠️  Connection error on attempt $attempt');
+        } else {
+          rethrow;
+        }
+      }
+
+      if (attempt < _maxUploadAttempts) {
+        await Future<void>.delayed(Duration(milliseconds: 400 * attempt));
+      }
+    }
+
+    if (lastTransientError != null) {
+      developer.log('❌ All attempts failed with network error');
+      throw lastTransientError;
+    }
+
+    developer.log('❌ Bucket not found or not accessible');
+    throw Exception(
+      'Bucket "$bucketId" not found or not accessible (404). '
+      'Make sure bucket is PUBLIC in Supabase Storage settings.',
+    );
+  }
+
+  Future<String> _uploadImageAndGetUrl({
+    required File file,
+    required String bucketId,
+    required String pathPrefix,
+  }) async {
+    final objectPath = await _uploadImageAndGetPath(
+      file: file,
+      bucketId: bucketId,
+      pathPrefix: pathPrefix,
+    );
+    return '$supabaseUrl/storage/v1/object/public/$bucketId/$objectPath';
   }
 
   /// Upload image file to Supabase Storage (meal_photo bucket)
@@ -97,7 +231,11 @@ class ImageUploadService {
         throw Exception('❌ Image file is empty');
       }
 
-      return await _uploadImageAndGetUrl(imageFile);
+      return await _uploadImageAndGetUrl(
+        file: imageFile,
+        bucketId: _imageBucketId,
+        pathPrefix: 'meals',
+      );
     } on _StorageHttpException catch (e) {
       developer.log('❌ StorageException: HTTP ${e.statusCode}');
       developer.log('❌ Response: ${e.body}');
@@ -141,7 +279,11 @@ class ImageUploadService {
       await tempFile.writeAsBytes(imageBytes);
 
       try {
-        return await _uploadImageAndGetUrl(tempFile);
+        return await _uploadImageAndGetUrl(
+          file: tempFile,
+          bucketId: _imageBucketId,
+          pathPrefix: 'meals',
+        );
       } finally {
         if (await tempFile.exists()) {
           await tempFile.delete();
@@ -156,71 +298,4 @@ class ImageUploadService {
       rethrow;
     }
   }
-
-  Future<String> _uploadImageAndGetUrl(File file) async {
-    final objectPath = _buildObjectPath(file);
-    final contentType = _detectContentType(file.path);
-
-    Object? lastTransientError;
-
-    for (var attempt = 1; attempt <= _maxUploadAttempts; attempt++) {
-      try {
-        developer.log('⏳ Upload attempt $attempt/$_maxUploadAttempts...');
-        await _uploadViaRest(
-          objectPath: objectPath,
-          file: file,
-          contentType: contentType,
-        );
-        
-        // Manually construct the public URL to ensure correct format
-        // Format: https://{project}.supabase.co/storage/v1/object/public/{bucket}/{path}
-        final url = '$supabaseUrl/storage/v1/object/public/$_imageBucketId/$objectPath';
-        
-        developer.log('✅ Upload response: $objectPath');
-        developer.log('🔗 Public URL: $url');
-        developer.log('✅ Image uploaded successfully');
-        return url;
-      } on _StorageHttpException catch (error) {
-        final code = error.statusCode;
-        if (code == 404) {
-          developer.log('⚠️  404 Error on attempt $attempt - bucket issue');
-          break;
-        }
-        developer.log('⚠️  HTTP $code on attempt $attempt');
-        rethrow;
-      } on SocketException catch (error) {
-        lastTransientError = error;
-        developer.log('⚠️  Network error on attempt $attempt: $error');
-      } on TimeoutException catch (error) {
-        lastTransientError = error;
-        developer.log('⚠️  Timeout on attempt $attempt');
-      } catch (error) {
-        if (error.toString().contains('ClientException') && error.toString().contains('Connection')) {
-          lastTransientError = error;
-          developer.log('⚠️  Connection error on attempt $attempt');
-        } else {
-          rethrow;
-        }
-      }
-
-      if (attempt < _maxUploadAttempts) {
-        await Future<void>.delayed(Duration(milliseconds: 400 * attempt));
-      }
-    }
-
-    if (lastTransientError != null) {
-      developer.log('❌ All attempts failed with network error');
-      throw lastTransientError;
-    }
-
-    developer.log('❌ Bucket not found or not accessible');
-    throw Exception(
-      'Bucket "$_imageBucketId" not found or not accessible (404). '
-      'Make sure bucket is PUBLIC in Supabase Storage settings.',
-    );
-  }
 }
-
-
-
-

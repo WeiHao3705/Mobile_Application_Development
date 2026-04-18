@@ -184,6 +184,41 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateProfilePhoto({
+    required int userId,
+    required String profilePhotoPath,
+  }) async {
+    _errorMessage = '';
+
+    try {
+      await _repository.updateProfilePhoto(
+        userId: userId,
+        profilePhotoPath: profilePhotoPath,
+        email: _currentUser?.email,
+      );
+
+      final current = _currentUser;
+      if (current != null) {
+        _currentUser = current.copyWith(profilePhotoUrl: profilePhotoPath);
+        await _sessionStorage.save(_currentUser!);
+        notifyListeners();
+      }
+      return true;
+    } on PostgrestException catch (e) {
+      _errorMessage = 'Failed to save profile photo: ${e.message}';
+      notifyListeners();
+      return false;
+    } on AuthException catch (e) {
+      _errorMessage = e.message;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _errorMessage = 'Unable to update profile photo right now. Please retry.';
+      notifyListeners();
+      return false;
+    }
+  }
+
   bool _isRlsInsertError(PostgrestException error) {
     final message = error.message.toLowerCase();
     return message.contains('row-level security') ||
