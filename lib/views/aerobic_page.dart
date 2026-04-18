@@ -20,10 +20,11 @@ class AerobicPage extends StatefulWidget{
 }
 
 class _AerobicPageState extends State<AerobicPage> {
+
+  bool _showArchived = false;
+
   @override
   Widget build(BuildContext context) {
-
-    final String userId;
 
     return Scaffold(
       backgroundColor: AppColors.black,
@@ -35,9 +36,20 @@ class _AerobicPageState extends State<AerobicPage> {
             children: [
               const _Header(),
               const SizedBox(height: 20),
-              const _TabSection(),
+              _TabSection(
+                isArchivePage: _showArchived,
+                onTapChanged: (bool isArchived) {
+                  setState(() {
+                    _showArchived = isArchived;
+                  });
+                }
+              ),
               const SizedBox(height: 20),
-              _AerobicRecord(userId: widget.userId),
+              // ✅ Show different widget based on tab selection
+              if (!_showArchived)
+                _PreviousRecordsWidget(userId: widget.userId)
+              else
+                _ArchivedRecordsWidget(userId: widget.userId),
             ],
           ),
         ),
@@ -91,64 +103,81 @@ class _Header extends StatelessWidget{
 }
 
 class _TabSection extends StatelessWidget {
-  const _TabSection();
+
+  final bool isArchivePage;
+  final ValueChanged<bool> onTapChanged;
+
+  const _TabSection({required this.isArchivePage, required this.onTapChanged});
 
   @override
   Widget build(BuildContext context){
     return Row(
-        children: [
-          Expanded(child:
-          Container(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => onTapChanged(false),
+            child: Container(
             height: 34,
             decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(17),
+            color: !isArchivePage ? AppColors.white : AppColors.lavender.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(
+              color: !isArchivePage ? AppColors.white : AppColors.lavender.withValues(alpha: 0.5),
+            ),
             ),
             alignment: Alignment.center,
-            child: const Text(
-              'MonthlySnapshot',
-              style: TextStyle(
-                color: AppColors.purple,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
-            ),
-          )
+            child: Text('MonthlySnapshot',
+            style: TextStyle(
+            color: !isArchivePage ? AppColors.purple : AppColors.lavender,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
           ),
-          const SizedBox(width: 6),
-          Expanded(child:
-          Container(
-            height: 34,
-            decoration: BoxDecoration(
-              color: AppColors.lime,
-              borderRadius: BorderRadius.circular(17),
+        ),
+      )
+    )
+      ),
+      const SizedBox(width: 6),
+
+      Expanded(
+        child: GestureDetector(
+        onTap: () => onTapChanged(true),
+        child: Container(
+          height: 34,
+          decoration: BoxDecoration(
+            color: isArchivePage ? AppColors.lime : AppColors.lavender.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(
+              color: isArchivePage ? AppColors.lime : AppColors.lavender.withValues(alpha: 0.5),
             ),
-            alignment: Alignment.center,
-            child: const Text(
-              'Share All',
-              style: TextStyle(
-                color: AppColors.nearBlack,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            'Archived',
+            style: TextStyle(
+              color: isArchivePage ? AppColors.nearBlack : AppColors.lavender,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
             ),
-          )
-          )
-        ]
+          ),
+        )
+      ),
+
+        )
+      ]
     );
   }
 }
 
-class _AerobicRecord extends StatefulWidget{
+class _PreviousRecordsWidget extends StatefulWidget{
   final int userId;
 
-  const _AerobicRecord({required this.userId});
+  const _PreviousRecordsWidget({required this.userId});
 
   @override
-  State<_AerobicRecord> createState() => _AerobicRecordState();
+  State<_PreviousRecordsWidget> createState() => _PreviousRecordsWidgetState();
 }
 
-class _AerobicRecordState extends State<_AerobicRecord> {
+class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
   final AerobicRepository _repository = AerobicRepository();
   late Future<List<Aerobic>> _recordsFuture;
   DateTime? _selectedFilterDate;
@@ -215,6 +244,7 @@ class _AerobicRecordState extends State<_AerobicRecord> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ✅ Always show button for Previous Records
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10.0),
           child: SizedBox(
@@ -256,6 +286,7 @@ class _AerobicRecordState extends State<_AerobicRecord> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // ✅ Always show "Previous Record" for this widget
               const Text(
                 'Previous Record',
                 style: TextStyle(
@@ -340,16 +371,41 @@ class _AerobicRecordState extends State<_AerobicRecord> {
               }
 
               final allRecords = snapshot.data ?? [];
-              final filteredRecords = _filterRecordsByDate(allRecords);
               
-              if(filteredRecords.isEmpty) {
+              // 🔍 DEBUG: Print all records and their archive status
+              print('📊 [PREVIOUS-RECORDS] ========== FETCH RESULT ==========');
+              print('📊 [PREVIOUS-RECORDS] Total records fetched: ${allRecords.length}');
+              for (int i = 0; i < allRecords.length; i++) {
+                final record = allRecords[i];
+                print('  Record #${i + 1}:');
+                print('    - Activity: ${record.activity_type}');
+                print('    - Location: ${record.location}');
+                print('    - Distance: ${record.total_distance} km');
+                print('    - Is Archived: ${record.is_archived}');
+                print('    - Date: ${record.start_at}');
+              }
+              
+              // Filter to show only non-archived records
+              final nonArchivedRecords = allRecords.where((record) => !record.is_archived).toList();
+              print('📌 [PREVIOUS-RECORDS] Non-archived records: ${nonArchivedRecords.length}');
+              print('📌 [PREVIOUS-RECORDS] ========== END FETCH RESULT ==========');
+              
+              // Then filter by date
+              final filteredRecords = _filterRecordsByDate(nonArchivedRecords);
+
+              if (filteredRecords.isEmpty) {
+                String emptyMessage;
+                if (_selectedFilterDate != null) {
+                  emptyMessage = 'No Aerobic Records Found for ${_selectedFilterDate!.day}/${_selectedFilterDate!.month}/${_selectedFilterDate!.year}.';
+                } else {
+                  emptyMessage = 'No Aerobic Records Found.';
+                }
+
                 return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(20.0),
                       child: Text(
-                        _selectedFilterDate != null 
-                          ? 'No Aerobic Records Found for ${_selectedFilterDate!.day}/${_selectedFilterDate!.month}/${_selectedFilterDate!.year}.' 
-                          : 'No Aerobic Records Found.', 
+                        emptyMessage,
                         style: const TextStyle(color: AppColors.lavender),
                         textAlign: TextAlign.center,
                       ),
@@ -534,16 +590,231 @@ class _ActivityCard extends StatelessWidget{
               color: Colors.grey[600],
             ),
             const SizedBox(height: 4),
-            Text(
-              'Route',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-              ),
-            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+// ✅ NEW WIDGET: Archived Records Display
+class _ArchivedRecordsWidget extends StatefulWidget {
+  final int userId;
+
+  const _ArchivedRecordsWidget({required this.userId});
+
+  @override
+  State<_ArchivedRecordsWidget> createState() => _ArchivedRecordsWidgetState();
+}
+
+class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
+  final AerobicRepository _repository = AerobicRepository();
+  late Future<List<Aerobic>> _recordsFuture;
+  DateTime? _selectedFilterDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _recordsFuture = _repository.fetchArchivedRecords(widget.userId.toString());
+  }
+
+  void _refreshRecords() {
+    setState(() {
+      _recordsFuture = _repository.fetchUserRecords(widget.userId.toString());
+    });
+  }
+
+  Future<void> _selectFilterDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedFilterDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AppColors.primary,
+              surface: AppColors.nearBlack,
+              onSurface: AppColors.lavender,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null) {
+      setState(() {
+        _selectedFilterDate = pickedDate;
+      });
+    }
+  }
+
+  void _clearFilter() {
+    setState(() {
+      _selectedFilterDate = null;
+    });
+  }
+
+  List<Aerobic> _filterRecordsByDate(List<Aerobic> records) {
+    if (_selectedFilterDate == null) {
+      return records;
+    }
+
+    return records.where((record) {
+      return record.start_at.year == _selectedFilterDate!.year &&
+          record.start_at.month == _selectedFilterDate!.month &&
+          record.start_at.day == _selectedFilterDate!.day;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // ✅ Show "Archived Records" for this widget
+              const Text(
+                'Archived Records',
+                style: TextStyle(
+                  color: AppColors.lime,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              GestureDetector(
+                onTap: _selectFilterDate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.primary),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.calendar_today, color: AppColors.primary, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Filter',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Selected date filter display
+        if (_selectedFilterDate != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primary),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Filtered: ${_selectedFilterDate!.day}/${_selectedFilterDate!.month}/${_selectedFilterDate!.year}',
+                    style: const TextStyle(
+                      color: AppColors.lime,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _clearFilter,
+                    child: const Icon(Icons.close, color: AppColors.primary, size: 18),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        const SizedBox(height: 12),
+
+        // ✅ Display archived records
+        FutureBuilder<List<Aerobic>>(
+            future: _recordsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: AppColors.lime));
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text('Error loading records: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.red)),
+                );
+              }
+
+              final allRecords = snapshot.data ?? [];
+
+              // 🔍 DEBUG: Print archived records
+              print('📊 [ARCHIVED-RECORDS] ========== FETCH RESULT ==========');
+              print('📊 [ARCHIVED-RECORDS] Total ARCHIVED records fetched: ${allRecords.length}');
+              for (int i = 0; i < allRecords.length; i++) {
+                final record = allRecords[i];
+                print('  Archived Record #${i + 1}:');
+                print('    - Activity: ${record.activity_type}');
+                print('    - Location: ${record.location}');
+                print('    - Distance: ${record.total_distance} km');
+                print('    - Is Archived: ${record.is_archived}');
+                print('    - Date: ${record.start_at}');
+              }
+
+              // These are already archived records, just filter by date if needed
+              final filteredRecords = _filterRecordsByDate(allRecords);
+              print('📌 [ARCHIVED-RECORDS] After date filter: ${filteredRecords.length} records');
+              print('📌 [ARCHIVED-RECORDS] ========== END FETCH RESULT ==========');
+
+
+              if (filteredRecords.isEmpty) {
+                String emptyMessage;
+                if (_selectedFilterDate != null) {
+                  emptyMessage = 'No archived records found for ${_selectedFilterDate!.day}/${_selectedFilterDate!.month}/${_selectedFilterDate!.year}.';
+                } else {
+                  emptyMessage = 'No archived records.';
+                }
+
+                return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Text(
+                        emptyMessage,
+                        style: const TextStyle(color: AppColors.lavender),
+                        textAlign: TextAlign.center,
+                      ),
+                    ));
+              }
+
+              return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: filteredRecords.length,
+                  itemBuilder: (context, index) {
+                    return _ActivityCard(
+                      record: filteredRecords[index],
+                      resolveRouteImageUrl: _repository.resolveRouteImageUrl,
+                    );
+                  });
+            })
+      ],
     );
   }
 }

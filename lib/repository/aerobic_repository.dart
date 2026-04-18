@@ -104,17 +104,17 @@ class AerobicRepository {
     try {
       print('📦 [STORAGE] Checking if aerobic_route bucket exists...');
       print('📦 [STORAGE] Listing all available buckets...');
-      
+
       // Try to list buckets to see what's actually available
       final buckets = await _supabase.storage.listBuckets();
-      
+
       print('📦 [STORAGE] Available buckets:');
       for (var bucket in buckets) {
         print('   - Name: "${bucket.name}" | Public: ${bucket.public}');
       }
-      
+
       final aerobicBucketExists = buckets.any((b) => b.name == 'aerobic_route');
-      
+
       if (!aerobicBucketExists) {
         print('❌ [STORAGE] "aerobic_route" bucket NOT found!');
         print('⚠️  [STORAGE] Check the exact bucket name above');
@@ -139,18 +139,19 @@ class AerobicRepository {
           .from('AerobicExercise')
           .select()
           .eq('user_id', userId)
+          .eq('is_archived', false)
           .order('start_at', ascending: false);
 
       if (response is List) {
         print('📥 [FETCH] Retrieved ${response.length} records from database');
-        
+
         final records = <Aerobic>[];
-        
+
         for (int i = 0; i < response.length; i++) {
           final data = response[i];
           if (data is Map<String, dynamic>) {
             final aerobic = Aerobic.fromJson(data);
-            
+
             // Print detailed info about each record
             print('\n📥 [FETCH] Record #${i + 1}:');
             print('   Activity: ${aerobic.activity_type}');
@@ -163,11 +164,11 @@ class AerobicRepository {
             print('   Contains supabase.co: ${aerobic.route_image.contains('supabase.co')}');
             print('   Contains /storage/: ${aerobic.route_image.contains('/storage/')}');
             print('   Contains aerobic_route: ${aerobic.route_image.contains('aerobic_route')}');
-            
+
             records.add(aerobic);
           }
         }
-        
+
         print('\n✅ [FETCH] Successfully parsed ${records.length} records');
         print('📥 [FETCH] ========== FETCH COMPLETE ==========\n');
         return records;
@@ -178,6 +179,53 @@ class AerobicRepository {
     } catch (e) {
       print('❌ [FETCH] Error fetching user records: $e');
       throw Exception('Failed to fetch user records: $e');
+    }
+  }
+
+  // ✅ NEW: Fetch ARCHIVED records only
+  Future<List<Aerobic>> fetchArchivedRecords(String userId) async {
+    try {
+      print('\n📥 [FETCH-ARCHIVED] ========== FETCHING ARCHIVED RECORDS ==========');
+      print('📥 [FETCH-ARCHIVED] User ID: $userId');
+      final response = await _supabase
+          .from('AerobicExercise')
+          .select()
+          .eq('user_id', userId)
+          .eq('is_archived', true)
+          .order('start_at', ascending: false);
+
+      if (response is List) {
+        print('📥 [FETCH-ARCHIVED] Retrieved ${response.length} ARCHIVED records from database');
+
+        final records = <Aerobic>[];
+
+        for (int i = 0; i < response.length; i++) {
+          final data = response[i];
+          if (data is Map<String, dynamic>) {
+            final aerobic = Aerobic.fromJson(data);
+
+            // Print detailed info about each archived record
+            print('\n📥 [FETCH-ARCHIVED] Archived Record #${i + 1}:');
+            print('   Activity: ${aerobic.activity_type}');
+            print('   Location: ${aerobic.location}');
+            print('   Distance: ${aerobic.total_distance} km');
+            print('   Is Archived: ${aerobic.is_archived}');
+            print('   Date: ${aerobic.start_at}');
+
+            records.add(aerobic);
+          }
+        }
+
+        print('\n✅ [FETCH-ARCHIVED] Successfully parsed ${records.length} ARCHIVED records');
+        print('📥 [FETCH-ARCHIVED] ========== FETCH COMPLETE ==========\n');
+        return records;
+      }
+
+      print('⚠️  [FETCH-ARCHIVED] Response is not a list: ${response.runtimeType}');
+      return [];
+    } catch (e) {
+      print('❌ [FETCH-ARCHIVED] Error fetching archived records: $e');
+      throw Exception('Failed to fetch archived records: $e');
     }
   }
 
@@ -221,7 +269,7 @@ class AerobicRepository {
       for (var attempt = 1; attempt <= maxUploadAttempts; attempt++) {
         try {
           print('📤 [UPLOAD] Attempt $attempt/$maxUploadAttempts...');
-          
+
           await _uploadViaRestApi(
             bucketId: bucketId,
             objectPath: objectPath,
@@ -232,7 +280,7 @@ class AerobicRepository {
           // Format: https://{project}.supabase.co/storage/v1/object/public/{bucket}/{path}
           // This matches the exact format Supabase expects for public bucket access
           final publicUrl = '$supabaseUrl/storage/v1/object/public/$bucketId/$objectPath';
-          
+
           print('✅ [UPLOAD] Upload successful!');
           print('✅ [UPLOAD] Constructed public URL: $publicUrl');
 
@@ -242,7 +290,7 @@ class AerobicRepository {
               Uri.parse(publicUrl),
               headers: routeImageRequestHeaders(),
             ).timeout(const Duration(seconds: 5));
-            
+
             if (response.statusCode == 200) {
               print('✅ [VERIFY] Public URL is accessible (HTTP ${response.statusCode})');
             } else if (response.statusCode == 403) {
@@ -269,14 +317,14 @@ class AerobicRepository {
       throw Exception('Upload failed after $maxUploadAttempts attempts: $lastError');
     } catch (e) {
       print('❌ [UPLOAD] Error: $e');
-      
+
       // Provide diagnostic info
       if (e.toString().contains('404')) {
         print('⚠️  Bucket not found - ensure "aerobic_route" bucket exists');
       } else if (e.toString().contains('403') || e.toString().contains('permission')) {
         print('⚠️  Permission denied - ensure bucket is PUBLIC');
       }
-      
+
       return '';
     }
   }
@@ -291,27 +339,27 @@ class AerobicRepository {
         .split('/')
         .map(Uri.encodeComponent)
         .join('/');
-    
+
     final uri = Uri.parse('$supabaseUrl/storage/v1/object/$bucketId/$encodedPath');
     print('📤 [REST] POST to: $uri');
 
     final client = HttpClient();
     try {
       final request = await client.postUrl(uri);
-      
+
       // Set required headers - EXACTLY like the working code
       request.headers.set('apikey', supabaseAnonKey);
       request.headers.set('Authorization', 'Bearer $supabaseAnonKey');
       request.headers.set('x-upsert', 'true');
       request.headers.set(HttpHeaders.contentTypeHeader, 'image/png');
-      
+
       print('📤 [REST] Headers set, adding image bytes...');
       request.add(imageBytes);
 
       print('📤 [REST] Sending request...');
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
-      
+
       print('📤 [REST] Response status: ${response.statusCode}');
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -321,6 +369,83 @@ class AerobicRepository {
       print('✅ [REST] Request successful');
     } finally {
       client.close(force: true);
+    }
+  }
+
+  Future<List<Aerobic>> fetchUserArchivedRecords(String userId) async {
+    try {
+      print('\n📥 [FETCH-ARCHIVED] Fetching archived records for user: $userId');
+      final response = await _supabase
+          .from('AerobicExercise')
+          .select()
+          .eq('user_id', userId)
+          .eq('is_archived', true)
+          .order('start_at', ascending: false);
+
+      if (response is List) {
+        final records = response.map((data) => Aerobic.fromJson(data as Map<String, dynamic>)).toList();
+        print('✅ [FETCH-ARCHIVED] Retrieved ${records.length} archived records');
+        return records;
+      }
+
+      return [];
+    } catch (e) {
+      print('❌ [FETCH-ARCHIVED] Error: $e');
+      throw Exception('Failed to fetch archived records: $e');
+    }
+  }
+
+  Future<void> archiveRecord(String recordId) async {
+    try {
+      print('🗂️ [ARCHIVE] Archiving record: $recordId');
+      await _supabase
+          .from('AerobicExercise')
+          .update({'is_archived': true})
+          .eq('aerobic_id', recordId);
+      print('✅ [ARCHIVE] Record archived successfully');
+    } catch (e) {
+      print('❌ [ARCHIVE] Error: $e');
+      throw Exception('Failed to archive record: $e');
+    }
+  }
+
+  Future<void> unarchiveRecord(String recordId) async {
+    try {
+      print('📤 [UNARCHIVE] Unarchiving record: $recordId');
+      await _supabase
+          .from('AerobicExercise')
+          .update({'is_archived': false})
+          .eq('aerobic_id', recordId);
+      print('✅ [UNARCHIVE] Record unarchived successfully');
+    } catch (e) {
+      print('❌ [UNARCHIVE] Error: $e');
+      throw Exception('Failed to unarchive record: $e');
+    }
+  }
+
+  // ✅ NEW: Update archive status and return the updated record
+  Future<Aerobic> updateAerobicArchiveStatus(String recordId, bool isArchived) async {
+    try {
+      print('🔄 [UPDATE-ARCHIVE] Updating record $recordId to isArchived: $isArchived');
+      
+      await _supabase
+          .from('AerobicExercise')
+          .update({'is_archived': isArchived})
+          .eq('aerobic_id', recordId);
+      
+      print('✅ [UPDATE-ARCHIVE] Record updated successfully');
+      
+      // Fetch the updated record
+      final response = await _supabase
+          .from('AerobicExercise')
+          .select()
+          .eq('aerobic_id', recordId)
+          .single();
+      
+      return Aerobic.fromJson(response);
+    } catch (e) {
+      print('❌ [UPDATE-ARCHIVE] Error: $e');
+      throw Exception('Failed to update archive status: $e');
     }
   }
 }

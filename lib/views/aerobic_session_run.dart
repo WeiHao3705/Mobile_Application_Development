@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../theme/app_colors.dart';
 import '../repository/aerobic_repository.dart';
@@ -136,6 +137,11 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
     final userId = widget.userId;
     final fileName = 'route_${userId}_$timestamp.png';
 
+    // Save to local storage first
+    print('💾 Saving to local storage...');
+    final localPath = await _saveImageLocally(fileName, imageBytes);
+    print('✅ Saved locally at: $localPath');
+
     print('📤 Uploading screenshot to Supabase: $fileName');
     
     try {
@@ -146,14 +152,38 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
 
       if (imageUrl.isEmpty) {
         print('❌ Upload returned empty URL');
-        throw Exception('Route image upload failed (empty URL returned).');
+        print('⚠️ But local copy saved at: $localPath');
+        return localPath; // Return local path if Supabase fails
       }
 
       print('✅ Image uploaded successfully: $imageUrl');
       return imageUrl;
     } catch (e) {
       print('❌ Upload error: $e');
-      throw Exception('Route image upload failed: $e');
+      print('⚠️ But local copy saved at: $localPath');
+      return localPath; // Return local path as fallback
+    }
+  }
+
+  Future<String> _saveImageLocally(String fileName, Uint8List imageBytes) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final aerobicDir = Directory('${appDir.path}/aerobic_routes');
+      
+      // Create directory if it doesn't exist
+      if (!await aerobicDir.exists()) {
+        await aerobicDir.create(recursive: true);
+        print('📁 Created aerobic_routes directory');
+      }
+
+      final file = File('${aerobicDir.path}/$fileName');
+      await file.writeAsBytes(imageBytes);
+      
+      print('✅ Image saved locally: ${file.path}');
+      return file.path;
+    } catch (e) {
+      print('❌ Local storage save failed: $e');
+      throw Exception('Failed to save image locally: $e');
     }
   }
 
@@ -171,100 +201,110 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
           style: const TextStyle(color: AppColors.lavender, height: 1.5),
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _startTracking();
-            },
-            child: const Text('Cancel', style: TextStyle(color: Colors.red)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.nearBlack,
-            ),
-            onPressed: _isSaving ? null : () async {
-              setState(() => _isSaving = true);
-              try {
-                print('\n🔵 ===== SAVE RECORD STARTED =====');
-                
-                // Step 1: Get location
-                print('Step 1: Fetching location...');
-                final locationAddress = await _getLocationAddress();
-                print('✅ Location: $locationAddress');
-                
-                // Step 2: Capture screenshot
-                print('\nStep 2: Capturing screenshot...');
-                print('📍 Current location: ${_trackingController.currentLocation}');
-                print('📍 Location history count: ${_trackingController.locationHistory.length}');
-                
-                final routeImageUrl = await _captureAndUploadMapScreenshot();
-                print('✅ Route image URL: ${routeImageUrl.isEmpty ? "EMPTY (no image saved)" : routeImageUrl}');
-
-                if (routeImageUrl.isEmpty) {
-                  throw Exception('Unable to capture/upload route image. Please try again.');
-                }
-                
-                // Step 3: Create record
-                print('\nStep 3: Creating aerobic record...');
-                final newRecord = Aerobic(
-                  id: widget.userId.toString(),
-                  activity_type: widget.activityType,
-                  location: locationAddress,
-                  total_distance: _trackingController.totalDistance,
-                  average_pace: (_trackingController.currentPace *100).toInt(),
-                  calories_burned: _trackingController.caloriesBurned,
-                  total_step: _trackingController.totalSteps,
-                  elevation_gain: _trackingController.elevationGain,
-                  start_at: _trackingController.sessionStartTime ?? DateTime.now(),
-                  end_at: DateTime.now(),
-                  moving_time: _trackingController.elapsedSeconds,
-                  footwear: 'None',
-                  route_image: routeImageUrl,
-                  userId: widget.userId.toString(),
-                );
-                print('✅ Record created with data:');
-                print('   - Activity: ${newRecord.activity_type}');
-                print('   - Location: ${newRecord.location}');
-                print('   - Distance: ${newRecord.total_distance} km');
-                print('   - Route Image: ${newRecord.route_image.isEmpty ? "EMPTY" : "HAS URL"}');
-
-                // Step 4: Save to database
-                print('\nStep 4: Saving to database...');
-                await _aerobicRepository.createAerobicRecord(newRecord);
-                print('✅ Record saved to database');
-                print('🔵 ===== SAVE RECORD COMPLETED =====\n');
-
-                if (mounted) {
-                  Navigator.pop(context); // Close dialog
-                  Navigator.pop(context); // Close aerobic_session_run
-                  Navigator.pop(context, true); // Close aerobic_type and return to aerobic_page
-                }
-              } catch (e) {
-                print('❌ ERROR: $e');
-                print('Stack trace: ${StackTrace.current}');
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to save: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } finally {
-                if (mounted) setState(() => _isSaving = false);
-              }
-            },
-            child: _isSaving
-                ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                color: AppColors.nearBlack,
-                strokeWidth: 2,
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _startTracking();
+                  },
+                  child: const Text('Cancel', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+                ),
               ),
-            )
-                : const Text('Save Record', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.nearBlack,
+                  ),
+                  onPressed: _isSaving ? null : () async {
+                    setState(() => _isSaving = true);
+                    try {
+                      print('\n🔵 ===== SAVE RECORD STARTED =====');
+                      
+                      // Step 1: Get location
+                      print('Step 1: Fetching location...');
+                      final locationAddress = await _getLocationAddress();
+                      print('✅ Location: $locationAddress');
+                      
+                      // Step 2: Capture screenshot
+                      print('\nStep 2: Capturing screenshot...');
+                      print('📍 Current location: ${_trackingController.currentLocation}');
+                      print('📍 Location history count: ${_trackingController.locationHistory.length}');
+                      
+                      final routeImageUrl = await _captureAndUploadMapScreenshot();
+                      print('✅ Route image URL: ${routeImageUrl.isEmpty ? "EMPTY (no image saved)" : routeImageUrl}');
+
+                      if (routeImageUrl.isEmpty) {
+                        throw Exception('Unable to capture/upload route image. Please try again.');
+                      }
+                      
+                      // Step 3: Create record
+                      print('\nStep 3: Creating aerobic record...');
+                      final newRecord = Aerobic(
+                        id: widget.userId.toString(),
+                        activity_type: widget.activityType,
+                        location: locationAddress,
+                        total_distance: _trackingController.totalDistance,
+                        average_pace: (_trackingController.currentPace *100).toInt(),
+                        calories_burned: _trackingController.caloriesBurned,
+                        total_step: _trackingController.totalSteps,
+                        elevation_gain: _trackingController.elevationGain,
+                        start_at: _trackingController.sessionStartTime ?? DateTime.now(),
+                        end_at: DateTime.now(),
+                        moving_time: _trackingController.elapsedSeconds,
+                        footwear: 'None',
+                        route_image: routeImageUrl,
+                        userId: widget.userId.toString(),
+                        is_archived: false,
+                      );
+                      print('✅ Record created with data:');
+                      print('   - Activity: ${newRecord.activity_type}');
+                      print('   - Location: ${newRecord.location}');
+                      print('   - Distance: ${newRecord.total_distance} km');
+                      print('   - Route Image: ${newRecord.route_image.isEmpty ? "EMPTY" : "HAS URL"}');
+
+                      // Step 4: Save to database
+                      print('\nStep 4: Saving to database...');
+                      await _aerobicRepository.createAerobicRecord(newRecord);
+                      print('✅ Record saved to database');
+                      print('🔵 ===== SAVE RECORD COMPLETED =====\n');
+
+                      if (mounted) {
+                        Navigator.pop(context); // Close dialog
+                        Navigator.pop(context); // Close aerobic_session_run
+                        Navigator.pop(context, true); // Close aerobic_type and return to aerobic_page
+                      }
+                    } catch (e) {
+                      print('❌ ERROR: $e');
+                      print('Stack trace: ${StackTrace.current}');
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to save: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _isSaving = false);
+                    }
+                  },
+                  child: _isSaving
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: AppColors.nearBlack,
+                      strokeWidth: 2,
+                    ),
+                  )
+                      : const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -354,7 +394,7 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
         mapController: _mapController,
         options: MapOptions(
           initialCenter: _trackingController.currentLocation!,
-          initialZoom: 20.0,
+          initialZoom: 18.0,
           interactionOptions:
           const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
         ),
