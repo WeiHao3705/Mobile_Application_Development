@@ -125,7 +125,7 @@ class Exercise {
     }
 
     final parsedPrimaryMuscle = readString(
-      ['primary_muscle', 'primaryMuscle', 'muscle_group', 'target_muscle', 'muscle'],
+      ['primary_muscle', 'primaryMuscle', 'target_muscle', 'muscle'],
       fallback: 'Unknown Muscle',
     );
 

@@ -77,7 +77,6 @@ class _EditExercisePageState extends State<EditExercisePage> {
     super.dispose();
   }
 
-
   bool _isGifPath(String path) {
     return path.toLowerCase().endsWith('.gif');
   }

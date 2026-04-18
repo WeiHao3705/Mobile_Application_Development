@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/exercise.dart';
@@ -22,15 +23,20 @@ class ExerciseExplorePage extends StatefulWidget {
 }
 
 class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
+  static const String _recentSearchesStorageKey = 'exercise_recent_searches';
+  static const int _maxRecentSearches = 8;
+
   late final ExerciseRepository _repository;
   late Future<List<Exercise>> _exercisesFuture;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   String _selectedEquipment = 'All Equipment';
   String _selectedMuscle = 'All Muscles';
 
   final Set<String> _selectedExerciseIds = <String>{};
   List<Exercise> _latestExercises = const <Exercise>[];
+  List<String> _recentSearches = <String>[];
 
   @override
   void initState() {
@@ -38,13 +44,90 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
     _repository = ExerciseRepository(supabase: Supabase.instance.client);
     _exercisesFuture = _repository.getAllExercises();
     _selectedExerciseIds.addAll(widget.initialSelectedExerciseIds);
-    _searchController.addListener(() => setState(() {}));
+    _searchController.addListener(_onSearchChanged);
+    _searchFocusNode.addListener(_onSearchChanged);
+    _loadRecentSearches();
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchFocusNode.removeListener(_onSearchChanged);
+    _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    setState(() {});
+  }
+
+  Future<void> _loadRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedSearches = prefs.getStringList(_recentSearchesStorageKey) ?? <String>[];
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _recentSearches = savedSearches.where((value) => value.trim().isNotEmpty).toList();
+    });
+  }
+
+  Future<void> _saveRecentSearch(String value) async {
+    final normalized = value.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    final next = <String>[..._recentSearches];
+    next.removeWhere((item) => item.toLowerCase() == normalized.toLowerCase());
+    next.insert(0, normalized);
+    if (next.length > _maxRecentSearches) {
+      next.removeRange(_maxRecentSearches, next.length);
+    }
+
+    if (mounted) {
+      setState(() {
+        _recentSearches = next;
+      });
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_recentSearchesStorageKey, next);
+  }
+
+  Future<void> _removeRecentSearch(String query) async {
+    final next = _recentSearches
+        .where((item) => item.toLowerCase() != query.toLowerCase())
+        .toList();
+
+    setState(() {
+      _recentSearches = next;
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    if (next.isEmpty) {
+      await prefs.remove(_recentSearchesStorageKey);
+      return;
+    }
+    await prefs.setStringList(_recentSearchesStorageKey, next);
+  }
+
+  List<String> _recentSearchMatches() {
+    final query = _searchController.text.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? _recentSearches
+        : _recentSearches.where((item) => item.toLowerCase().contains(query)).toList();
+    return filtered.take(3).toList();
+  }
+
+  void _useRecentSearch(String query) {
+    _searchController.value = TextEditingValue(
+      text: query,
+      selection: TextSelection.collapsed(offset: query.length),
+    );
+    _searchFocusNode.unfocus();
+    _saveRecentSearch(query);
   }
 
   void _openExerciseDetail(Exercise exercise) {
@@ -153,44 +236,67 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
               allExercises.map((item) => item.primaryMuscle),
               defaultValue: 'All Muscles',
             );
-
+            final recentMatches = _recentSearchMatches();
+            final showSearchDropdown = _searchFocusNode.hasFocus && recentMatches.isNotEmpty;
             return Column(
               children: [
                 Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Column(
+                  child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      _SearchField(controller: _searchController),
-                      const SizedBox(height: 12),
-                      Row(
+                      Column(
                         children: [
-                          Expanded(
-                            child: _FilterButton(
-                              title: _selectedEquipment,
-                              onTap: () => _showOptionPicker(
-                                title: 'Equipment',
-                                options: equipmentOptions,
-                                onSelected: (value) {
-                                  setState(() => _selectedEquipment = value);
-                                },
-                              ),
-                            ),
+                          _SearchField(
+                            controller: _searchController,
+                            focusNode: _searchFocusNode,
+                            onSubmitted: _saveRecentSearch,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _FilterButton(
-                              title: _selectedMuscle,
-                              onTap: () => _showOptionPicker(
-                                title: 'Muscles',
-                                options: muscleOptions,
-                                onSelected: (value) {
-                                  setState(() => _selectedMuscle = value);
-                                },
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _FilterButton(
+                                  title: _selectedEquipment,
+                                  onTap: () => _showOptionPicker(
+                                    title: 'Equipment',
+                                    options: equipmentOptions,
+                                    onSelected: (value) {
+                                      setState(() => _selectedEquipment = value);
+                                    },
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _FilterButton(
+                                  title: _selectedMuscle,
+                                  onTap: () => _showOptionPicker(
+                                    title: 'Muscles',
+                                    options: muscleOptions,
+                                    onSelected: (value) {
+                                      setState(() => _selectedMuscle = value);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
+                      if (showSearchDropdown)
+                        Positioned(
+                          top: 54,
+                          left: 0,
+                          right: 0,
+                          child: TextFieldTapRegion(
+                            child: _SearchHistoryDropdown(
+                              items: recentMatches,
+                              onTapRecentSearch: _useRecentSearch,
+                              onRemoveRecentSearch: _removeRecentSearch,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -215,7 +321,7 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
                       : ListView.separated(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           itemCount: filteredExercises.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (context, index) =>
                               const Divider(color: Colors.white12, height: 1),
                           itemBuilder: (context, index) {
                             final exercise = filteredExercises[index];
@@ -319,17 +425,27 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
 }
 
 class _SearchField extends StatelessWidget {
-  const _SearchField({required this.controller});
+  const _SearchField({
+    required this.controller,
+    required this.focusNode,
+    required this.onSubmitted,
+  });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onSubmitted;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      focusNode: focusNode,
       style: const TextStyle(color: Colors.white),
+      textInputAction: TextInputAction.search,
+      onTapOutside: (_) => focusNode.unfocus(),
+      onSubmitted: onSubmitted,
       decoration: InputDecoration(
-        hintText: 'Search exercise',
+        hintText: 'Search for an item...',
         hintStyle: const TextStyle(color: Colors.white60),
         prefixIcon: const Icon(Icons.search, color: Colors.white54),
         filled: true,
@@ -343,6 +459,64 @@ class _SearchField extends StatelessWidget {
     );
   }
 }
+
+class _SearchHistoryDropdown extends StatelessWidget {
+  const _SearchHistoryDropdown({
+    required this.items,
+    required this.onTapRecentSearch,
+    required this.onRemoveRecentSearch,
+  });
+
+  final List<String> items;
+  final ValueChanged<String> onTapRecentSearch;
+  final ValueChanged<String> onRemoveRecentSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFF111111),
+      elevation: 14,
+      borderRadius: BorderRadius.circular(12),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 170),
+        child: ListView.separated(
+          shrinkWrap: true,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          itemCount: items.length,
+          separatorBuilder: (context, index) =>
+              const Divider(height: 1, color: Colors.white12),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            return ListTile(
+              dense: true,
+              contentPadding: const EdgeInsets.only(left: 16, right: 8),
+              title: Text(
+                item,
+                style: const TextStyle(color: Colors.white),
+              ),
+              trailing: SizedBox(
+                width: 24,
+                height: 24,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Text(
+                    'x',
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+                  onPressed: () => onRemoveRecentSearch(item),
+                  tooltip: 'Delete search',
+                ),
+              ),
+              onTap: () => onTapRecentSearch(item),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 
 class _FilterButton extends StatelessWidget {
   const _FilterButton({
