@@ -40,6 +40,7 @@ class TrackingController {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (isSessionActive) {
         elapsedSeconds++;
+        onElapsedSecondsChanged(elapsedSeconds); // Call the callback to update UI
         if (elapsedSeconds > 0 && totalDistance > 0) {
           currentPace = (elapsedSeconds / 60) / totalDistance;
           onCurrentPaceChanged(currentPace);
@@ -70,7 +71,7 @@ class TrackingController {
     _positionStream = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 3,
+        distanceFilter: 2, // Reduced from 3 to 2 meters for better responsiveness
       ),
     ).listen((Position position) {
       if (!isSessionActive) return;
