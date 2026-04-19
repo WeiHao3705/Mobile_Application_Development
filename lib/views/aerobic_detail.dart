@@ -99,18 +99,18 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
         await Share.shareXFiles(
           files,
           text: shareText,
-          subject: '${currentRecord.activity_type} Workout - ${currentRecord.formattedDate}',
+          subject: '${currentRecord.activity_type} Exercise - ${currentRecord.formattedDate}',
         );
       } else {
         await Share.share(
           shareText,
-          subject: '${currentRecord.activity_type} Workout - ${currentRecord.formattedDate}',
+          subject: '${currentRecord.activity_type} Exercise - ${currentRecord.formattedDate}',
         );
       }
       
-      print('✅ [SHARE] Workout shared successfully');
+      print('✅ [SHARE] Exercise shared successfully');
     } catch (e) {
-      print('❌ [SHARE] Error sharing workout: $e');
+      print('❌ [SHARE] Error sharing exercise: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -187,8 +187,6 @@ Elevation Gain: ${currentRecord.elevation_gain} m
 
 🕐 Start Time: ${currentRecord.start_at.hour.toString().padLeft(2, '0')}:${currentRecord.start_at.minute.toString().padLeft(2, '0')}
 🕐 End Time: ${currentRecord.end_at.hour.toString().padLeft(2, '0')}:${currentRecord.end_at.minute.toString().padLeft(2, '0')}
-
-${currentRecord.is_archived ? '🗂️ [ARCHIVED]' : '✅ [ACTIVE]'}
     '''.trim();
   }
 
@@ -327,6 +325,20 @@ ${currentRecord.is_archived ? '🗂️ [ARCHIVED]' : '✅ [ACTIVE]'}
   }
 
   Widget _buildImageSection() {
+    // Don't load image for archived records
+    if (currentRecord.is_archived) {
+      print('📦 [AEROBIC-DETAIL] Record is archived, showing placeholder instead of loading image');
+      return Container(
+        width: double.infinity,
+        height: 200,
+        decoration: BoxDecoration(
+          color: Colors.grey[800],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: _buildPlaceholderImage(),
+      );
+    }
+
     final resolver = AerobicRepository();
     final resolvedImageUrl = resolver.resolveRouteImageUrl(currentRecord.route_image);
 
@@ -458,7 +470,7 @@ ${currentRecord.is_archived ? '🗂️ [ARCHIVED]' : '✅ [ACTIVE]'}
       {
         'label': 'Steps',
         'value': currentRecord.total_step.toString(),
-        'icon': Icons.terrain,
+        'icon': Icons.transfer_within_a_station,
       },
       {
         'label': 'Elevation Gain',
