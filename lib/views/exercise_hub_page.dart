@@ -60,7 +60,7 @@ class ExerciseHubPage extends StatelessWidget {
       backgroundColor: AppColors.black,
       appBar: AppBar(
         backgroundColor: AppColors.black,
-        foregroundColor: AppColors.lavender,
+        elevation: 0,
         title: const Text(
           'Exercise',
           style: TextStyle(
@@ -71,7 +71,6 @@ class ExerciseHubPage extends StatelessWidget {
           ),
         ),
         centerTitle: false,
-        elevation: 0,
       ),
       body: SingleChildScrollView(
         child: Padding(

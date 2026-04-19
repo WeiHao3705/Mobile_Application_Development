@@ -864,9 +864,25 @@ class _AddExercisePageState extends State<AddExercisePage> {
       child: Scaffold(
       backgroundColor: AppColors.black,
       appBar: AppBar(
-        backgroundColor: AppColors.cardBg,
-        foregroundColor: AppColors.white,
-        title: const Text('Add Exercise'),
+        backgroundColor: AppColors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.primary),
+          style: IconButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: _isSaving ? null : _discardExercise,
+        ),
+        title: Text(
+          'Add Exercise',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: false,
         actions: [
           TextButton(
             onPressed: _isSaving ? null : _saveExercise,

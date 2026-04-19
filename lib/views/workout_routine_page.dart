@@ -480,11 +480,21 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
       child: Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Workout Routine'),
-        centerTitle: true,
         backgroundColor: Colors.black,
-        foregroundColor: theme.colorScheme.primary,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Workout Routine',
+          style: TextStyle(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: false,
         actions: [
           TextButton(
             onPressed: _openSaveWorkoutPage,

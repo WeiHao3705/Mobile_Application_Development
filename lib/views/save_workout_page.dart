@@ -493,18 +493,32 @@ class _SaveWorkoutPageState extends State<SaveWorkoutPage> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Save Workout'),
-        centerTitle: true,
         backgroundColor: Colors.black,
-        foregroundColor: theme.colorScheme.primary,
         elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.primary),
+          style: IconButton.styleFrom(
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Save Workout',
+          style: TextStyle(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: false,
         actions: [
           TextButton(
             onPressed: _isSaving ? null : _saveWorkout,
             child: Text(
               _isSaving ? 'Saving...' : 'Save',
               style: TextStyle(
-                color: theme.colorScheme.primary,
+                color: _isSaving ? theme.colorScheme.primary.withValues(alpha: 0.5) : theme.colorScheme.primary,
                 fontWeight: FontWeight.w700,
               ),
             ),

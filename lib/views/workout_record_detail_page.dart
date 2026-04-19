@@ -135,10 +135,24 @@ class _WorkoutRecordDetailPageState extends State<WorkoutRecordDetailPage> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
-        foregroundColor: theme.colorScheme.primary,
         elevation: 0,
-        centerTitle: true,
-        title: const Text('Workout Record'),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.primary),
+          style: IconButton.styleFrom(
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Workout Record',
+          style: TextStyle(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: false,
         actions: [
           IconButton(
             onPressed: _deleteRecord,
