@@ -33,6 +33,7 @@ class _SignUpState extends State<SignUpPages> {
   DateTime _selectedDateOfBirth = DateTime.now();
   bool _hasSelectedDateOfBirth = false;
   bool _isPasswordVisible = false;
+  String? _genderValidationError;
 
   AuthController get _authController => widget.authController;
 
@@ -114,6 +115,10 @@ class _SignUpState extends State<SignUpPages> {
   }
 
   void _goNext() {
+    if (_stepIndex == 0 && !_validateGenderSelection()) {
+      return;
+    }
+
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) {
       return;
@@ -154,18 +159,14 @@ class _SignUpState extends State<SignUpPages> {
       return;
     }
 
-    final selectedGender = _selectedGender;
-    if (selectedGender == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select your gender')),
-      );
+    if (!_validateGenderSelection(showSnackBar: true)) {
       return;
     }
 
     FocusScope.of(context).unfocus();
 
     final profile = SignUpProfileData(
-      gender: selectedGender,
+      gender: _selectedGender!.trim(),
       dateOfBirth: _selectedDateOfBirth,
       height: double.parse(_heightController.text.trim()),
       currentWeight: double.parse(_weightController.text.trim()),
@@ -208,6 +209,31 @@ class _SignUpState extends State<SignUpPages> {
       LandingPage.routeName,
       (route) => false,
     );
+  }
+
+  bool _validateGenderSelection({bool showSnackBar = false}) {
+    final selectedGender = _selectedGender?.trim();
+    final isValid = selectedGender != null && selectedGender.isNotEmpty;
+
+    if (!isValid) {
+      setState(() {
+        _genderValidationError = 'Please select your gender';
+      });
+
+      if (showSnackBar) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select your gender')),
+        );
+      }
+      return false;
+    }
+
+    if (_genderValidationError != null) {
+      setState(() {
+        _genderValidationError = null;
+      });
+    }
+    return true;
   }
 
   @override
@@ -343,6 +369,7 @@ class _SignUpState extends State<SignUpPages> {
                 onTap: () {
                   setState(() {
                     _selectedGender = 'male';
+                    _genderValidationError = null;
                   });
                 },
                 child: Container(
@@ -390,6 +417,7 @@ class _SignUpState extends State<SignUpPages> {
                 onTap: () {
                   setState(() {
                     _selectedGender = 'female';
+                    _genderValidationError = null;
                   });
                 },
                 child: Container(
@@ -433,6 +461,17 @@ class _SignUpState extends State<SignUpPages> {
             ),
           ],
         ),
+        if (_genderValidationError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              _genderValidationError!,
+              style: TextStyle(
+                color: theme.colorScheme.error,
+                fontSize: 12,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -729,4 +768,10 @@ class _SignUpState extends State<SignUpPages> {
     );
   }
 }
+
+
+
+
+
+
 
