@@ -8,6 +8,7 @@ import '../models/water_intake.dart';
 import '../repository/weight_log_repository.dart';
 import '../repository/water_intake_repository.dart';
 import '../repository/workout_record_repository.dart';
+import '../repository/aerobic_repository.dart';
 import '../services/auth_session_storage.dart';
 import '../utils/time_formatters.dart';
 import 'add_weight_log_page.dart';
@@ -28,14 +29,20 @@ class _HomePageState extends State<HomePage> {
 
   late final WaterIntakeRepository _waterIntakeRepository;
   late final WeightLogRepository _weightLogRepository;
+  late final AerobicRepository _aerobicRepository;
   final AuthSessionStorage _sessionStorage = AuthSessionStorage();
 
   WaterIntake? _waterIntake;
   List<WeightLog> _weightLogs = const [];
+  int _todayCaloriesBurned = 0;
+  int _todaySteps = 0;
+  int _todayWorkoutCount = 0; // Number of workouts today
   bool _isHydrationLoading = true;
   bool _isWeightLoading = true;
+  bool _isAerobicLoading = true;
   String? _hydrationError;
   String? _weightError;
+  String? _aerobicError;
 
   int? get _userId {
     final id = widget.authController.currentUser?.id;
@@ -54,6 +61,7 @@ class _HomePageState extends State<HomePage> {
     _weightLogRepository = WeightLogRepository(
       supabase: Supabase.instance.client,
     );
+    _aerobicRepository = AerobicRepository();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -63,7 +71,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadHomeCards() async {
-    await Future.wait([_loadHydrationSummary(), _loadWeightTrend()]);
+    await Future.wait([_loadHydrationSummary(), _loadWeightTrend(), _loadTodayAerobicStats()]);
   }
 
   Future<void> _loadHydrationSummary() async {
@@ -140,6 +148,62 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _loadTodayAerobicStats() async {
+    setState(() {
+      _isAerobicLoading = true;
+      _aerobicError = null;
+    });
+
+    try {
+      final userId = await _resolveUserId();
+      if (userId == null) {
+        if (!mounted) return;
+        setState(() {
+          _isAerobicLoading = false;
+          _aerobicError = 'No active user session found.';
+        });
+        return;
+      }
+
+      // Fetch all user's aerobic records
+      final records = await _aerobicRepository.fetchUserRecords(userId);
+      
+      // Filter records for today
+      final today = DateTime.now();
+      final todayStart = DateTime(today.year, today.month, today.day);
+      final todayEnd = DateTime(today.year, today.month, today.day, 23, 59, 59);
+      
+      final todayRecords = records.where((record) {
+        return record.start_at.isAfter(todayStart) && record.start_at.isBefore(todayEnd);
+      }).toList();
+
+      // Calculate totals
+      int totalCalories = 0;
+      int totalSteps = 0;
+      int workoutCount = todayRecords.length; // Count the number of workouts
+      
+      for (final record in todayRecords) {
+        totalCalories += record.calories_burned;
+        totalSteps += record.total_step;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _todayCaloriesBurned = totalCalories;
+        _todaySteps = totalSteps;
+        _todayWorkoutCount = workoutCount;
+        _isAerobicLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isAerobicLoading = false;
+        _aerobicError = 'Unable to load aerobic data.';
+      });
+      debugPrint('Aerobic stats load error: $error');
+    }
+  }
+
   Future<int?> _resolveUserId() async {
     final fromController = _userId;
     if (fromController != null) {
@@ -166,11 +230,47 @@ class _HomePageState extends State<HomePage> {
     return repository.getLatestRecordForUser(userId);
   }
 
+  Future<Map<String, dynamic>?> _loadLatestAerobicExercise() async {
+    final userId = _userId;
+    if (userId == null) {
+      return null;
+    }
+
+    try {
+      final records = await _aerobicRepository.fetchUserRecords(userId);
+      if (records.isEmpty) {
+        return null;
+      }
+
+      // Get the most recent record (already sorted by start_at descending in the repository)
+      final latest = records.first;
+
+      return {
+        'activity_type': latest.activity_type,
+        'total_distance': latest.total_distance,
+        'moving_time': latest.moving_time,
+        'calories_burned': latest.calories_burned,
+        'start_at': latest.start_at,
+      };
+    } catch (e) {
+      debugPrint('Error loading latest aerobic exercise: $e');
+      return null;
+    }
+  }
+
+  String _formatAerobicDetails(Map<String, dynamic> aerobic) {
+    final distance = (aerobic['total_distance'] as double).toStringAsFixed(2);
+    final duration = _formatWorkoutDuration(Duration(seconds: aerobic['moving_time'] as int));
+    final calories = aerobic['calories_burned'] as int;
+    return '$duration • $distance km • $calories cal';
+  }
+
   String _formatWorkoutDuration(Duration value) {
     final minutes = value.inMinutes;
     final seconds = value.inSeconds.remainder(60);
     return '${minutes.toString().padLeft(2, '0')}min ${seconds.toString().padLeft(2, '0')}s';
   }
+
 
   void _openWorkoutRecords(BuildContext context) {
     final userId = _userId;
@@ -290,20 +390,20 @@ class _HomePageState extends State<HomePage> {
                             _StatItem(
                               icon: Icons.local_fire_department,
                               label: 'Calories',
-                              value: '420',
+                              value: _todayCaloriesBurned.toString(),
                               color: theme.colorScheme.secondary,
                             ),
                             _StatItem(
                               icon: Icons.directions_walk,
                               label: 'Steps',
-                              value: '6,543',
+                              value: _todaySteps.toString(),
                               color: theme.colorScheme.tertiary,
                             ),
                             _StatItem(
                               icon: Icons.fitness_center,
                               label: 'Workouts',
-                              value: '2',
-                              color: theme.colorScheme.secondary,
+                              value: _todayWorkoutCount.toString(),
+                              color: theme.colorScheme.primary,
                             ),
                           ],
                         ),
@@ -372,13 +472,30 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                _WorkoutItem(
-                  title: 'Morning Run',
-                  subtitle: '30 min • 250 calories',
-                  icon: Icons.directions_run,
-                  iconColor: theme.colorScheme.tertiary,
+                // Most Recent Aerobic Exercise
+                FutureBuilder<Map<String, dynamic>?>(
+                  future: _loadLatestAerobicExercise(),
+                  builder: (context, snapshot) {
+                    final aerobic = snapshot.data;
+                    final isLoading =
+                        snapshot.connectionState == ConnectionState.waiting;
+                    final subtitle = isLoading
+                        ? 'Loading latest aerobic...'
+                        : aerobic == null
+                        ? 'No aerobic workout yet'
+                        : _formatAerobicDetails(aerobic);
+                    final title = aerobic?['activity_type'] ?? 'Aerobic Exercise';
+
+                    return _WorkoutItem(
+                      title: title,
+                      subtitle: subtitle,
+                      icon: Icons.directions_run,
+                      iconColor: theme.colorScheme.tertiary,
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
+                // Most Recent Strength Training
                 FutureBuilder<WorkoutRecordSummary?>(
                   future: _loadLatestStrengthTrainingRecord(),
                   builder: (context, snapshot) {

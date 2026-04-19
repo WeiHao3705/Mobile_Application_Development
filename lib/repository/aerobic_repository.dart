@@ -131,7 +131,7 @@ class AerobicRepository {
     }
   }
 
-  Future<List<Aerobic>> fetchUserRecords(String userId) async {
+  Future<List<Aerobic>> fetchUserRecords(int userId) async {
     try {
       print('\n📥 [FETCH] ========== FETCHING RECORDS ==========');
       print('📥 [FETCH] User ID: $userId');
@@ -183,7 +183,7 @@ class AerobicRepository {
   }
 
   // ✅ NEW: Fetch ARCHIVED records only
-  Future<List<Aerobic>> fetchArchivedRecords(String userId) async {
+  Future<List<Aerobic>> fetchArchivedRecords(int userId) async {
     try {
       print('\n📥 [FETCH-ARCHIVED] ========== FETCHING ARCHIVED RECORDS ==========');
       print('📥 [FETCH-ARCHIVED] User ID: $userId');

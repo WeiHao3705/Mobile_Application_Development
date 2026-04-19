@@ -185,12 +185,12 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
   @override
   void initState() {
     super.initState();
-    _recordsFuture = _repository.fetchUserRecords(widget.userId.toString());
+    _recordsFuture = _repository.fetchUserRecords(widget.userId);
   }
 
   void _refreshRecords() {
     setState(() {
-      _recordsFuture = _repository.fetchUserRecords(widget.userId.toString());
+      _recordsFuture = _repository.fetchUserRecords(widget.userId);
     });
   }
 
@@ -615,12 +615,12 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
   @override
   void initState() {
     super.initState();
-    _recordsFuture = _repository.fetchArchivedRecords(widget.userId.toString());
+    _recordsFuture = _repository.fetchArchivedRecords(widget.userId);
   }
 
   void _refreshRecords() {
     setState(() {
-      _recordsFuture = _repository.fetchUserRecords(widget.userId.toString());
+      _recordsFuture = _repository.fetchUserRecords(widget.userId);
     });
   }
 
