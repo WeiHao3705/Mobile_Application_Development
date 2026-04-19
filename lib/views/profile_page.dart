@@ -14,6 +14,7 @@ import '../services/user_session_service.dart';
 import '../views/dialogs/edit_daily_goals_dialog.dart';
 import '../views/dialogs/logout_confirmation_dialog.dart';
 import '../views/edit_profile_page.dart';
+import '../theme/app_colors.dart';
 import 'login_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -431,7 +432,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Text('Profile',
+          style: TextStyle(
+            color: AppColors.lavender,
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+          ),),
         centerTitle: true,
         backgroundColor: theme.colorScheme.surface,
         foregroundColor: theme.colorScheme.onSurface,

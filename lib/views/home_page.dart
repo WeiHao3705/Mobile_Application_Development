@@ -10,6 +10,7 @@ import '../repository/water_intake_repository.dart';
 import '../repository/workout_record_repository.dart';
 import '../repository/aerobic_repository.dart';
 import '../services/auth_session_storage.dart';
+import '../theme/app_colors.dart';
 import 'add_weight_log_page.dart';
 import 'add_water_intake_page.dart';
 import 'workout_record_list_page.dart';
@@ -567,7 +568,13 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FitTrack'),
+        title: const Text('FitTrack',
+          style: TextStyle(
+            color: AppColors.lavender,
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+          ),),
         centerTitle: false,
         backgroundColor: theme.colorScheme.surface,
         foregroundColor: theme.colorScheme.onSurface,

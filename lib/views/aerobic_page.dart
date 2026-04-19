@@ -436,10 +436,12 @@ class _ActivityCard extends StatelessWidget{
   // 3. Update this to use your official Aerobic model
   final Aerobic record;
   final String Function(String rawValue) resolveRouteImageUrl;
+  final bool isArchived;
 
   const _ActivityCard({
     required this.record,
     required this.resolveRouteImageUrl,
+    this.isArchived = false,
   });
 
   @override
@@ -536,6 +538,11 @@ class _ActivityCard extends StatelessWidget{
   }
 
   Widget _buildImageSection() {
+    //For archived records, skip image loading and show placeholder directly
+    if (isArchived) {
+      return _buildPlaceholderMap();
+    }
+
     final resolvedImageUrl = resolveRouteImageUrl(record.route_image);
 
     if (resolvedImageUrl.isEmpty) {
@@ -597,7 +604,6 @@ class _ActivityCard extends StatelessWidget{
   }
 }
 
-// ✅ NEW WIDGET: Archived Records Display
 class _ArchivedRecordsWidget extends StatefulWidget {
   final int userId;
 
@@ -679,7 +685,6 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // ✅ Show "Archived Records" for this widget
               const Text(
                 'Archived Records',
                 style: TextStyle(
@@ -811,6 +816,7 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
                     return _ActivityCard(
                       record: filteredRecords[index],
                       resolveRouteImageUrl: _repository.resolveRouteImageUrl,
+                      isArchived: true,
                     );
                   });
             })

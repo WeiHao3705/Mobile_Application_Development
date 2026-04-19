@@ -63,9 +63,14 @@ class ExerciseHubPage extends StatelessWidget {
         foregroundColor: AppColors.lavender,
         title: const Text(
           'Exercise',
-          style: TextStyle(fontWeight: FontWeight.w700),
+          style: TextStyle(
+            color: AppColors.lavender,
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+          ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -84,16 +89,16 @@ class ExerciseHubPage extends StatelessWidget {
               const SizedBox(height: 4),
               const Text(
                 'Pick a training mode to continue.',
-                style: TextStyle(color: AppColors.lightGray, fontSize: 13),
+                style: TextStyle(color: AppColors.lightGray, fontSize: 16),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               _ExerciseHubCard(
                 icon: Icons.directions_run,
                 title: 'Aerobic',
                 subtitle: 'Track running, walking and other cardio sessions.',
                 onTap: () => _openAerobic(context),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
               _ExerciseHubCard(
                 icon: Icons.fitness_center,
                 title: 'Workout',
@@ -127,24 +132,24 @@ class _ExerciseHubCard extends StatelessWidget {
       color: AppColors.purple,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: AppColors.purple.withValues(alpha: 0.25)),
+        side: BorderSide(color: AppColors.purple.withValues(alpha: 2)),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.only(left: 16, top: 30, bottom: 30, right: 12),
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
                   color: AppColors.inputBg,
-                  border: Border.all(color: AppColors.purple.withValues(alpha: 0.35)),
-                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.lavender.withValues(alpha: 1)),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: AppColors.white),
+                child: Icon(icon, color: AppColors.lime),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -155,24 +160,24 @@ class _ExerciseHubCard extends StatelessWidget {
                       title,
                       style: const TextStyle(
                         color: AppColors.white,
-                        fontSize: 18,
+                        fontSize: 24,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.black,
-                        fontSize: 13,
+                        fontSize: 16,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AppColors.lavender),
+              const Icon(Icons.chevron_right, color: AppColors.lime),
             ],
           ),
         ),
