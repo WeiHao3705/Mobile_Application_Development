@@ -23,11 +23,14 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
   bool isLoading = false;
   File? _capturedPhoto; // Store the captured photo
   final ImagePicker _imagePicker = ImagePicker();
+  late TextEditingController _descriptionController;
+  bool _isEditingDescription = false;
 
   @override
   void initState() {
     super.initState();
     currentRecord = widget.record;
+    _descriptionController = TextEditingController(text: currentRecord.description);
     _loadSnapPhotoFromDatabase();
   }
 
@@ -35,17 +38,22 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
     // If the record has a snap_photo URL, load it
     if (currentRecord.snap_photo.isNotEmpty) {
       try {
-        final resolver = AerobicRepository();
-        final photoUrl = resolver.resolveSnapPhotoUrl(currentRecord.snap_photo);
+        final photoUrl = _repository.resolveSnapPhotoUrl(currentRecord.snap_photo);
+        
         if (photoUrl.isNotEmpty) {
-          // Download and cache the image
+          
+          // Download the image
           final response = await http.get(Uri.parse(photoUrl)).timeout(
             const Duration(seconds: 10),
           );
+
           if (response.statusCode == 200 && mounted) {
+            // Get temporary directory
             final tempDir = await getTemporaryDirectory();
             final fileName = 'snap_${currentRecord.id}_loaded.png';
             final file = File('${tempDir.path}/$fileName');
+
+            // Write the image bytes to file
             await file.writeAsBytes(response.bodyBytes);
 
             if (mounted) {
@@ -59,6 +67,12 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
         print('Error loading snap photo from database: $e');
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   Future<void> _capturePhoto() async {
@@ -100,6 +114,7 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
               userId: currentRecord.userId,
               is_archived: currentRecord.is_archived,
               snap_photo: photoUrl,
+              description: currentRecord.description,
             );
           });
 
@@ -143,6 +158,55 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
     setState(() {
       _capturedPhoto = null;
     });
+  }
+
+  Future<void> _saveDescription() async {
+    try {
+      await _repository.updateAerobicDescription(currentRecord.id, _descriptionController.text);
+      
+      setState(() {
+        currentRecord = Aerobic(
+          id: currentRecord.id,
+          activity_type: currentRecord.activity_type,
+          location: currentRecord.location,
+          total_distance: currentRecord.total_distance,
+          average_pace: currentRecord.average_pace,
+          calories_burned: currentRecord.calories_burned,
+          total_step: currentRecord.total_step,
+          elevation_gain: currentRecord.elevation_gain,
+          start_at: currentRecord.start_at,
+          end_at: currentRecord.end_at,
+          moving_time: currentRecord.moving_time,
+          route_image: currentRecord.route_image,
+          userId: currentRecord.userId,
+          is_archived: currentRecord.is_archived,
+          snap_photo: currentRecord.snap_photo,
+          description: _descriptionController.text,
+        );
+        _isEditingDescription = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Description saved successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error saving description: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving description: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   void _showDeleteConfirmation() {
@@ -526,6 +590,47 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
                     ),
                     const SizedBox(height: 8),
                     _buildPhotoCaptureContainer(),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Description Section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Activity Notes',
+                          style: TextStyle(
+                            color: AppColors.lavender,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (!_isEditingDescription && !currentRecord.is_archived)
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isEditingDescription = true;
+                              });
+                            },
+                            child: const Icon(
+                              Icons.edit,
+                              color: AppColors.primary,
+                              size: 18,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _isEditingDescription && !currentRecord.is_archived
+                        ? _buildDescriptionEditor()
+                        : _buildDescriptionView(),
                   ],
                 ),
               ),
@@ -961,4 +1066,116 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
     int seconds = pace % 100;
     return '$minutes:${seconds.toString().padLeft(2, '0')}/km';
   }
+
+  Widget _buildDescriptionView() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.nearBlack,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.lavender.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Text(
+        currentRecord.description.isEmpty
+            ? 'No notes added yet. Tap the edit icon to add notes about this activity.'
+            : currentRecord.description,
+        style: TextStyle(
+          color: currentRecord.description.isEmpty
+              ? AppColors.lavender.withValues(alpha: 0.6)
+              : AppColors.lavender,
+          fontSize: 13,
+          fontWeight: FontWeight.w400,
+          height: 1.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDescriptionEditor() {
+    return Column(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.nearBlack,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColors.primary,
+              width: 1.5,
+            ),
+          ),
+          child: TextField(
+            controller: _descriptionController,
+            maxLines: 4,
+            minLines: 3,
+            style: const TextStyle(
+              color: AppColors.lavender,
+              fontSize: 13,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Write your notes about this activity...',
+              hintStyle: TextStyle(
+                color: AppColors.lavender.withValues(alpha: 0.5),
+                fontSize: 13,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isEditingDescription = false;
+                  _descriptionController.text = currentRecord.description;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.nearBlack,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.lavender.withValues(alpha: 0.3)),
+                ),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: AppColors.lavender,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _saveDescription,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Save',
+                  style: TextStyle(
+                    color: AppColors.nearBlack,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
+
