@@ -46,6 +46,7 @@ class _EditExercisePageState extends State<EditExercisePage> {
   final Set<String> _selectedSecondaryMuscles = <String>{};
 
   bool _isSaving = false;
+  bool _allowProgrammaticPop = false;
   String? _imageUrl;
   String? _videoUrl;
   File? _imageFile;
@@ -75,6 +76,34 @@ class _EditExercisePageState extends State<EditExercisePage> {
     _nameController.dispose();
     _howToController.dispose();
     super.dispose();
+  }
+
+  Future<bool> _confirmDiscardChanges() async {
+    final shouldDiscard = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          title: const Text('Discard changes?', style: TextStyle(color: Colors.white)),
+          content: const Text(
+            'You have unsaved changes. Do you want to discard them and leave this page?',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Keep editing'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Discard', style: TextStyle(color: Colors.redAccent)),
+            ),
+          ],
+        );
+      },
+    );
+
+    return shouldDiscard == true;
   }
 
   bool _isGifPath(String path) {
@@ -688,19 +717,26 @@ class _EditExercisePageState extends State<EditExercisePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: _allowProgrammaticPop,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop || _isSaving) {
+          return;
+        }
+
+        final shouldDiscard = await _confirmDiscardChanges();
+        if (!mounted || !shouldDiscard) {
+          return;
+        }
+
+        _allowProgrammaticPop = true;
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
       backgroundColor: AppColors.black,
       appBar: AppBar(
         backgroundColor: AppColors.black,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.primary),
-          style: IconButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         title: Text(
           'Edit Exercise',
           style: TextStyle(
@@ -832,11 +868,12 @@ class _EditExercisePageState extends State<EditExercisePage> {
                         ),
                 ),
               ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        ),
-      ),
+               const SizedBox(height: 24),
+             ],
+           ),
+         ),
+       ),
+    ),
     );
   }
 }

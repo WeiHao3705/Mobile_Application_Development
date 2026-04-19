@@ -23,11 +23,58 @@ class ExerciseReorderPage extends StatefulWidget {
 
 class _ExerciseReorderPageState extends State<ExerciseReorderPage> {
   late final List<ExerciseReorderResult> _entries;
+  late final List<ExerciseReorderResult> _originalEntries;
+  bool _allowProgrammaticPop = false;
 
   @override
   void initState() {
     super.initState();
     _entries = List<ExerciseReorderResult>.from(widget.entries);
+    _originalEntries = List<ExerciseReorderResult>.from(widget.entries);
+  }
+
+  bool get _hasChanges {
+    if (_entries.length != _originalEntries.length) {
+      return true;
+    }
+    for (int i = 0; i < _entries.length; i++) {
+      if (_entries[i].rowId != _originalEntries[i].rowId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<bool> _confirmDiscardChanges() async {
+    if (!_hasChanges) {
+      return true;
+    }
+
+    final shouldDiscard = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          title: const Text('Discard changes?', style: TextStyle(color: Colors.white)),
+          content: const Text(
+            'You have unsaved changes. Do you want to discard them and leave this page?',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Keep editing'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Discard', style: TextStyle(color: Colors.redAccent)),
+            ),
+          ],
+        );
+      },
+    );
+
+    return shouldDiscard == true;
   }
 
   void _save() {
@@ -47,7 +94,22 @@ class _ExerciseReorderPageState extends State<ExerciseReorderPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return PopScope(
+      canPop: _allowProgrammaticPop,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          return;
+        }
+
+        final shouldDiscard = await _confirmDiscardChanges();
+        if (!mounted || !shouldDiscard) {
+          return;
+        }
+
+        _allowProgrammaticPop = true;
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
@@ -59,6 +121,7 @@ class _ExerciseReorderPageState extends State<ExerciseReorderPage> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           onPressed: () => Navigator.of(context).pop(),
+          tooltip: 'Back',
         ),
         title: Text(
           'Rearrange Exercises',
@@ -196,6 +259,7 @@ class _ExerciseReorderPageState extends State<ExerciseReorderPage> {
           ],
         ),
       ),
+    ),
     );
   }
 }

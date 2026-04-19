@@ -483,8 +483,13 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
         backgroundColor: Colors.black,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.primary),
+          style: IconButton.styleFrom(
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
           onPressed: () => Navigator.of(context).pop(),
+          tooltip: 'Back to Workout',
         ),
         title: Text(
           'Workout Routine',
