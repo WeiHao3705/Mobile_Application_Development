@@ -33,6 +33,7 @@ class _SignUpState extends State<SignUpPages> {
   String? _selectedGender;
   DateTime _selectedDateOfBirth = DateTime.now();
   bool _hasSelectedDateOfBirth = false;
+  bool _isPasswordVisible = false;
 
   AuthController get _authController => widget.authController;
 
@@ -448,10 +449,20 @@ class _SignUpState extends State<SignUpPages> {
         const SizedBox(height: 12),
         TextFormField(
           controller: _passwordController,
-          obscureText: true,
-          decoration: const InputDecoration(
+          obscureText: !_isPasswordVisible,
+          decoration: InputDecoration(
             labelText: 'Password',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+              onPressed: () {
+                setState(() {
+                  _isPasswordVisible = !_isPasswordVisible;
+                });
+              },
+              icon: Icon(
+                _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+              ),
+            ),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {

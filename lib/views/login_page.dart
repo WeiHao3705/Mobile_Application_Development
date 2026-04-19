@@ -21,6 +21,7 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isPasswordVisible = false;
 
   AuthController get _authController => widget.authController;
 
@@ -145,11 +146,23 @@ class _LoginPageState extends State<LoginPage> {
                                   const SizedBox(height: 16),
                                   TextFormField(
                                     controller: _passwordController,
-                                    decoration: const InputDecoration(
+                                    decoration: InputDecoration(
                                       labelText: 'Password',
-                                      border: OutlineInputBorder(),
+                                      border: const OutlineInputBorder(),
+                                      suffixIcon: IconButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _isPasswordVisible = !_isPasswordVisible;
+                                          });
+                                        },
+                                        icon: Icon(
+                                          _isPasswordVisible
+                                              ? Icons.visibility_off
+                                              : Icons.visibility,
+                                        ),
+                                      ),
                                     ),
-                                    obscureText: true,
+                                    obscureText: !_isPasswordVisible,
                                     enabled: !_authController.isLoading,
                                     onFieldSubmitted: (_) => _handleLogin(),
                                     validator: (value) {
@@ -200,4 +213,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-

@@ -28,6 +28,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   String? _accountError;
   bool _isLoadingAccount = true;
   bool _isSubmitting = false;
+  bool _isNewPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
 
   @override
   void initState() {
@@ -58,7 +60,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   Future<void> _loadRecoveredAccount() async {
     final auth = Supabase.instance.client.auth;
-    final email = _readText(auth.currentUser?.email ?? auth.currentSession?.user.email);
+    final email = _readText(
+      auth.currentUser?.email ?? auth.currentSession?.user.email,
+    );
 
     if (!mounted) {
       return;
@@ -67,7 +71,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     if (email == null) {
       setState(() {
         _isLoadingAccount = false;
-        _accountError = 'Recovery session is missing. Please open the reset link again.';
+        _accountError =
+            'Recovery session is missing. Please open the reset link again.';
       });
       return;
     }
@@ -78,7 +83,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         return;
       }
 
-      // Fetch the old password hash from User table for validation
       String? oldPasswordHash;
       if (account != null) {
         try {
@@ -113,7 +117,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       setState(() {
         _recoveryEmail = email;
         _isLoadingAccount = false;
-        _accountError = 'Unable to load the account details right now. Please retry.';
+        _accountError =
+            'Unable to load the account details right now. Please retry.';
       });
     }
   }
@@ -133,7 +138,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       return;
     }
 
-    // Additional check: new password cannot be the same as old password
     if (_isSameAsOldPassword(_passwordController.text)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -146,7 +150,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     if (_isLoadingAccount || _accountError != null || _recoveryEmail == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_accountError ?? 'Recovery session is still loading. Please wait.'),
+          content: Text(
+            _accountError ??
+                'Recovery session is still loading. Please wait.',
+          ),
         ),
       );
       return;
@@ -209,138 +216,162 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         foregroundColor: theme.colorScheme.onSurface,
       ),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints:
-                    BoxConstraints(minHeight: constraints.maxHeight - 48),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 440),
-                    child: Card(
-                      color: theme.colorScheme.surface,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Card(
+                color: theme.colorScheme.surface,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Set a new password',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (_isLoadingAccount) ...[
+                          Row(
                             children: [
-                              Text(
-                                'Set a new password',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
+                              SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.colorScheme.primary,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              if (_isLoadingAccount) ...[
-                                Row(
-                                  children: [
-                                    SizedBox(
-                                      height: 16,
-                                      width: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: theme.colorScheme.primary,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    const Expanded(
-                                      child: Text('Loading account details...'),
-                                    ),
-                                  ],
-                                ),
-                              ] else ...[
-                                Text(
-                                  'You are changing the password for $accountName.',
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                                if (_recoveryEmail != null) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _recoveryEmail!,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                              if (_accountError != null) ...[
-                                const SizedBox(height: 12),
-                                Text(
-                                  _accountError!,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.error,
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 20),
-                              TextFormField(
-                                controller: _passwordController,
-                                enabled: !_isSubmitting && !_isLoadingAccount && _accountError == null,
-                                obscureText: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'New Password',
-                                  border: OutlineInputBorder(),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter a new password';
-                                  }
-                                  if (value.length < 6) {
-                                    return 'Password must be at least 6 characters';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _confirmPasswordController,
-                                enabled: !_isSubmitting && !_isLoadingAccount && _accountError == null,
-                                obscureText: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'Confirm Password',
-                                  border: OutlineInputBorder(),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please confirm your new password';
-                                  }
-                                  if (value != _passwordController.text) {
-                                    return 'Passwords do not match';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 20),
-                              ElevatedButton(
-                                onPressed: (_isSubmitting || _isLoadingAccount || _accountError != null)
-                                    ? null
-                                    : _submit,
-                                child: _isSubmitting
-                                    ? SizedBox(
-                                        height: 18,
-                                        width: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: theme.colorScheme.onPrimary,
-                                        ),
-                                      )
-                                    : const Text('Update Password'),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Text('Loading account details...'),
                               ),
                             ],
                           ),
+                        ] else ...[
+                          Text(
+                            'You are changing the password for $accountName.',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                          if (_recoveryEmail != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              _recoveryEmail!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
+                        if (_accountError != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            _accountError!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.error,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: _passwordController,
+                          enabled: !_isSubmitting &&
+                              !_isLoadingAccount &&
+                              _accountError == null,
+                          obscureText: !_isNewPasswordVisible,
+                          decoration: InputDecoration(
+                            labelText: 'New Password',
+                            border: const OutlineInputBorder(),
+                            suffixIcon: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isNewPasswordVisible =
+                                      !_isNewPasswordVisible;
+                                });
+                              },
+                              icon: Icon(
+                                _isNewPasswordVisible
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                              ),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a new password';
+                            }
+                            if (value.length < 6) {
+                              return 'Password must be at least 6 characters';
+                            }
+                            return null;
+                          },
                         ),
-                      ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: _confirmPasswordController,
+                          enabled: !_isSubmitting &&
+                              !_isLoadingAccount &&
+                              _accountError == null,
+                          obscureText: !_isConfirmPasswordVisible,
+                          decoration: InputDecoration(
+                            labelText: 'Confirm Password',
+                            border: const OutlineInputBorder(),
+                            suffixIcon: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isConfirmPasswordVisible =
+                                      !_isConfirmPasswordVisible;
+                                });
+                              },
+                              icon: Icon(
+                                _isConfirmPasswordVisible
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                              ),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please confirm your new password';
+                            }
+                            if (value != _passwordController.text) {
+                              return 'Passwords do not match';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: (_isSubmitting ||
+                                  _isLoadingAccount ||
+                                  _accountError != null)
+                              ? null
+                              : _submit,
+                          child: _isSubmitting
+                              ? SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: theme.colorScheme.onPrimary,
+                                  ),
+                                )
+                              : const Text('Update Password'),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );

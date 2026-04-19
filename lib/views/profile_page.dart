@@ -12,6 +12,7 @@ import '../services/image_picker_service.dart';
 import '../services/image_upload_service.dart';
 import '../services/user_session_service.dart';
 import '../views/dialogs/edit_daily_goals_dialog.dart';
+import '../views/dialogs/logout_confirmation_dialog.dart';
 import '../views/edit_profile_page.dart';
 import 'login_page.dart';
 
@@ -435,12 +436,12 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundColor: theme.colorScheme.surface,
         foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {},
-          ),
-        ],
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.settings),
+        //     onPressed: () {},
+        //   ),
+        // ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -721,6 +722,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     title: 'Logout',
                     icon: Icons.logout,
                     onTap: () async {
+                      final shouldLogout = await LogoutConfirmationDialog.show(context);
+                      if (!shouldLogout || !context.mounted) {
+                        return;
+                      }
+
                       await _sessionService.clearSession();
                       await widget.authController.logout();
                       if (!context.mounted) {
