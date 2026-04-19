@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../controllers/auth_controller.dart';
 import '../models/app_user.dart';
@@ -290,7 +291,7 @@ class _SignUpState extends State<SignUpPages> {
                                                 color: theme.colorScheme.onPrimary,
                                               ),
                                             )
-                                          : Text(isLastStep ? 'Finish Sign Up' : 'Next'),
+                                          : Text(isLastStep ? 'Sign Up' : 'Next'),
                                     ),
                                   ),
                                 ],
@@ -334,24 +335,103 @@ class _SignUpState extends State<SignUpPages> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('What is your gender?', style: theme.textTheme.titleLarge),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedGender,
-          decoration: const InputDecoration(
-            labelText: 'Gender',
-            border: OutlineInputBorder(),
-          ),
-          items: const [
-            DropdownMenuItem(value: 'male', child: Text('Male')),
-            DropdownMenuItem(value: 'female', child: Text('Female')),
-            // DropdownMenuItem(value: 'other', child: Text('Other')),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedGender = 'male';
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: _selectedGender == 'male'
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outline,
+                      width: _selectedGender == 'male' ? 2 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    color: _selectedGender == 'male'
+                        ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                        : Colors.transparent,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Image.asset(
+                        'lib/Image/Bot-Gender-Male.png',
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Male',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: _selectedGender == 'male'
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedGender = 'female';
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: _selectedGender == 'female'
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outline,
+                      width: _selectedGender == 'female' ? 2 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    color: _selectedGender == 'female'
+                        ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                        : Colors.transparent,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Image.asset(
+                        'lib/Image/Bot-Gender-Female.png',
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Female',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: _selectedGender == 'female'
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
-          validator: (value) => value == null ? 'Please select your gender' : null,
-          onChanged: (value) {
-            setState(() {
-              _selectedGender = value;
-            });
-          },
         ),
       ],
     );
@@ -392,14 +472,40 @@ class _SignUpState extends State<SignUpPages> {
         TextFormField(
           controller: _heightController,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Height (cm)',
-            border: OutlineInputBorder(),
+            helperText: 'Max 3 digits (e.g., 180)',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.outline),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+            ),
+            errorStyle: TextStyle(color: theme.colorScheme.error),
           ),
+          inputFormatters: [
+            LengthLimitingTextInputFormatter(3),
+          ],
           validator: (value) {
             final number = double.tryParse(value?.trim() ?? '');
             if (number == null || number <= 0) {
               return 'Please enter a valid height';
+            }
+            if (number > 999) {
+              return 'Height cannot exceed 999 cm';
             }
             return null;
           },
@@ -417,14 +523,40 @@ class _SignUpState extends State<SignUpPages> {
         TextFormField(
           controller: _weightController,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Current Weight (kg)',
-            border: OutlineInputBorder(),
+            helperText: 'Max 3 digits (e.g., 75)',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.outline),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+            ),
+            errorStyle: TextStyle(color: theme.colorScheme.error),
           ),
+          inputFormatters: [
+            LengthLimitingTextInputFormatter(3),
+          ],
           validator: (value) {
             final number = double.tryParse(value?.trim() ?? '');
             if (number == null || number <= 0) {
               return 'Please enter a valid current weight';
+            }
+            if (number > 999) {
+              return 'Weight cannot exceed 999 kg';
             }
             return null;
           },
@@ -442,14 +574,40 @@ class _SignUpState extends State<SignUpPages> {
         TextFormField(
           controller: _targetWeightController,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Target Weight (kg)',
-            border: OutlineInputBorder(),
+            helperText: 'Max 3 digits (e.g., 70)',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.outline),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+            ),
+            errorStyle: TextStyle(color: theme.colorScheme.error),
           ),
+          inputFormatters: [
+            LengthLimitingTextInputFormatter(3),
+          ],
           validator: (value) {
             final number = double.tryParse(value?.trim() ?? '');
             if (number == null || number <= 0) {
               return 'Please enter a valid target weight';
+            }
+            if (number > 999) {
+              return 'Weight cannot exceed 999 kg';
             }
             return null;
           },
@@ -466,16 +624,42 @@ class _SignUpState extends State<SignUpPages> {
         const SizedBox(height: 16),
         TextFormField(
           controller: _usernameController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Username',
-            border: OutlineInputBorder(),
+            helperText: '3-25 characters',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.outline),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+            ),
+            errorStyle: TextStyle(color: theme.colorScheme.error),
           ),
+          inputFormatters: [
+            LengthLimitingTextInputFormatter(25),
+          ],
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
               return 'Please enter a username';
             }
             if (value.trim().length < 3) {
               return 'Username must be at least 3 characters';
+            }
+            if (value.trim().length > 25) {
+              return 'Username cannot exceed 25 characters';
             }
             return null;
           },

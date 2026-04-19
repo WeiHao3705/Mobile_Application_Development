@@ -783,13 +783,6 @@ class _HomePageState extends State<HomePage> {
                     );
                   },
                 ),
-                // const SizedBox(height: 8),
-                // _WorkoutItem(
-                //   title: 'Yoga Session',
-                //   subtitle: '20 min • 90 calories',
-                //   icon: Icons.self_improvement,
-                //   iconColor: theme.colorScheme.tertiary,
-                // ),
               ],
             ),
           ),
