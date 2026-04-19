@@ -140,20 +140,6 @@ class TrackingController {
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
-  /// Reset all tracking data
-  void reset() {
-    elapsedSeconds = 0;
-    totalDistance = 0.0;
-    currentPace = 0.0;
-    caloriesBurned = 0;
-    totalSteps = 0;
-    elevationGain = 0;
-    lastElevation = 0.0;
-    locationHistory.clear();
-    currentLocation = null;
-    isSessionActive = false;
-  }
-
   /// Cleanup resources
   void dispose() {
     _timer?.cancel();
