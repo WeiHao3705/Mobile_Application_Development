@@ -45,7 +45,6 @@ class _AerobicPageState extends State<AerobicPage> {
                 }
               ),
               const SizedBox(height: 20),
-              // ✅ Show different widget based on tab selection
               if (!_showArchived)
                 _PreviousRecordsWidget(userId: widget.userId)
               else
