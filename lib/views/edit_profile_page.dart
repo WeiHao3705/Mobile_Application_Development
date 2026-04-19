@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../controllers/auth_controller.dart';
@@ -277,7 +278,33 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _usernameController,
-                  decoration: _profileInputDecoration(theme, 'Username'),
+                  decoration: InputDecoration(
+                    labelText: 'Username',
+                    helperText: '3-25 characters',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: theme.colorScheme.outline),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+                    ),
+                    errorStyle: TextStyle(color: theme.colorScheme.error),
+                  ),
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(25),
+                  ],
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Username is required';
@@ -285,8 +312,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     if (value.trim().length < 3) {
                       return 'Username must be at least 3 characters';
                     }
-                    if (value.trim().length > 20) {
-                      return 'Username must be less than 20 characters';
+                    if (value.trim().length > 25) {
+                      return 'Username cannot exceed 25 characters';
                     }
                     return null;
                   },
@@ -323,13 +350,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 TextFormField(
                   controller: _heightController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: _profileInputDecoration(theme, 'Height in cm'),
+                  decoration: InputDecoration(
+                    labelText: 'Height in cm',
+                    helperText: 'Max 3 digits (e.g., 180)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(3),
+                  ],
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return null;
                     }
-                    if (double.tryParse(value.trim()) == null) {
+                    final number = double.tryParse(value.trim());
+                    if (number == null) {
                       return 'Please enter a valid number';
+                    }
+                    if (number > 999) {
+                      return 'Height cannot exceed 999 cm';
                     }
                     return null;
                   },
@@ -347,13 +387,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 TextFormField(
                   controller: _currentWeightController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: _profileInputDecoration(theme, 'Current weight in kg'),
+                  decoration: InputDecoration(
+                    labelText: 'Current weight in kg',
+                    helperText: 'Max 3 digits (e.g., 75)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(3),
+                  ],
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return null;
                     }
-                    if (double.tryParse(value.trim()) == null) {
+                    final number = double.tryParse(value.trim());
+                    if (number == null) {
                       return 'Please enter a valid number';
+                    }
+                    if (number > 999) {
+                      return 'Weight cannot exceed 999 kg';
                     }
                     return null;
                   },
@@ -371,13 +424,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 TextFormField(
                   controller: _targetWeightController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: _profileInputDecoration(theme, 'Target weight in kg'),
+                  decoration: InputDecoration(
+                    labelText: 'Target weight in kg',
+                    helperText: 'Max 3 digits (e.g., 70)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(3),
+                  ],
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return null;
                     }
-                    if (double.tryParse(value.trim()) == null) {
+                    final number = double.tryParse(value.trim());
+                    if (number == null) {
                       return 'Please enter a valid number';
+                    }
+                    if (number > 999) {
+                      return 'Weight cannot exceed 999 kg';
                     }
                     return null;
                   },
