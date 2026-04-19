@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../controllers/auth_controller.dart';
+import '../models/auth_user.dart';
 
 class EditProfilePage extends StatefulWidget {
   static const routeName = '/edit-profile';
@@ -122,7 +123,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         if (!isAvailable) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('❌ Username is already taken. Please choose another.')),
+            const SnackBar(content: Text('Username is already taken. Please choose another.')),
           );
           setState(() {
             _isSubmitting = false;
@@ -131,16 +132,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         }
       }
 
-      final updatedUser = user.copyWith(
-        username: newUsername,
-        fullName: _fullNameController.text.trim().isEmpty ? null : _fullNameController.text.trim(),
-        height: double.tryParse(_heightController.text.trim()),
-        currentWeight: double.tryParse(_currentWeightController.text.trim()),
-        targetWeight: double.tryParse(_targetWeightController.text.trim()),
-      );
-
-      // Update the user in the database
-      await Supabase.instance.client
+      final updatedRows = await Supabase.instance.client
           .from('User')
           .update({
             'username': newUsername,
@@ -149,10 +141,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
             'current_weight': double.tryParse(_currentWeightController.text.trim()),
             'target_weight': double.tryParse(_targetWeightController.text.trim()),
           })
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .select(
+            'user_id, username, full_name, email, height, current_weight, target_weight, is_admin, password, profile_photo, date_of_birth, gender',
+          );
 
-      // Update the session
-      widget.authController.updateSessionUser(updatedUser);
+      final updatedList = List<Map<String, dynamic>>.from(updatedRows as List);
+      if (updatedList.isNotEmpty) {
+        final freshUser = LoginUser.fromMap(updatedList.first);
+        await widget.authController.updateSessionUser(freshUser);
+      }
 
       if (!mounted) {
         return;
@@ -162,7 +160,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         const SnackBar(content: Text('Profile updated successfully')),
       );
 
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) {
         return;

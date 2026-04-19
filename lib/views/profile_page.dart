@@ -700,14 +700,18 @@ class _ProfilePageState extends State<ProfilePage> {
                   _OptionItem(
                     title: 'Edit Profile',
                     icon: Icons.edit,
-                    onTap: () {
-                      Navigator.of(context).push(
+                    onTap: () async {
+                      final didUpdate = await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
                           builder: (context) => EditProfilePage(
                             authController: widget.authController,
                           ),
                         ),
                       );
+
+                      if (didUpdate == true && mounted) {
+                        setState(() {});
+                      }
                     },
                   ),
                   // _OptionItem(
