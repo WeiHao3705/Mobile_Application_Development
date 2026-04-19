@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../controllers/auth_controller.dart';
 import '../models/auth_user.dart';
-import '../models/weight_log.dart';
 import '../repository/weight_log_repository.dart';
 import '../services/auth_session_storage.dart';
 
@@ -121,10 +120,14 @@ class _AddWeightLogPageState extends State<AddWeightLogPage> {
         weight: weight,
         date: _selectedDate,
       );
-      await _weightLogRepository.updateUserCurrentWeight(
-        userId: userId,
-        weight: inserted.weight,
-      );
+
+      // Keep local session state aligned with the synced user current_weight.
+      final activeUser = widget.authController.currentUser ?? _sessionUser;
+      if (activeUser != null) {
+        final updatedUser = activeUser.copyWith(currentWeight: inserted.weight);
+        await widget.authController.updateSessionUser(updatedUser);
+        _sessionUser = updatedUser;
+      }
 
       if (!mounted) {
         return;

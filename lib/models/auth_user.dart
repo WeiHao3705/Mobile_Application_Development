@@ -9,6 +9,8 @@ class LoginUser {
     required this.targetWeight,
     required this.isAdmin,
     required this.profilePhotoUrl,
+    required this.dateOfBirth,
+    required this.gender,
   });
 
   final dynamic id;
@@ -20,6 +22,8 @@ class LoginUser {
   final num? targetWeight;
   final bool isAdmin;
   final String? profilePhotoUrl;
+  final DateTime? dateOfBirth;
+  final String? gender;
 
   factory LoginUser.fromMap(Map<String, dynamic> map) {
     return LoginUser(
@@ -34,6 +38,10 @@ class LoginUser {
       profilePhotoUrl: _toNullableString(
         map['profile_photo'] ?? map['profilePhotoUrl'],
       ),
+      dateOfBirth: _toNullableDateTime(
+        map['date_of_birth'] ?? map['dateOfBirth'],
+      ),
+      gender: _toNullableString(map['gender']),
     );
   }
 
@@ -47,6 +55,8 @@ class LoginUser {
     num? targetWeight,
     bool? isAdmin,
     String? profilePhotoUrl,
+    DateTime? dateOfBirth,
+    String? gender,
   }) {
     return LoginUser(
       id: id ?? this.id,
@@ -58,6 +68,8 @@ class LoginUser {
       targetWeight: targetWeight ?? this.targetWeight,
       isAdmin: isAdmin ?? this.isAdmin,
       profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      gender: gender ?? this.gender,
     );
   }
 
@@ -72,6 +84,8 @@ class LoginUser {
       'targetWeight': targetWeight,
       'isAdmin': isAdmin,
       'profilePhotoUrl': profilePhotoUrl,
+      'dateOfBirth': dateOfBirth?.toIso8601String(),
+      'gender': gender,
     };
   }
 
@@ -104,5 +118,13 @@ class LoginUser {
 
     final text = value?.toString().trim().toLowerCase();
     return text == 'true' || text == '1' || text == 't';
+  }
+
+  static DateTime? _toNullableDateTime(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty) {
+      return null;
+    }
+    return DateTime.tryParse(text);
   }
 }

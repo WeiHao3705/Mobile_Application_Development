@@ -31,17 +31,30 @@ class WaterIntakeRepository {
     required int userId,
     required DateTime day,
     required double defaultTargetAmount,
+    String? userGender,
   }) async {
     final existing = await getByUserIdAndDate(userId, day);
     if (existing != null) {
       return existing;
     }
 
+    // Fixed daily target by gender:
+    // Female: 2.7L (2700ml), Male: 3.7L (3700ml)
+    final targetAmount = _calculateHydrationTarget(userGender);
+
     return createForUser(
       userId: userId,
-      targetAmount: defaultTargetAmount,
+      targetAmount: targetAmount,
       day: day,
     );
+  }
+
+  double _calculateHydrationTarget(String? gender) {
+    final normalizedGender = gender?.trim().toLowerCase() ?? 'male';
+    if (normalizedGender == 'female' || normalizedGender == 'f') {
+      return 2700;
+    }
+    return 3700;
   }
 
   Future<List<WaterIntake>> getHistoryByUserId(

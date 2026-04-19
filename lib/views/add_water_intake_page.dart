@@ -208,7 +208,7 @@ class _AddWaterIntakePageState extends State<AddWaterIntakePage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Add Water Intake'),
+          title: const Text('Water Intake Tracker'),
           actions: [
             IconButton(
               tooltip: 'History',
@@ -223,117 +223,119 @@ class _AddWaterIntakePageState extends State<AddWaterIntakePage> {
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Card(
-                      color: theme.colorScheme.surface,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Hydration Progress',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            LinearProgressIndicator(
-                              value: (intake?.progressRatio ?? 0).clamp(
-                                0.0,
-                                1.0,
-                              ),
-                              minHeight: 10,
-                              color: Colors.blue,
-                              backgroundColor: Colors.white.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${(intake?.currentAmount ?? 0).toStringAsFixed(0)} ml / ${(intake?.targetAmount ?? 0).toStringAsFixed(0)} ml (${(intake?.progressPercent ?? 0).toStringAsFixed(1)}%)',
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Last updated: $lastUpdatedRelative',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            Text(
-                              lastUpdatedExact,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.75),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _amountController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Water intake (ml)',
-                        hintText: 'e.g. 250',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isSaving ? null : _submitCustomAmount,
-                        child: _isSaving
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+            : SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Card(
+                        color: theme.colorScheme.surface,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Hydration Progress',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
                                 ),
-                              )
-                            : const Text('Add Intake'),
+                              ),
+                              const SizedBox(height: 10),
+                              LinearProgressIndicator(
+                                value: (intake?.progressRatio ?? 0).clamp(
+                                  0.0,
+                                  1.0,
+                                ),
+                                minHeight: 10,
+                                color: Colors.blue,
+                                backgroundColor: Colors.white.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${(intake?.currentAmount ?? 0).toStringAsFixed(0)} ml / ${(intake?.targetAmount ?? 0).toStringAsFixed(0)} ml (${(intake?.progressPercent ?? 0).toStringAsFixed(1)}%)',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Last updated: $lastUpdatedRelative',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              Text(
+                                lastUpdatedExact,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.75),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton(
-                          onPressed: _isSaving ? null : () => _quickAdd(250),
-                          child: const Text('+250 ml'),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
                         ),
-                        OutlinedButton(
-                          onPressed: _isSaving ? null : () => _quickAdd(500),
-                          child: const Text('+500 ml'),
+                        decoration: const InputDecoration(
+                          labelText: 'Water intake (ml)',
+                          hintText: 'e.g. 250',
+                          border: OutlineInputBorder(),
                         ),
-                        OutlinedButton(
-                          onPressed: _isSaving ? null : () => _quickAdd(750),
-                          child: const Text('+750 ml'),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isSaving ? null : _submitCustomAmount,
+                          child: _isSaving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Add Intake'),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton(
+                            onPressed: _isSaving ? null : () => _quickAdd(250),
+                            child: const Text('+250 ml'),
+                          ),
+                          OutlinedButton(
+                            onPressed: _isSaving ? null : () => _quickAdd(500),
+                            child: const Text('+500 ml'),
+                          ),
+                          OutlinedButton(
+                            onPressed: _isSaving ? null : () => _quickAdd(750),
+                            child: const Text('+750 ml'),
+                          ),
+                        ],
+                      ),
+                      if (_errorText != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          _errorText!,
+                          style: TextStyle(
+                            color: theme.colorScheme.error,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
-                    ),
-                    if (_errorText != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _errorText!,
-                        style: TextStyle(
-                          color: theme.colorScheme.error,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
       ),

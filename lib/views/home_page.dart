@@ -10,10 +10,14 @@ import '../repository/water_intake_repository.dart';
 import '../repository/workout_record_repository.dart';
 import '../repository/aerobic_repository.dart';
 import '../services/auth_session_storage.dart';
-import '../utils/time_formatters.dart';
 import 'add_weight_log_page.dart';
 import 'add_water_intake_page.dart';
 import 'workout_record_list_page.dart';
+import 'bmi_calculator_page.dart';
+import 'aerobic_page.dart';
+import 'widgets/home_bmi_indicator_card.dart';
+import 'widgets/home_hydration_progress_card.dart';
+import 'widgets/home_daily_progress_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.authController});
@@ -26,6 +30,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   static const double _defaultTargetAmount = 2000;
+  static const int _dailyActiveMinutesTarget = 60;
+  static const double _defaultActivityFactor = 1.375; // Lightly active
 
   late final WaterIntakeRepository _waterIntakeRepository;
   late final WeightLogRepository _weightLogRepository;
@@ -36,13 +42,19 @@ class _HomePageState extends State<HomePage> {
   List<WeightLog> _weightLogs = const [];
   int _todayCaloriesBurned = 0;
   int _todaySteps = 0;
-  int _todayWorkoutCount = 0; // Number of workouts today
+  int _todayWorkoutCount = 0;
+  int _dailyCaloriesBurnedTotal = 0; // For daily calories progress
+  int _dailyActiveTimeSeconds = 0; // For daily active time progress
+  _BmiProfile? _bmiProfile;
   bool _isHydrationLoading = true;
   bool _isWeightLoading = true;
   bool _isAerobicLoading = true;
+  bool _isBmiLoading = true;
+  bool _isDailyStatsLoading = true;
   String? _hydrationError;
   String? _weightError;
   String? _aerobicError;
+  String? _bmiError;
 
   int? get _userId {
     final id = widget.authController.currentUser?.id;
@@ -71,7 +83,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadHomeCards() async {
-    await Future.wait([_loadHydrationSummary(), _loadWeightTrend(), _loadTodayAerobicStats()]);
+    await Future.wait([
+      _loadHydrationSummary(),
+      _loadWeightTrend(),
+      _loadTodayAerobicStats(),
+      _loadBmiProfile(),
+      _loadDailyStats(),
+    ]);
   }
 
   Future<void> _loadHydrationSummary() async {
@@ -91,10 +109,14 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
+      final sessionUser = widget.authController.currentUser;
+      final userGender = sessionUser?.gender;
+
       final intake = await _waterIntakeRepository.getOrCreateByUserIdAndDate(
         userId: userId,
         day: DateTime.now(),
         defaultTargetAmount: _defaultTargetAmount,
+        userGender: userGender,
       );
 
       if (!mounted) return;
@@ -204,6 +226,180 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _loadBmiProfile() async {
+    setState(() {
+      _isBmiLoading = true;
+      _bmiError = null;
+    });
+
+    try {
+      final userId = await _resolveUserId();
+      if (userId == null) {
+        if (!mounted) return;
+        setState(() {
+          _isBmiLoading = false;
+          _bmiError = 'No active user session found.';
+        });
+        return;
+      }
+
+      Map<String, dynamic>? row;
+      try {
+        final response = await Supabase.instance.client
+            .from('User')
+            .select('current_weight, height, date_of_birth, gender')
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (response != null) {
+          row = Map<String, dynamic>.from(response);
+        }
+      } catch (_) {
+        // Fall back to session values when direct row fetch is blocked.
+      }
+
+      final sessionUser = widget.authController.currentUser;
+      final weightKg = _toDouble(row?['current_weight'] ?? sessionUser?.currentWeight);
+      final heightCm = _normalizeHeightCm(_toDouble(row?['height'] ?? sessionUser?.height));
+      final dob = _parseDate(row?['date_of_birth']) ?? sessionUser?.dateOfBirth;
+      final gender = _normalizeGender(row?['gender'] ?? sessionUser?.gender);
+
+      if (!mounted) return;
+      setState(() {
+        _bmiProfile = _BmiProfile(
+          weightKg: weightKg,
+          heightCm: heightCm,
+          dateOfBirth: dob,
+          gender: gender,
+        );
+        _isBmiLoading = false;
+        if (weightKg == null || heightCm == null || dob == null) {
+          _bmiError = 'Complete your weight, height and date of birth for BMI insights.';
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isBmiLoading = false;
+        _bmiError = 'Unable to load BMI profile.';
+      });
+      debugPrint('BMI load error: $error');
+    }
+  }
+
+  Future<void> _loadDailyStats() async {
+    setState(() {
+      _isDailyStatsLoading = true;
+    });
+
+    try {
+      final userId = await _resolveUserId();
+      if (userId == null) {
+        if (!mounted) return;
+        setState(() {
+          _isDailyStatsLoading = false;
+        });
+        return;
+      }
+
+      // Fetch all user's aerobic records
+      final records = await _aerobicRepository.fetchUserRecords(userId);
+
+      // Filter records for today
+      final today = DateTime.now();
+      final todayStart = DateTime(today.year, today.month, today.day);
+      final todayEnd = DateTime(today.year, today.month, today.day, 23, 59, 59);
+
+      final todayRecords = records.where((record) {
+        return record.start_at.isAfter(todayStart) && record.start_at.isBefore(todayEnd);
+      }).toList();
+
+      // Calculate totals
+      int totalCalories = 0;
+      int totalActiveTimeSeconds = 0;
+
+      for (final record in todayRecords) {
+        totalCalories += record.calories_burned;
+        totalActiveTimeSeconds += record.moving_time;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _dailyCaloriesBurnedTotal = totalCalories;
+        _dailyActiveTimeSeconds = totalActiveTimeSeconds;
+        _isDailyStatsLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isDailyStatsLoading = false;
+      });
+      debugPrint('Daily stats load error: $error');
+    }
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty) return null;
+    return DateTime.tryParse(text);
+  }
+
+  double? _normalizeHeightCm(double? value) {
+    if (value == null || value <= 0) return null;
+    return value <= 3 ? value * 100 : value;
+  }
+
+  int? _computeAge(DateTime? dob) {
+    if (dob == null) return null;
+    final now = DateTime.now();
+    var age = now.year - dob.year;
+    final hasBirthdayPassed =
+        now.month > dob.month || (now.month == dob.month && now.day >= dob.day);
+    if (!hasBirthdayPassed) age -= 1;
+    return age < 0 ? null : age;
+  }
+
+  double? _calculateBmi(_BmiProfile? profile) {
+    final weight = profile?.weightKg;
+    final heightCm = profile?.heightCm;
+    if (weight == null || heightCm == null || weight <= 0 || heightCm <= 0) {
+      return null;
+    }
+    final heightM = heightCm / 100;
+    return weight / (heightM * heightM);
+  }
+
+  int _resolveDailyCaloriesTarget() {
+    final profile = _bmiProfile;
+    final weightKg = profile?.weightKg;
+    final heightCm = profile?.heightCm;
+    final age = _computeAge(profile?.dateOfBirth);
+
+    if (weightKg == null || heightCm == null || age == null || age <= 0) {
+      return 250; // General-health midpoint fallback
+    }
+
+    final gender = (profile?.gender ?? '').trim().toLowerCase();
+    final isFemale = gender == 'female' || gender == 'f';
+
+    // Mifflin-St Jeor BMR
+    final bmr =
+        (10 * weightKg) + (6.25 * heightCm) - (5 * age) + (isFemale ? -161 : 5);
+
+    final tdee = bmr * _defaultActivityFactor;
+    final activeEnergy = (tdee - bmr).clamp(0.0, 5000.0);
+
+    final targetWeight = _toDouble(widget.authController.currentUser?.targetWeight);
+    final isWeightLossGoal =
+        targetWeight != null && weightKg > (targetWeight + 0.3);
+
+    final minGoal = isWeightLossGoal ? 300.0 : 200.0;
+    final maxGoal = isWeightLossGoal ? 500.0 : 300.0;
+
+    // Keep target inside the requested range while still reflecting user physiology.
+    final suggested = isWeightLossGoal ? activeEnergy * 0.60 : activeEnergy * 0.45;
+    return suggested.clamp(minGoal, maxGoal).round();
+  }
+
   Future<int?> _resolveUserId() async {
     final fromController = _userId;
     if (fromController != null) {
@@ -282,6 +478,16 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  void _openAerobicRecords(BuildContext context) {
+    final userId = _userId;
+    if (userId == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AerobicPage(userId: userId),
+      ),
+    );
+  }
+
   Future<void> _openWaterIntakePage() async {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
@@ -314,6 +520,31 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _openBmiCalculatorPage() async {
+    final profile = _bmiProfile;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => BmiCalculatorPage(
+          initialWeightKg: profile?.weightKg,
+          initialHeightCm: profile?.heightCm,
+          dateOfBirth: profile?.dateOfBirth,
+          initialGender: profile?.gender,
+        ),
+      ),
+    );
+  }
+
+  String? _normalizeGender(dynamic value) {
+    final raw = value?.toString().trim().toLowerCase() ?? '';
+    if (raw == 'female' || raw == 'f') {
+      return 'Female';
+    }
+    if (raw == 'male' || raw == 'm') {
+      return 'Male';
+    }
+    return null;
+  }
+
   double? _toDouble(dynamic value) {
     if (value is double) {
       return value;
@@ -330,6 +561,9 @@ class _HomePageState extends State<HomePage> {
     final mutedTextColor = theme.colorScheme.onSurfaceVariant.withValues(
       alpha: 0.8,
     );
+    final bmi = _calculateBmi(_bmiProfile);
+    final age = _computeAge(_bmiProfile?.dateOfBirth);
+    final dailyCaloriesTarget = _resolveDailyCaloriesTarget();
 
     return Scaffold(
       appBar: AppBar(
@@ -413,6 +647,19 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(height: 16),
 
+                // BMI Indicator Card
+                HomeBmiIndicatorCard(
+                  bmi: bmi,
+                  age: age,
+                  weightKg: _bmiProfile?.weightKg,
+                  heightCm: _bmiProfile?.heightCm,
+                  isLoading: _isBmiLoading,
+                  errorText: _bmiError,
+                  onTap: _openBmiCalculatorPage,
+                  onRetry: _loadBmiProfile,
+                ),
+                const SizedBox(height: 16),
+
                 // Weight Trend Card
                 _WeightTrendCard(
                   logs: _weightLogs,
@@ -424,7 +671,7 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 16),
 
                 // Hydration Progress Card
-                _HydrationProgressCard(
+                HomeHydrationProgressCard(
                   waterIntake: _waterIntake,
                   isLoading: _isHydrationLoading,
                   errorText: _hydrationError,
@@ -433,34 +680,45 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(height: 24),
 
-                // // Quick Actions
-                // Text(
-                //   'Quick Actions',
-                //   style: theme.textTheme.titleLarge?.copyWith(
-                //     fontWeight: FontWeight.bold,
-                //     color: theme.colorScheme.onSurface,
-                //   ),
-                // ),
-                // const SizedBox(height: 12),
-                // Row(
-                //   children: [
-                //     Expanded(
-                //       child: _ActionCard(
-                //         icon: Icons.play_circle_filled,
-                //         label: 'Start Workout',
-                //         color: theme.colorScheme.tertiary,
-                //       ),
-                //     ),
-                //     const SizedBox(width: 12),
-                //     Expanded(
-                //       child: _ActionCard(
-                //         icon: Icons.restaurant,
-                //         label: 'Log Meal',
-                //         color: theme.colorScheme.secondary,
-                //       ),
-                //     ),
-                //   ],
-                // ),
+                // Daily Progress Cards (Calories & Active Time)
+                Row(
+                  children: [
+                    Expanded(
+                      child: HomeDailyProgressCard(
+                        title: 'Calories Burned',
+                        currentValue: _dailyCaloriesBurnedTotal,
+                        targetValue: dailyCaloriesTarget,
+                        displayUnit: 'kcal',
+                        icon: Icons.local_fire_department,
+                        iconColor: Colors.orange,
+                        progressColor: Colors.orange,
+                        progress:
+                            _dailyCaloriesBurnedTotal > 0
+                                ? (_dailyCaloriesBurnedTotal / dailyCaloriesTarget)
+                                : 0.0,
+                        isLoading: _isDailyStatsLoading,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: HomeDailyProgressCard(
+                        title: 'Active Time',
+                        currentValue: (_dailyActiveTimeSeconds ~/ 60),
+                        targetValue: _dailyActiveMinutesTarget,
+                        displayUnit: 'min',
+                        icon: Icons.timer,
+                        iconColor: theme.colorScheme.tertiary,
+                        progressColor: theme.colorScheme.tertiary,
+                        progress:
+                            _dailyActiveTimeSeconds > 0
+                                ? ((_dailyActiveTimeSeconds / 60) /
+                                    _dailyActiveMinutesTarget)
+                                : 0.0,
+                        isLoading: _isDailyStatsLoading,
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 24),
 
                 // Recent Workouts
@@ -491,6 +749,7 @@ class _HomePageState extends State<HomePage> {
                       subtitle: subtitle,
                       icon: Icons.directions_run,
                       iconColor: theme.colorScheme.tertiary,
+                      onTap: () => _openAerobicRecords(context),
                     );
                   },
                 ),
@@ -908,116 +1167,19 @@ class _WeightTrendCard extends StatelessWidget {
   }
 }
 
-class _HydrationProgressCard extends StatelessWidget {
-  const _HydrationProgressCard({
-    required this.waterIntake,
-    required this.isLoading,
-    required this.errorText,
-    required this.onTap,
-    required this.onRetry,
+// Extracted to lib/views/widgets/home_hydration_progress_card.dart
+// Extracted to lib/views/widgets/home_bmi_indicator_card.dart
+
+class _BmiProfile {
+  const _BmiProfile({
+    required this.weightKg,
+    required this.heightCm,
+    required this.dateOfBirth,
+    required this.gender,
   });
 
-  final WaterIntake? waterIntake;
-  final bool isLoading;
-  final String? errorText;
-  final VoidCallback onTap;
-  final VoidCallback onRetry;
-
-  String _formatLastUpdated(DateTime? value) {
-    return formatRelativeTime(value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final intake = waterIntake;
-    const hydrationBlue = Colors.blue;
-    final lastUpdatedText = _formatLastUpdated(intake?.lastUpdated);
-
-    return Card(
-      elevation: 2,
-      color: theme.colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: isLoading ? null : onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.water_drop, color: hydrationBlue),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Hydration Progress',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (intake != null)
-                    Text(
-                      '${intake.progressPercent.toStringAsFixed(1)}%',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (isLoading)
-                const LinearProgressIndicator(minHeight: 8)
-              else ...[
-                LinearProgressIndicator(
-                  minHeight: 8,
-                  value: (intake?.progressRatio ?? 0).clamp(0.0, 1.0),
-                  color: hydrationBlue,
-                  backgroundColor: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  errorText ??
-                      '${(intake?.currentAmount ?? 0).toStringAsFixed(0)} ml / ${(intake?.targetAmount ?? 0).toStringAsFixed(0)} ml',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                if (errorText == null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Last updated: $lastUpdatedText',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.8,
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 4),
-                Text(
-                  'Tap to add water intake',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ],
-              if (!isLoading && errorText != null) ...[
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  final double? weightKg;
+  final double? heightCm;
+  final DateTime? dateOfBirth;
+  final String? gender;
 }
