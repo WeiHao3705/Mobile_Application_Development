@@ -32,6 +32,28 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  String _friendlyLoginError(String rawMessage) {
+    final raw = rawMessage.toLowerCase();
+
+    if (raw.contains('invalid login') ||
+        raw.contains('invalid credentials') ||
+        raw.contains('wrong password') ||
+        raw.contains('user not found')) {
+      return 'Invalid username or password. Please try again.';
+    }
+    if (raw.contains('rate limit')) {
+      return 'Too many attempts. Please wait a moment and try again.';
+    }
+    if (raw.contains('network') || raw.contains('socket') || raw.contains('timeout')) {
+      return 'Network issue detected. Please check your connection and try again.';
+    }
+    if (raw.contains('row-level security') || raw.contains('permission')) {
+      return 'Unable to login right now. Please try again later.';
+    }
+
+    return 'Login failed. Please check your credentials and try again.';
+  }
+
   Future<void> _handleLogin() async {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) {
@@ -51,7 +73,7 @@ class _LoginPageState extends State<LoginPage> {
 
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_authController.errorMessage)),
+        SnackBar(content: Text(_friendlyLoginError(_authController.errorMessage))),
       );
       return;
     }

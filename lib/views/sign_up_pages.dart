@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
 import '../models/app_user.dart';
 import 'landing_page.dart';
-import 'main_navigation.dart';
-
 class SignUpPages extends StatefulWidget {
   static const routeName = '/signup';
 
@@ -37,7 +35,6 @@ class _SignUpState extends State<SignUpPages> {
 
   AuthController get _authController => widget.authController;
 
-  @override
   @override
   void dispose() {
     _heightController.dispose();
@@ -127,6 +124,29 @@ class _SignUpState extends State<SignUpPages> {
     });
   }
 
+  String _friendlySignUpError(String rawMessage) {
+    final raw = rawMessage.toLowerCase();
+
+    if (raw.contains('rate limit')) {
+      return 'Too many sign-up attempts. Please wait a moment and try again.';
+    }
+    if (raw.contains('already') ||
+        raw.contains('duplicate') ||
+        raw.contains('unique') ||
+        raw.contains('key-pair') ||
+        raw.contains('violates')) {
+      return 'This username or email is already in use. Please choose another one.';
+    }
+    if (raw.contains('network') || raw.contains('socket') || raw.contains('timeout')) {
+      return 'Network issue detected. Please check your connection and try again.';
+    }
+    if (raw.contains('permission') || raw.contains('row-level security')) {
+      return 'Unable to create account right now. Please try again later.';
+    }
+
+    return 'Unable to sign up right now. Please try again.';
+  }
+
   Future<void> _handleSignUp() async {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) {
@@ -163,14 +183,28 @@ class _SignUpState extends State<SignUpPages> {
 
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_authController.errorMessage)),
+        SnackBar(content: Text(_friendlySignUpError(_authController.errorMessage))),
       );
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('New account created successfully. Please login to continue.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (!mounted) {
       return;
     }
 
     Navigator.pushNamedAndRemoveUntil(
       context,
-      MainNavigation.routeName,
+      LandingPage.routeName,
       (route) => false,
     );
   }
@@ -511,3 +545,4 @@ class _SignUpState extends State<SignUpPages> {
     );
   }
 }
+

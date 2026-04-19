@@ -132,6 +132,34 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     return newPasswordHash == _oldPasswordHash;
   }
 
+  String _friendlyResetError(String rawMessage) {
+    final raw = rawMessage.toLowerCase();
+
+    if (raw.contains('same') || raw.contains('old password')) {
+      return 'New password must be different from your old password.';
+    }
+    if (raw.contains('weak') ||
+        raw.contains('minimum') ||
+        raw.contains('at least')) {
+      return 'Your new password is too weak. Please use at least 6 characters.';
+    }
+    if (raw.contains('expired') ||
+        raw.contains('invalid') ||
+        raw.contains('recovery')) {
+      return 'This reset link is invalid or expired. Please request a new one.';
+    }
+    if (raw.contains('rate limit')) {
+      return 'Too many attempts. Please wait a moment and try again.';
+    }
+    if (raw.contains('network') ||
+        raw.contains('socket') ||
+        raw.contains('timeout')) {
+      return 'Network issue detected. Please check your connection and try again.';
+    }
+
+    return 'Unable to reset password right now. Please try again.';
+  }
+
   Future<void> _submit() async {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) {
@@ -181,7 +209,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         content: Text(
           success
               ? 'Password updated successfully for $_displayAccountLabel.'
-              : widget.authController.errorMessage,
+              : _friendlyResetError(widget.authController.errorMessage),
         ),
       ),
     );

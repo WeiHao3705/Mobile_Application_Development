@@ -108,6 +108,25 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     }
   }
 
+  String _friendlyResetError(String rawMessage) {
+    final raw = rawMessage.toLowerCase();
+
+    if (raw.contains('rate limit')) {
+      return 'Too many requests. Please wait a moment before trying again.';
+    }
+    if (raw.contains('network') || raw.contains('socket') || raw.contains('timeout')) {
+      return 'Network issue detected. Please check your connection and try again.';
+    }
+    if (raw.contains('not found') || raw.contains('no rows') || raw.contains('invalid')) {
+      return 'We could not process that email right now. Please check and try again.';
+    }
+    if (raw.contains('permission') || raw.contains('row-level security')) {
+      return 'Unable to process your request right now. Please try again later.';
+    }
+
+    return 'Unable to send reset email right now. Please try again.';
+  }
+
   Future<void> _sendResetLink({bool isResend = false}) async {
     if (!isResend) {
       final formState = _formKey.currentState;
@@ -165,7 +184,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         return;
       }
 
-      message = widget.authController.errorMessage;
+      message = _friendlyResetError(widget.authController.errorMessage);
     } finally {
       if (mounted) {
         setState(() {
