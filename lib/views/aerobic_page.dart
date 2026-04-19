@@ -229,12 +229,6 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
     });
   }
 
-  void _clearActivityTypeFilter() {
-    setState(() {
-      _selectedActivityType = null;
-    });
-  }
-
   List<Aerobic> _filterRecordsByDate(List<Aerobic> records) {
     if (_selectedFilterDate == null) {
       return records;
@@ -765,12 +759,6 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
   void _clearFilter() {
     setState(() {
       _selectedFilterDate = null;
-    });
-  }
-
-  void _clearActivityTypeFilter() {
-    setState(() {
-      _selectedActivityType = null;
     });
   }
 
