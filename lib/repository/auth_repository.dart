@@ -9,7 +9,7 @@ class AuthRepository {
   final SupabaseClient? _client;
 
   static const String _loginSelectFields =
-      'user_id, username, full_name, email, height, current_weight, target_weight, is_admin, password, profile_photo';
+      'user_id, username, full_name, email, height, current_weight, target_weight, is_admin, password, profile_photo, date_of_birth';
 
   SupabaseClient get client => _client ?? Supabase.instance.client;
 
