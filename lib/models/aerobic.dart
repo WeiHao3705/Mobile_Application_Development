@@ -14,6 +14,7 @@ class Aerobic {
   final String route_image;
   final String userId;
   final bool is_archived;
+  final String snap_photo;
 
   const Aerobic({
     required this.id,
@@ -30,6 +31,7 @@ class Aerobic {
     required this.route_image,
     required this.userId,
     this.is_archived = false,
+    this.snap_photo = '',
   });
 
   factory Aerobic.fromJson(Map<String, dynamic> json) {
@@ -65,6 +67,7 @@ class Aerobic {
       route_image: json['route_image'] ?? '',
       userId: json['user_id']?.toString() ?? '',
       is_archived: json['is_archived'] as bool? ?? false,
+      snap_photo: json['snap_photo'] ?? '',
     );
   }
 
@@ -83,6 +86,7 @@ class Aerobic {
     "route_image": route_image,
     "user_id": userId,
     "is_archived": is_archived,
+    "snap_photo": snap_photo,
   };
 
   String get formattedDistance => "${total_distance.toStringAsFixed(2)} km";

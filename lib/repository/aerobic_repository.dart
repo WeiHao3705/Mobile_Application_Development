@@ -449,6 +449,66 @@ class AerobicRepository {
     }
   }
 
+  // ✅ Upload snap photo and update database
+  Future<String> uploadSnapPhoto(String recordId, File photoFile) async {
+    try {
+      
+      final fileName = 'snap_${recordId}_${DateTime.now().millisecondsSinceEpoch}.png';
+      final storagePath = 'snap_photos/$fileName';
+
+      print('📤 [SNAP-PHOTO] File name: $fileName');
+      print('📤 [SNAP-PHOTO] Storage path: $storagePath');
+
+      // Upload to storage
+      final response = await _supabase.storage
+          .from('aerobic_route')
+          .upload(storagePath, photoFile);
+
+      print('✅ [SNAP-PHOTO] Upload successful');
+
+      // Build the full URL
+      final photoUrl = '$supabaseUrl/storage/v1/object/public/aerobic_route/$storagePath';
+      print('✅ [SNAP-PHOTO] Photo URL: $photoUrl');
+
+      // Update the database with the photo URL
+      await _supabase
+          .from('AerobicExercise')
+          .update({'snap_photo': photoUrl})
+          .eq('aerobic_id', recordId);
+
+      print('✅ [SNAP-PHOTO] Database updated successfully');
+      print('📤 [SNAP-PHOTO] ========== UPLOAD COMPLETE ==========');
+
+      return photoUrl;
+    } catch (e) {
+      print('❌ [SNAP-PHOTO] Error: $e');
+      throw Exception('Failed to upload snap photo: $e');
+    }
+  }
+
+  // ✅ Resolve snap photo URL similar to route image
+  String resolveSnapPhotoUrl(String rawValue) {
+    final value = rawValue.trim();
+    if (value.isEmpty || value.contains('via.placeholder.com')) {
+      return '';
+    }
+
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+
+    // Handle storage paths
+    if (value.contains('/storage/v1/object/public/')) {
+      return value;
+    }
+
+    if (value.startsWith('snap_photos/')) {
+      return '$supabaseUrl/storage/v1/object/public/aerobic_route/$value';
+    }
+
+    return '';
+  }
+
   // ✅ Fetch distinct activity types for filtering
   Future<List<String>> fetchDistinctActivityTypes(int userId) async {
     try {

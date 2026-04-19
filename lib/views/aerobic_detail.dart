@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/aerobic.dart';
 import '../repository/aerobic_repository.dart';
 
@@ -20,11 +21,224 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
   final AerobicRepository _repository = AerobicRepository();
   late Aerobic currentRecord;
   bool isLoading = false;
+  File? _capturedPhoto; // Store the captured photo
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
     currentRecord = widget.record;
+    _loadSnapPhotoFromDatabase();
+  }
+
+  Future<void> _loadSnapPhotoFromDatabase() async {
+    // If the record has a snap_photo URL, load it
+    if (currentRecord.snap_photo.isNotEmpty) {
+      try {
+        final resolver = AerobicRepository();
+        final photoUrl = resolver.resolveSnapPhotoUrl(currentRecord.snap_photo);
+        if (photoUrl.isNotEmpty) {
+          // Download and cache the image
+          final response = await http.get(Uri.parse(photoUrl)).timeout(
+            const Duration(seconds: 10),
+          );
+          if (response.statusCode == 200 && mounted) {
+            final tempDir = await getTemporaryDirectory();
+            final fileName = 'snap_${currentRecord.id}_loaded.png';
+            final file = File('${tempDir.path}/$fileName');
+            await file.writeAsBytes(response.bodyBytes);
+
+            if (mounted) {
+              setState(() {
+                _capturedPhoto = file;
+              });
+            }
+          }
+        }
+      } catch (e) {
+        print('Error loading snap photo from database: $e');
+      }
+    }
+  }
+
+  Future<void> _capturePhoto() async {
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        final photoFile = File(pickedFile.path);
+        
+        setState(() {
+          _capturedPhoto = photoFile;
+        });
+
+        // Upload to database
+        try {
+          print('📤 Saving snap photo to database...');
+          final photoUrl = await _repository.uploadSnapPhoto(currentRecord.id, photoFile);
+          
+          // Update currentRecord with the new snap_photo URL
+          setState(() {
+            currentRecord = Aerobic(
+              id: currentRecord.id,
+              activity_type: currentRecord.activity_type,
+              location: currentRecord.location,
+              total_distance: currentRecord.total_distance,
+              average_pace: currentRecord.average_pace,
+              calories_burned: currentRecord.calories_burned,
+              total_step: currentRecord.total_step,
+              elevation_gain: currentRecord.elevation_gain,
+              start_at: currentRecord.start_at,
+              end_at: currentRecord.end_at,
+              moving_time: currentRecord.moving_time,
+              route_image: currentRecord.route_image,
+              userId: currentRecord.userId,
+              is_archived: currentRecord.is_archived,
+              snap_photo: photoUrl,
+            );
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Photo captured and saved successfully!'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } catch (uploadError) {
+          print('Error uploading photo to database: $uploadError');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Photo captured but failed to save: $uploadError'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('Error capturing photo: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error capturing photo: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  void _removePhoto() {
+    setState(() {
+      _capturedPhoto = null;
+    });
+  }
+
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.nearBlack,
+        title: const Text(
+          'Delete Photo?',
+          style: TextStyle(color: AppColors.lavender),
+        ),
+        content: const Text(
+          'Are you sure you want to remove this photo? This action cannot be undone.',
+          style: TextStyle(color: AppColors.lavender, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+            },
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              _removePhoto();
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFullScreenPhoto() {
+    if (_capturedPhoto == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(0),
+        child: Stack(
+          children: [
+            // Full screen image
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: double.infinity,
+                height: double.infinity,
+                color: Colors.black,
+                child: Image.file(
+                  _capturedPhoto!,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            // Close button
+            Positioned(
+              top: 16,
+              right: 16,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _toggleArchiveRecord() async {
@@ -294,6 +508,27 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: _buildImageSection(),
               ),
+              const SizedBox(height: 20),
+
+              // Photo Capture Section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Session Photo',
+                      style: TextStyle(
+                        color: AppColors.lavender,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildPhotoCaptureContainer(),
+                  ],
+                ),
+              ),
               const SizedBox(height: 24),
 
               // Activity Information Section
@@ -395,6 +630,125 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoCaptureContainer() {
+    return GestureDetector(
+      onTap: _capturedPhoto == null && !currentRecord.is_archived ? _capturePhoto : null,
+      child: Container(
+        width: double.infinity,
+        height: 150,
+        decoration: BoxDecoration(
+          color: AppColors.nearBlack,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _capturedPhoto != null
+                ? AppColors.primary
+                : (currentRecord.is_archived 
+                    ? AppColors.lavender.withValues(alpha: 0.2)
+                    : AppColors.lavender.withValues(alpha: 0.5)),
+            width: 2,
+          ),
+        ),
+        child: _capturedPhoto == null
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_a_photo,
+                      size: 48,
+                      color: currentRecord.is_archived
+                          ? AppColors.lavender.withValues(alpha: 0.3)
+                          : AppColors.primary,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      currentRecord.is_archived ? 'Archived - No Edit' : 'Tap to Add Photo',
+                      style: TextStyle(
+                        color: currentRecord.is_archived
+                            ? AppColors.lavender.withValues(alpha: 0.3)
+                            : AppColors.lavender,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Stack(
+                children: [
+                  // Tappable image for full-screen view
+                  GestureDetector(
+                    onTap: !currentRecord.is_archived ? _showFullScreenPhoto : null,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.file(
+                        _capturedPhoto!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                      ),
+                    ),
+                  ),
+                  // Gray overlay for archived records
+                  if (currentRecord.is_archived)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        width: double.infinity,
+                        height: double.infinity,
+                        color: Colors.black.withValues(alpha: 0.6),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.lock,
+                                color: AppColors.lavender.withValues(alpha: 0.7),
+                                size: 40,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Archived',
+                                style: TextStyle(
+                                  color: AppColors.lavender.withValues(alpha: 0.7),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Delete button only shows for non-archived records
+                  if (!currentRecord.is_archived)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: _showDeleteConfirmation,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
       ),
     );
   }
