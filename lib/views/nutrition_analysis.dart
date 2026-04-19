@@ -64,7 +64,7 @@ class _NutritionScreenState extends State<NutritionScreen>
     _selectedNavIndex = widget.initialNavIndex ?? 2;
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 300),
     );
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();

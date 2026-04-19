@@ -77,10 +77,29 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   
   void _onSearchChanged() {
     setState(() {
-      _showSearchHistory = _searchCtrl.text.isEmpty && _searchHistory.isNotEmpty;
+      // Show search history if field is empty OR if input matches history items
+      final input = _searchCtrl.text.trim().toLowerCase();
+      final hasRelevantHistory = _searchHistory.any(
+        (item) => item.toLowerCase().contains(input) || input.isEmpty
+      );
+      _showSearchHistory = hasRelevantHistory && _searchHistory.isNotEmpty;
     });
   }
-  
+
+  /// Get filtered search history based on current search input
+  List<String> _getFilteredSearchHistory() {
+    final input = _searchCtrl.text.trim().toLowerCase();
+
+    if (input.isEmpty) {
+      return _searchHistory;  // Show all history if input is empty
+    }
+
+    // Filter history items that contain the user input (case-insensitive)
+    return _searchHistory
+        .where((item) => item.toLowerCase().contains(input))
+        .toList();
+  }
+
   Future<void> _selectSearchHistoryItem(String query) async {
     setState(() {
       _searchCtrl.text = query;
@@ -281,7 +300,10 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
   }
 
   Future<void> _logMeal() async {
-    if (_selected.isEmpty) return;
+    if (_selected.isEmpty) {
+      _showErrorSnackbar('Please select at least one food before logging a meal');
+      return;
+    }
 
     final authController = widget.authController;
     if (authController.currentUser == null) {
@@ -871,7 +893,12 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
             onChanged: (v) {
               setState(() {
                 _searchQuery = v;
-                _showSearchHistory = v.isEmpty && _searchHistory.isNotEmpty;
+                // Show search history if field is empty or has matching history
+                final input = v.trim().toLowerCase();
+                final hasRelevantHistory = _searchHistory.any(
+                  (item) => item.toLowerCase().contains(input) || input.isEmpty
+                );
+                _showSearchHistory = hasRelevantHistory && _searchHistory.isNotEmpty;
               });
             },
             onSubmitted: (value) async {
@@ -889,8 +916,8 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
             ),
           ),
         ),
-        // Search history dropdown
-        if (_showSearchHistory && _searchHistory.isNotEmpty)
+        // Search history dropdown - shows matching history as user types
+        if (_showSearchHistory && _getFilteredSearchHistory().isNotEmpty)
           Container(
             width: double.infinity,
             margin: const EdgeInsets.only(top: 4),
@@ -902,15 +929,16 @@ class _AddNewMealPageState extends State<AddNewMealPage> {
             constraints: const BoxConstraints(maxHeight: 200),
             child: ListView.builder(
               shrinkWrap: true,
-              itemCount: _searchHistory.length,
+              itemCount: _getFilteredSearchHistory().length,
               itemBuilder: (context, index) {
-                final query = _searchHistory[index];
+                final filteredHistory = _getFilteredSearchHistory();
+                final query = filteredHistory[index];
                 return GestureDetector(
                   onTap: () => _selectSearchHistoryItem(query),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      border: index < _searchHistory.length - 1
+                      border: index < filteredHistory.length - 1
                           ? Border(bottom: BorderSide(color: AppColors.lavender.withOpacity(0.15)))
                           : null,
                     ),
