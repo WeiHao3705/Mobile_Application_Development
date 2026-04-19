@@ -7,11 +7,13 @@ class BmiCalculatorPage extends StatefulWidget {
     this.initialWeightKg,
     this.initialHeightCm,
     this.dateOfBirth,
+    this.initialGender,
   });
 
   final double? initialWeightKg;
   final double? initialHeightCm;
   final DateTime? dateOfBirth;
+  final String? initialGender;
 
   @override
   State<BmiCalculatorPage> createState() => _BmiCalculatorPageState();
@@ -24,7 +26,7 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
   late final TextEditingController _ageController;
 
   double? _bmi;
-  String _selectedGender = 'Male'; // Default gender
+  String _selectedGender = 'Male';
   late int _currentAge;
 
   @override
@@ -36,9 +38,21 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
     _heightController = TextEditingController(
       text: _formatNullable(widget.initialHeightCm),
     );
-    _currentAge = _computeAge(widget.dateOfBirth) ?? 25; // Default age 25 if not provided
+    _selectedGender = _normalizeGender(widget.initialGender) ?? 'Male';
+    _currentAge = _computeAge(widget.dateOfBirth) ?? 25;
     _ageController = TextEditingController(text: _currentAge.toString());
     _recalculate();
+  }
+
+  String? _normalizeGender(String? value) {
+    final raw = value?.trim().toLowerCase() ?? '';
+    if (raw == 'female' || raw == 'f') {
+      return 'Female';
+    }
+    if (raw == 'male' || raw == 'm') {
+      return 'Male';
+    }
+    return null;
   }
 
   @override
@@ -164,7 +178,6 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bmi = _bmi;
-    final age = _computeAge(widget.dateOfBirth);
 
     return Scaffold(
       appBar: AppBar(title: const Text('BMI Calculator')),
@@ -306,7 +319,7 @@ class _BmiCalculatorPageState extends State<BmiCalculatorPage> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: _selectedGender,
+                        initialValue: _selectedGender,
                         decoration: const InputDecoration(
                           labelText: 'Gender',
                           border: OutlineInputBorder(),

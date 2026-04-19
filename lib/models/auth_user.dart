@@ -10,6 +10,7 @@ class LoginUser {
     required this.isAdmin,
     required this.profilePhotoUrl,
     required this.dateOfBirth,
+    required this.gender,
   });
 
   final dynamic id;
@@ -22,6 +23,7 @@ class LoginUser {
   final bool isAdmin;
   final String? profilePhotoUrl;
   final DateTime? dateOfBirth;
+  final String? gender;
 
   factory LoginUser.fromMap(Map<String, dynamic> map) {
     return LoginUser(
@@ -39,6 +41,7 @@ class LoginUser {
       dateOfBirth: _toNullableDateTime(
         map['date_of_birth'] ?? map['dateOfBirth'],
       ),
+      gender: _toNullableString(map['gender']),
     );
   }
 
@@ -53,6 +56,7 @@ class LoginUser {
     bool? isAdmin,
     String? profilePhotoUrl,
     DateTime? dateOfBirth,
+    String? gender,
   }) {
     return LoginUser(
       id: id ?? this.id,
@@ -65,6 +69,7 @@ class LoginUser {
       isAdmin: isAdmin ?? this.isAdmin,
       profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      gender: gender ?? this.gender,
     );
   }
 
@@ -80,6 +85,7 @@ class LoginUser {
       'isAdmin': isAdmin,
       'profilePhotoUrl': profilePhotoUrl,
       'dateOfBirth': dateOfBirth?.toIso8601String(),
+      'gender': gender,
     };
   }
 

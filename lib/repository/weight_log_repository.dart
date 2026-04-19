@@ -51,7 +51,15 @@ class WeightLogRepository {
         .select()
         .single();
 
-    return WeightLog.fromMap(Map<String, dynamic>.from(response));
+    final inserted = WeightLog.fromMap(Map<String, dynamic>.from(response));
+
+    // Keep User.current_weight in sync whenever a new weight log is added.
+    await supabase
+        .from('User')
+        .update({'current_weight': inserted.weight})
+        .eq('user_id', userId);
+
+    return inserted;
   }
 
   Future<void> updateUserCurrentWeight({
