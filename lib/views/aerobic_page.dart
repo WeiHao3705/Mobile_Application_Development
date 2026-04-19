@@ -180,12 +180,15 @@ class _PreviousRecordsWidget extends StatefulWidget{
 class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
   final AerobicRepository _repository = AerobicRepository();
   late Future<List<Aerobic>> _recordsFuture;
+  late Future<List<String>> _activityTypesFuture;
   DateTime? _selectedFilterDate;
+  String? _selectedActivityType; // Add activity type filter
 
   @override
   void initState() {
     super.initState();
     _recordsFuture = _repository.fetchUserRecords(widget.userId);
+    _activityTypesFuture = _repository.fetchDistinctActivityTypes(widget.userId);
   }
 
   void _refreshRecords() {
@@ -227,6 +230,12 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
     });
   }
 
+  void _clearActivityTypeFilter() {
+    setState(() {
+      _selectedActivityType = null;
+    });
+  }
+
   List<Aerobic> _filterRecordsByDate(List<Aerobic> records) {
     if (_selectedFilterDate == null) {
       return records;
@@ -239,12 +248,28 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
     }).toList();
   }
 
+  List<Aerobic> _filterRecordsByActivityType(List<Aerobic> records) {
+    if (_selectedActivityType == null || _selectedActivityType!.isEmpty) {
+      return records;
+    }
+
+    return records.where((record) {
+      return record.activity_type.toLowerCase() == _selectedActivityType!.toLowerCase();
+    }).toList();
+  }
+
+  List<Aerobic> _applyAllFilters(List<Aerobic> records) {
+    var filtered = records;
+    filtered = _filterRecordsByDate(filtered);
+    filtered = _filterRecordsByActivityType(filtered);
+    return filtered;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ✅ Always show button for Previous Records
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10.0),
           child: SizedBox(
@@ -263,7 +288,6 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
                       duration: Duration(seconds: 2),
                     ),
                   );
-                  // ✅ REFRESH THE RECORDS
                   _refreshRecords();
                 }
               },
@@ -286,38 +310,127 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // ✅ Always show "Previous Record" for this widget
               const Text(
                 'Previous Record',
                 style: TextStyle(
                   color: AppColors.lime,
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              GestureDetector(
-                onTap: _selectFilterDate,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.primary),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.calendar_today, color: AppColors.primary, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Filter',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: _selectFilterDate,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.primary),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
+                      child: const Row(
+                        children: [
+                          Icon(Icons.calendar_today, color: AppColors.primary, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Date',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  // Activity Type Filter Button
+                  FutureBuilder<List<String>>(
+                    future: _activityTypesFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.primary),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: AppColors.primary,
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        );
+                      }
+
+                      final activityTypes = snapshot.data ?? [];
+                      final dropdownItems = [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text(
+                            'All',
+                            style: TextStyle(
+                              color: AppColors.lavender,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        ...activityTypes.map((type) => DropdownMenuItem<String?>(
+                          value: type,
+                          child: Text(
+                            type,
+                            style: const TextStyle(
+                              color: AppColors.lavender,
+                              fontSize: 12,
+                            ),
+                          ),
+                        )),
+                      ];
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.primary),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: DropdownButton<String?>(
+                          value: _selectedActivityType,
+                          underline: const SizedBox(),
+                          isDense: true,
+                          hint: const Row(
+                            children: [
+                              Icon(Icons.category, color: AppColors.primary, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'Type',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                          dropdownColor: AppColors.nearBlack,
+                          items: dropdownItems,
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedActivityType = value;
+                            });
+                          },
+                          style: const TextStyle(
+                            color: AppColors.lime,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -354,9 +467,9 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
             ),
           ),
 
+
         const SizedBox(height: 12),
 
-        // ✅ NOW USES STATE VARIABLE FOR FUTURE WITH FILTERING
         FutureBuilder<List<Aerobic>>(
             future: _recordsFuture,
             builder: (context, snapshot) {
@@ -371,27 +484,12 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
               }
 
               final allRecords = snapshot.data ?? [];
-              
-              // 🔍 DEBUG: Print all records and their archive status
-              print('📊 [PREVIOUS-RECORDS] ========== FETCH RESULT ==========');
-              print('📊 [PREVIOUS-RECORDS] Total records fetched: ${allRecords.length}');
-              for (int i = 0; i < allRecords.length; i++) {
-                final record = allRecords[i];
-                print('  Record #${i + 1}:');
-                print('    - Activity: ${record.activity_type}');
-                print('    - Location: ${record.location}');
-                print('    - Distance: ${record.total_distance} km');
-                print('    - Is Archived: ${record.is_archived}');
-                print('    - Date: ${record.start_at}');
-              }
-              
+
               // Filter to show only non-archived records
               final nonArchivedRecords = allRecords.where((record) => !record.is_archived).toList();
-              print('📌 [PREVIOUS-RECORDS] Non-archived records: ${nonArchivedRecords.length}');
-              print('📌 [PREVIOUS-RECORDS] ========== END FETCH RESULT ==========');
               
-              // Then filter by date
-              final filteredRecords = _filterRecordsByDate(nonArchivedRecords);
+              // Apply all filters (date and activity type)
+              final filteredRecords = _applyAllFilters(nonArchivedRecords);
 
               if (filteredRecords.isEmpty) {
                 String emptyMessage;
@@ -421,7 +519,7 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
                     return _ActivityCard(
                       record: filteredRecords[index],
                       resolveRouteImageUrl: _repository.resolveRouteImageUrl,
-
+                      onDetailClose: _refreshRecords,
                     );
                   }
               );
@@ -437,11 +535,13 @@ class _ActivityCard extends StatelessWidget{
   final Aerobic record;
   final String Function(String rawValue) resolveRouteImageUrl;
   final bool isArchived;
+  final VoidCallback onDetailClose; // Add callback for when detail page closes
 
   const _ActivityCard({
     required this.record,
     required this.resolveRouteImageUrl,
     this.isArchived = false,
+    required this.onDetailClose, // Require the callback
   });
 
   @override
@@ -453,7 +553,10 @@ class _ActivityCard extends StatelessWidget{
           MaterialPageRoute(
             builder: (context) => AerobicDetailPage(record: record),
           ),
-        );
+        ).then((_) {
+          // Refresh records when returning from detail page
+          onDetailClose();
+        });
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16.0),
@@ -546,11 +649,11 @@ class _ActivityCard extends StatelessWidget{
     final resolvedImageUrl = resolveRouteImageUrl(record.route_image);
 
     if (resolvedImageUrl.isEmpty) {
-      print('⚠️  [AEROBIC-PAGE] Image URL is empty for: ${record.route_image}');
+      print('[AEROBIC-PAGE] Image URL is empty for: ${record.route_image}');
       return _buildPlaceholderMap();
     }
 
-    print('✅ [AEROBIC-PAGE] Loading image from: $resolvedImageUrl');
+    print('[AEROBIC-PAGE] Loading image from: $resolvedImageUrl');
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: Image.network(
@@ -574,7 +677,7 @@ class _ActivityCard extends StatelessWidget{
           );
         },
         errorBuilder: (context, error, stackTrace) {
-          print('❌ Error loading route image: $error | raw=${record.route_image} | resolved=$resolvedImageUrl');
+          print('Error loading route image: $error | raw=${record.route_image} | resolved=$resolvedImageUrl');
           return _buildPlaceholderMap();
         },
       ),
@@ -616,17 +719,20 @@ class _ArchivedRecordsWidget extends StatefulWidget {
 class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
   final AerobicRepository _repository = AerobicRepository();
   late Future<List<Aerobic>> _recordsFuture;
+  late Future<List<String>> _activityTypesFuture;
   DateTime? _selectedFilterDate;
+  String? _selectedActivityType; // Add activity type filter
 
   @override
   void initState() {
     super.initState();
     _recordsFuture = _repository.fetchArchivedRecords(widget.userId);
+    _activityTypesFuture = _repository.fetchDistinctActivityTypes(widget.userId);
   }
 
   void _refreshRecords() {
     setState(() {
-      _recordsFuture = _repository.fetchUserRecords(widget.userId);
+      _recordsFuture = _repository.fetchArchivedRecords(widget.userId);
     });
   }
 
@@ -663,6 +769,12 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
     });
   }
 
+  void _clearActivityTypeFilter() {
+    setState(() {
+      _selectedActivityType = null;
+    });
+  }
+
   List<Aerobic> _filterRecordsByDate(List<Aerobic> records) {
     if (_selectedFilterDate == null) {
       return records;
@@ -673,6 +785,23 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
           record.start_at.month == _selectedFilterDate!.month &&
           record.start_at.day == _selectedFilterDate!.day;
     }).toList();
+  }
+
+  List<Aerobic> _filterRecordsByActivityType(List<Aerobic> records) {
+    if (_selectedActivityType == null || _selectedActivityType!.isEmpty) {
+      return records;
+    }
+
+    return records.where((record) {
+      return record.activity_type.toLowerCase() == _selectedActivityType!.toLowerCase();
+    }).toList();
+  }
+
+  List<Aerobic> _applyAllFilters(List<Aerobic> records) {
+    var filtered = records;
+    filtered = _filterRecordsByDate(filtered);
+    filtered = _filterRecordsByActivityType(filtered);
+    return filtered;
   }
 
   @override
@@ -689,33 +818,123 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
                 'Archived Records',
                 style: TextStyle(
                   color: AppColors.lime,
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              GestureDetector(
-                onTap: _selectFilterDate,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.primary),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.calendar_today, color: AppColors.primary, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Filter',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: _selectFilterDate,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.primary),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
+                      child: const Row(
+                        children: [
+                          Icon(Icons.calendar_today, color: AppColors.primary, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Date',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  // Activity Type Filter Button
+                  FutureBuilder<List<String>>(
+                    future: _activityTypesFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.primary),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              color: AppColors.primary,
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        );
+                      }
+
+                      final activityTypes = snapshot.data ?? [];
+                      final dropdownItems = [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text(
+                            'All',
+                            style: TextStyle(
+                              color: AppColors.lavender,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        ...activityTypes.map((type) => DropdownMenuItem<String?>(
+                          value: type,
+                          child: Text(
+                            type,
+                            style: const TextStyle(
+                              color: AppColors.lavender,
+                              fontSize: 12,
+                            ),
+                          ),
+                        )),
+                      ];
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.primary),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: DropdownButton<String?>(
+                          value: _selectedActivityType,
+                          underline: const SizedBox(),
+                          isDense: true,
+                          hint: const Row(
+                            children: [
+                              Icon(Icons.category, color: AppColors.primary, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'Type',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                          dropdownColor: AppColors.nearBlack,
+                          items: dropdownItems,
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedActivityType = value;
+                            });
+                          },
+                          style: const TextStyle(
+                            color: AppColors.lime,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -754,7 +973,6 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
 
         const SizedBox(height: 12),
 
-        // ✅ Display archived records
         FutureBuilder<List<Aerobic>>(
             future: _recordsFuture,
             builder: (context, snapshot) {
@@ -770,24 +988,8 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
 
               final allRecords = snapshot.data ?? [];
 
-              // 🔍 DEBUG: Print archived records
-              print('📊 [ARCHIVED-RECORDS] ========== FETCH RESULT ==========');
-              print('📊 [ARCHIVED-RECORDS] Total ARCHIVED records fetched: ${allRecords.length}');
-              for (int i = 0; i < allRecords.length; i++) {
-                final record = allRecords[i];
-                print('  Archived Record #${i + 1}:');
-                print('    - Activity: ${record.activity_type}');
-                print('    - Location: ${record.location}');
-                print('    - Distance: ${record.total_distance} km');
-                print('    - Is Archived: ${record.is_archived}');
-                print('    - Date: ${record.start_at}');
-              }
-
-              // These are already archived records, just filter by date if needed
-              final filteredRecords = _filterRecordsByDate(allRecords);
-              print('📌 [ARCHIVED-RECORDS] After date filter: ${filteredRecords.length} records');
-              print('📌 [ARCHIVED-RECORDS] ========== END FETCH RESULT ==========');
-
+              // These are already archived records, apply all filters
+              final filteredRecords = _applyAllFilters(allRecords);
 
               if (filteredRecords.isEmpty) {
                 String emptyMessage;
@@ -817,6 +1019,7 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
                       record: filteredRecords[index],
                       resolveRouteImageUrl: _repository.resolveRouteImageUrl,
                       isArchived: true,
+                      onDetailClose: _refreshRecords,
                     );
                   });
             })

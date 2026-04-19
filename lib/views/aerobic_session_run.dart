@@ -38,13 +38,13 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
   final TrackingController _trackingController = TrackingController();
   final GlobalKey _mapRepaintKey = GlobalKey();
 
-  late MapController _mapController;  // ✅ LAZY INITIALIZATION
+  late MapController _mapController;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _mapController = MapController();  // ✅ Initialize in initState
+    _mapController = MapController();
     _trackingController.currentLocation = widget.startLocation;
     _trackingController.locationHistory.add(widget.startLocation);
     _trackingController.sessionStartTime = DateTime.now();
@@ -99,18 +99,14 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
   }
 
   Future<String> _captureAndUploadMapScreenshot() async {
-    print('🖼️ Starting map screenshot capture...');
-
     // Retry capture because the boundary may not be ready in the first frame.
     Uint8List? imageBytes;
     for (int attempt = 1; attempt <= 3; attempt++) {
       await Future.delayed(const Duration(milliseconds: 450));
-      print('📸 Capture attempt $attempt/3');
 
       final boundary = _mapRepaintKey.currentContext?.findRenderObject()
           as RenderRepaintBoundary?;
       if (boundary == null) {
-        print('⚠️ Map boundary not available yet');
         continue;
       }
 
@@ -120,16 +116,13 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
         imageBytes = byteData?.buffer.asUint8List();
 
         if (imageBytes != null && imageBytes.isNotEmpty) {
-          print('✅ Screenshot captured successfully, size: ${imageBytes.length} bytes');
           break;
         }
       } catch (e) {
-        print('⚠️ Screenshot capture attempt $attempt failed: $e');
       }
     }
 
     if (imageBytes == null || imageBytes.isEmpty) {
-      print('❌ Route image capture failed - map not ready after 3 attempts');
       throw Exception('Route image capture failed (map not ready).');
     }
 
@@ -138,12 +131,7 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
     final fileName = 'route_${userId}_$timestamp.png';
 
     // Save to local storage first
-    print('💾 Saving to local storage...');
     final localPath = await _saveImageLocally(fileName, imageBytes);
-    print('✅ Saved locally at: $localPath');
-
-    print('📤 Uploading screenshot to Supabase: $fileName');
-    
     try {
       final imageUrl = await _aerobicRepository.uploadAerobicRouteImage(
         fileName,
@@ -151,16 +139,11 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
       );
 
       if (imageUrl.isEmpty) {
-        print('❌ Upload returned empty URL');
-        print('⚠️ But local copy saved at: $localPath');
         return localPath; // Return local path if Supabase fails
       }
 
-      print('✅ Image uploaded successfully: $imageUrl');
       return imageUrl;
     } catch (e) {
-      print('❌ Upload error: $e');
-      print('⚠️ But local copy saved at: $localPath');
       return localPath; // Return local path as fallback
     }
   }
@@ -173,16 +156,12 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
       // Create directory if it doesn't exist
       if (!await aerobicDir.exists()) {
         await aerobicDir.create(recursive: true);
-        print('📁 Created aerobic_routes directory');
       }
-
       final file = File('${aerobicDir.path}/$fileName');
       await file.writeAsBytes(imageBytes);
       
-      print('✅ Image saved locally: ${file.path}');
       return file.path;
     } catch (e) {
-      print('❌ Local storage save failed: $e');
       throw Exception('Failed to save image locally: $e');
     }
   }
@@ -222,27 +201,17 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
                   onPressed: _isSaving ? null : () async {
                     setState(() => _isSaving = true);
                     try {
-                      print('\n🔵 ===== SAVE RECORD STARTED =====');
-                      
-                      // Step 1: Get location
-                      print('Step 1: Fetching location...');
+                      //Get location
                       final locationAddress = await _getLocationAddress();
-                      print('✅ Location: $locationAddress');
-                      
-                      // Step 2: Capture screenshot
-                      print('\nStep 2: Capturing screenshot...');
-                      print('📍 Current location: ${_trackingController.currentLocation}');
-                      print('📍 Location history count: ${_trackingController.locationHistory.length}');
-                      
+
+                      //Capture screenshot
                       final routeImageUrl = await _captureAndUploadMapScreenshot();
-                      print('✅ Route image URL: ${routeImageUrl.isEmpty ? "EMPTY (no image saved)" : routeImageUrl}');
 
                       if (routeImageUrl.isEmpty) {
                         throw Exception('Unable to capture/upload route image. Please try again.');
                       }
                       
-                      // Step 3: Create record
-                      print('\nStep 3: Creating aerobic record...');
+                      //Create record
                       final newRecord = Aerobic(
                         id: widget.userId.toString(),
                         activity_type: widget.activityType,
@@ -255,22 +224,13 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
                         start_at: _trackingController.sessionStartTime ?? DateTime.now(),
                         end_at: DateTime.now(),
                         moving_time: _trackingController.elapsedSeconds,
-                        footwear: 'None',
                         route_image: routeImageUrl,
                         userId: widget.userId.toString(),
                         is_archived: false,
                       );
-                      print('✅ Record created with data:');
-                      print('   - Activity: ${newRecord.activity_type}');
-                      print('   - Location: ${newRecord.location}');
-                      print('   - Distance: ${newRecord.total_distance} km');
-                      print('   - Route Image: ${newRecord.route_image.isEmpty ? "EMPTY" : "HAS URL"}');
 
-                      // Step 4: Save to database
-                      print('\nStep 4: Saving to database...');
+                      //Save to database
                       await _aerobicRepository.createAerobicRecord(newRecord);
-                      print('✅ Record saved to database');
-                      print('🔵 ===== SAVE RECORD COMPLETED =====\n');
 
                       if (mounted) {
                         Navigator.pop(context); // Close dialog
@@ -278,8 +238,6 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
                         Navigator.pop(context, true); // Close aerobic_type and return to aerobic_page
                       }
                     } catch (e) {
-                      print('❌ ERROR: $e');
-                      print('Stack trace: ${StackTrace.current}');
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -324,15 +282,57 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
                 children: [
                   GestureDetector(
                     onTap: () {
-                      _stopTracking();
-                      Navigator.pop(context);
+                      // Show confirmation dialog before discarding
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => AlertDialog(
+                          backgroundColor: AppColors.nearBlack,
+                          title: const Text(
+                            'Discard Session?',
+                            style: TextStyle(color: AppColors.lavender),
+                          ),
+                          content: const Text(
+                            'Are you sure you want to discard the current session? All recorded data will be lost.',
+                            style: TextStyle(color: AppColors.lavender, height: 1.5),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context); // Close dialog
+                              },
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () {
+                                _stopTracking();
+                                Navigator.pop(context); // Close dialog
+                                Navigator.pop(context); // Close aerobic_session_run
+                              },
+                              child: const Text(
+                                'Discard',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
                     },
                     child: Container(
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        border:
-                        Border.all(color: AppColors.lavender.withValues(alpha: 0.55)),
+                        border: Border.all(color: AppColors.lavender.withValues(alpha: 0.55)),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       alignment: Alignment.center,

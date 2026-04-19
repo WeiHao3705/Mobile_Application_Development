@@ -115,7 +115,7 @@ class _AdminAerobicTypePageState extends State<AdminAerobicTypePage> {
                   _refreshActivityTypes();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ Activity type created successfully'),
+                      content: Text('Activity type created successfully'),
                       backgroundColor: Colors.green,
                       duration: Duration(seconds: 2),
                     ),
@@ -226,7 +226,7 @@ class _AdminAerobicTypePageState extends State<AdminAerobicTypePage> {
                   _refreshActivityTypes();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ Activity type updated successfully'),
+                      content: Text('Activity type updated successfully'),
                       backgroundColor: Colors.green,
                       duration: Duration(seconds: 2),
                     ),
@@ -279,7 +279,7 @@ class _AdminAerobicTypePageState extends State<AdminAerobicTypePage> {
                   _refreshActivityTypes();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ Activity type deleted successfully'),
+                      content: Text('Activity type deleted successfully'),
                       backgroundColor: Colors.green,
                       duration: Duration(seconds: 2),
                     ),
@@ -425,20 +425,13 @@ class _AdminAerobicTypePageState extends State<AdminAerobicTypePage> {
 
                   final activityTypes = snapshot.data ?? [];
 
-                  // ✅ Sort by activity name (aerobic_name) in alphabetical order
-                  activityTypes.sort((a, b) => 
+                  activityTypes.sort((a, b) =>
                     (a['aerobic_name'] as String).compareTo(b['aerobic_name'] as String)
                   );
 
-                  print('📊 [ADMIN] ========== ACTIVITY TYPES (SORTED BY NAME) ==========');
-                  print('📊 [ADMIN] Total aerobic types: ${activityTypes.length}');
                   for (int i = 0; i < activityTypes.length; i++) {
                     final activity = activityTypes[i];
-                    print('  Type #${i + 1}:');
-                    print('    - Name: ${activity['aerobic_name']}');
-                    print('    - Calories/KM: ${activity['caloriesPerKM']}');
                   }
-                  print('📊 [ADMIN] ========== END ACTIVITY TYPES ==========');
 
                   if (activityTypes.isEmpty) {
                     return Center(

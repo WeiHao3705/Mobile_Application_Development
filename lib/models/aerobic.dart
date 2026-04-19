@@ -11,7 +11,6 @@ class Aerobic {
   final DateTime start_at;
   final DateTime end_at;
   final int moving_time;
-  final String footwear;
   final String route_image;
   final String userId;
   final bool is_archived;
@@ -28,7 +27,6 @@ class Aerobic {
     required this.start_at,
     required this.end_at,
     required this.moving_time,
-    required this.footwear,
     required this.route_image,
     required this.userId,
     this.is_archived = false,
@@ -44,10 +42,10 @@ class Aerobic {
         // Remove the 'Z' if it exists to treat it as local time
         final cleanedDate = dateString.replaceAll('Z', '');
         final parsedTime = DateTime.parse(cleanedDate);
-        print('📅 [AEROBIC] Parsed time: $parsedTime');
+        print('Parsed time: $parsedTime');
         return parsedTime;
       } catch (e) {
-        print('❌ Error parsing date: $dateString - $e');
+        print('Error parsing date: $dateString - $e');
         return DateTime.now();
       }
     }
@@ -64,7 +62,6 @@ class Aerobic {
       start_at: parseDateTime(json['start_at']),
       end_at: parseDateTime(json['end_at']),
       moving_time: (json['moving_time'] as num?)?.toInt() ?? 0,
-      footwear: json['footwear'] ?? 'None',
       route_image: json['route_image'] ?? '',
       userId: json['user_id']?.toString() ?? '',
       is_archived: json['is_archived'] as bool? ?? false,
@@ -83,7 +80,6 @@ class Aerobic {
     "start_at": start_at.toIso8601String(),
     "end_at": end_at.toIso8601String(),
     "moving_time": moving_time,
-    "footwear": footwear,
     "route_image": route_image,
     "user_id": userId,
     "is_archived": is_archived,

@@ -65,15 +65,15 @@ class NotificationService {
 
       // Send notifications only for missing meals
       if (missingMeals.contains('breakfast')) {
-        await _scheduleDaily(0, 9, 0, 'Breakfast Reminder', '🥣 Good morning! Don\'t forget your breakfast.');
+        await _scheduleDaily(0, 21, 31, 'Breakfast Reminder', '🥣 Good morning! Don\'t forget your breakfast.');
       }
 
       if (missingMeals.contains('lunch')) {
-        await _scheduleDaily(1, 13, 00, 'Lunch Reminder', '🍽️ Lunch time! Have you logged your meal yet?');
+        await _scheduleDaily(1, 21, 32, 'Lunch Reminder', '🍽️ Lunch time! Have you logged your meal yet?');
       }
 
       if (missingMeals.contains('dinner')) {
-        await _scheduleDaily(2, 19, 0, 'Dinner Reminder', '🍖 Dinner time! Don\'t forget to log your meal.');
+        await _scheduleDaily(2, 21, 33, 'Dinner Reminder', '🍖 Dinner time! Don\'t forget to log your meal.');
       }
 
       developer.log('Notifications scheduled for missing meals: $missingMeals');

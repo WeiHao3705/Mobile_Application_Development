@@ -448,4 +448,37 @@ class AerobicRepository {
       throw Exception('Failed to update archive status: $e');
     }
   }
+
+  // ✅ Fetch distinct activity types for filtering
+  Future<List<String>> fetchDistinctActivityTypes(int userId) async {
+    try {
+      print('📥 [FETCH-TYPES] Fetching distinct activity types for user: $userId');
+      final response = await _supabase
+          .from('AerobicExercise')
+          .select('activity_type')
+          .eq('user_id', userId)
+          .order('activity_type', ascending: true);
+
+      if (response is List) {
+        // Extract unique activity types
+        final Set<String> uniqueTypes = {};
+        for (var item in response) {
+          if (item is Map<String, dynamic> && item['activity_type'] != null) {
+            uniqueTypes.add(item['activity_type'].toString());
+          }
+        }
+
+        final typeList = uniqueTypes.toList();
+        print('📥 [FETCH-TYPES] Found ${typeList.length} activity types: $typeList');
+        return typeList;
+      }
+
+      print('⚠️  [FETCH-TYPES] Response is not a list');
+      return [];
+    } catch (e) {
+      print('❌ [FETCH-TYPES] Error fetching activity types: $e');
+      return [];
+    }
+  }
 }
+
