@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/exercise.dart';
 import '../repository/exercise_repository.dart';
+import '../theme/app_colors.dart';
 import 'exercise_detail_page.dart';
 
 class ExerciseExplorePage extends StatefulWidget {
@@ -170,11 +171,13 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
-        foregroundColor: theme.colorScheme.primary,
-        surfaceTintColor: Colors.black,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.primary),
+          style: IconButton.styleFrom(
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
           onPressed: () => Navigator.of(context).pop(),
           tooltip: 'Back to Workout',
         ),
@@ -184,10 +187,11 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
               : 'Exercise',
           style: TextStyle(
             color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         actions: [
           if (widget.selectable)
             TextButton(
@@ -404,14 +408,22 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
                   ),
                 ),
               ),
-              for (final option in options)
-                ListTile(
-                  title: Text(
-                    option,
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  onTap: () => Navigator.of(context).pop(option),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (context, index) {
+                    final option = options[index];
+                    return ListTile(
+                      title: Text(
+                        option,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      onTap: () => Navigator.of(context).pop(option),
+                    );
+                  },
                 ),
+              ),
             ],
           ),
         );

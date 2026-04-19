@@ -161,14 +161,30 @@ class _ExercisePageState extends State<ExercisePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       backgroundColor: AppColors.black,
       appBar: AppBar(
-        title: const Text('Exercise Management'),
-        centerTitle: true,
-        backgroundColor: AppColors.cardBg,
-        foregroundColor: AppColors.lavender,
+        backgroundColor: AppColors.black,
         elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.primary),
+          style: IconButton.styleFrom(
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Exercise Management',
+          style: TextStyle(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: false,
       ),
       body: SafeArea(
         child: Column(

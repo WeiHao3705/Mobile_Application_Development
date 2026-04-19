@@ -95,7 +95,10 @@ class AdminDashboardPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.cardBg,
         foregroundColor: AppColors.white,
-        title: const Text('Admin Dashboard'),
+        title: Text(
+          'Admin Dashboard',
+          style: TextStyle(color: theme.colorScheme.primary),
+        ),
         centerTitle: true,
         actions: [
           IconButton(

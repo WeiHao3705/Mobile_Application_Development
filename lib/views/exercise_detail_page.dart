@@ -6,6 +6,8 @@ import 'package:video_player/video_player.dart';
 
 import '../models/exercise.dart';
 import '../repository/exercise_repository.dart';
+import '../theme/app_colors.dart';
+import 'edit_exercise_page.dart';
 
 class ExerciseDetailPage extends StatefulWidget {
   const ExerciseDetailPage({
@@ -36,151 +38,22 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
   }
 
   Future<void> _openEditDialog() async {
-    final nameController = TextEditingController(text: _exercise.name);
-    final primaryMuscleController = TextEditingController(text: _exercise.primaryMuscle);
-    final secondaryMuscleController = TextEditingController(
-      text: _exercise.secondaryMuscles.join(', '),
-    );
-    final equipmentController = TextEditingController(text: _exercise.equipment);
-    final howToController = TextEditingController(text: _exercise.howTo);
-    final imageUrlController = TextEditingController(text: _exercise.imageUrl);
-    final videoUrlController = TextEditingController(text: _exercise.videoUrl ?? '');
-
-    try {
-      final didSave = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit Exercise'),
-          content: SizedBox(
-            width: 420,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
-                  TextField(
-                    controller: primaryMuscleController,
-                    decoration: const InputDecoration(labelText: 'Primary Muscle'),
-                  ),
-                  TextField(
-                    controller: secondaryMuscleController,
-                    decoration: const InputDecoration(labelText: 'Secondary Muscle(s) (comma-separated)'),
-                  ),
-                  TextField(
-                    controller: equipmentController,
-                    decoration: const InputDecoration(labelText: 'Equipment'),
-                  ),
-                  TextField(
-                    controller: imageUrlController,
-                    decoration: const InputDecoration(labelText: 'Image URL'),
-                  ),
-                  TextField(
-                    controller: videoUrlController,
-                    decoration: const InputDecoration(labelText: 'Video URL (optional)'),
-                  ),
-                  TextField(
-                    controller: howToController,
-                    decoration: const InputDecoration(labelText: 'How To'),
-                    minLines: 3,
-                    maxLines: 6,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
+    final updated = await Navigator.of(context).push<Exercise>(
+      MaterialPageRoute<Exercise>(
+        builder: (_) => EditExercisePage(
+          repository: _repository,
+          exercise: _exercise,
+        ),
+      ),
     );
 
-      if (didSave != true) {
-        return;
-      }
-
-      final name = nameController.text.trim();
-      final primaryMuscle = primaryMuscleController.text.trim();
-      final equipment = equipmentController.text.trim();
-      final howTo = howToController.text.trim();
-      final imageUrl = imageUrlController.text.trim();
-      final secondaryMuscles = secondaryMuscleController.text
-          .split(',')
-          .map((value) => value.trim())
-          .where((value) => value.isNotEmpty)
-          .toList();
-
-      if (name.isEmpty ||
-          primaryMuscle.isEmpty ||
-          equipment.isEmpty ||
-          howTo.isEmpty ||
-          imageUrl.isEmpty) {
-        if (!mounted) {
-          return;
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill all required fields.')),
-        );
-        return;
-      }
-
+    if (updated != null && mounted) {
       setState(() {
-        _isSaving = true;
+        _exercise = updated;
       });
-
-      try {
-        final updated = await _repository.updateExercise(
-          exerciseId: _exercise.id,
-          name: name,
-          primaryMuscle: primaryMuscle,
-          secondaryMuscles: secondaryMuscles,
-          equipment: equipment,
-          howTo: howTo,
-          imageUrl: imageUrl,
-          videoUrl: videoUrlController.text.trim(),
-        );
-
-        if (!mounted) {
-          return;
-        }
-
-        setState(() {
-          _exercise = updated;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Exercise updated successfully.')),
-        );
-        Navigator.of(context).pop(true);
-      } catch (error) {
-        if (!mounted) {
-          return;
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save exercise: $error')),
-        );
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isSaving = false;
-          });
-        }
-      }
-    } finally {
-      nameController.dispose();
-      primaryMuscleController.dispose();
-      secondaryMuscleController.dispose();
-      equipmentController.dispose();
-      howToController.dispose();
-      imageUrlController.dispose();
-      videoUrlController.dispose();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Exercise updated successfully.')),
+      );
     }
   }
 
@@ -192,9 +65,24 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
-        foregroundColor: theme.colorScheme.primary,
         elevation: 0,
-        title: const Text('Exercise Detail'),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.primary),
+          style: IconButton.styleFrom(
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Exercise Detail',
+          style: TextStyle(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: false,
         actions: [
           if (widget.isAdmin)
             IconButton(
@@ -203,9 +91,9 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
                     )
-                  : const Icon(Icons.edit),
+                  : const Icon(Icons.edit, color: Colors.white),
               tooltip: 'Edit Exercise',
             ),
         ],
