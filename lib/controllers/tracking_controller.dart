@@ -102,7 +102,6 @@ class TrackingController {
       totalSteps = (totalDistance * 1000 * 1.3).toInt();
       caloriesBurned = _calculateCalories(caloriesPerKM);
 
-      // Notify UI with updated metrics
       onLocationUpdated(
         newLocation,
         locationHistory,
@@ -114,12 +113,10 @@ class TrackingController {
     });
   }
 
-  /// Calculate calories based on distance and calories per KM
   int _calculateCalories(int caloriesPerKM) {
     return (totalDistance * caloriesPerKM).toInt();
   }
 
-  /// Format duration in seconds to readable format (HH:MM:SS or MM:SS)
   String formatDuration(int seconds) {
     int hours = seconds ~/ 3600;
     int minutes = (seconds % 3600) ~/ 60;
@@ -131,7 +128,6 @@ class TrackingController {
     return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
-  /// Format pace to readable format (MM:SS per KM)
   String formatPace(double pace) {
     if (pace == 0) return "0:00";
 

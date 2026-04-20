@@ -177,24 +177,18 @@ class LocationController {
     }
   }
 
-  /// Get location address using Nominatim and geocoding package fallback
   Future<String> getLocationAddress(double latitude, double longitude) async {
     try {
       if (latitude == 0 || longitude == 0) {
         return 'Location Unknown';
       }
 
-      // 1. TRY NOMINATIM FIRST (better for POI/building names)
-      print('🌐 Attempting Nominatim reverse geocoding...');
       final nominatimResult = await getLocationFromNominatim(latitude, longitude);
       if (nominatimResult.isNotEmpty && nominatimResult.length > 2) {
         // Accept Nominatim result even if it's not super specific - it's better than nothing
-        print('✅ Using Nominatim result: $nominatimResult');
         return nominatimResult;
       }
 
-      // 2. FALLBACK TO GEOCODING PACKAGE
-      print('⚙️ Nominatim returned empty, falling back to geocoding package...');
       final placemarks = await placemarkFromCoordinates(
         latitude,
         longitude,
@@ -204,25 +198,13 @@ class LocationController {
         final place = placemarks.first;
         final state = place.administrativeArea?.trim();
         
-        print('📍 === GEOCODING DETAILS ===');
-        print('Name: ${place.name}');
-        print('Thoroughfare: ${place.thoroughfare}');
-        print('SubThoroughfare: ${place.subThoroughfare}');
-        print('SubLocality: ${place.subLocality}');
-        print('Locality: ${place.locality}');
-        print('SubAdministrativeArea: ${place.subAdministrativeArea}');
-        print('AdministrativeArea: ${place.administrativeArea}');
-        print('Country: ${place.country}');
-        
         final addressParts = <String>[];
         bool hasSpecificLocation = false;
         
-        // 1. HIGHEST PRIORITY: Specific building/landmark names
         if (place.name != null && place.name!.isNotEmpty) {
           final name = place.name!.trim();
           
-          // Strictly filter out generic admin/city names
-          final isGeneric = name == place.administrativeArea || 
+          final isGeneric = name == place.administrativeArea ||
                            name == place.locality || 
                            name.contains('W.P.') ||
                            name.contains('Kuala Lumpur') ||
@@ -234,11 +216,9 @@ class LocationController {
           if (!isGeneric) {
             addressParts.add(name);
             hasSpecificLocation = true;
-            print('✅ Found specific landmark: $name');
           }
         }
         
-        // 2. Sub-locality/neighborhood (HIGH PRIORITY - more specific than street)
         if (place.subLocality != null && place.subLocality!.isNotEmpty) {
           final subLocality = place.subLocality!.trim();
           final isGeneric = subLocality.contains('W.P.') || 
@@ -248,17 +228,14 @@ class LocationController {
           if (!isGeneric && !addressParts.contains(subLocality)) {
             addressParts.add(subLocality);
             hasSpecificLocation = true;
-            print('✅ Found sub-locality: $subLocality');
           }
         }
         
-        // 3. Street name (e.g., "Jalan Raja")
         if (place.thoroughfare != null && place.thoroughfare!.isNotEmpty) {
           final street = place.thoroughfare!.trim();
           if (!addressParts.contains(street) && street.length > 3) {
             addressParts.add(street);
             hasSpecificLocation = true;
-            print('✅ Found street: $street');
           }
         }
         
@@ -268,7 +245,6 @@ class LocationController {
           if (!addressParts.contains(building)) {
             addressParts.add(building);
             hasSpecificLocation = true;
-            print('✅ Found building number: $building');
           }
         }
 
@@ -278,86 +254,72 @@ class LocationController {
             .toSet()
             .toList()
             .join(', ');
-
-        print('Has specific location: $hasSpecificLocation');
-        print('Final parsed address: $uniqueAddress');
         
         // If we found something specific, return it
         if (hasSpecificLocation && uniqueAddress.isNotEmpty) {
-          print('✅ Final Address: $uniqueAddress');
-          print('========================');
           return _withState(uniqueAddress, state);
         }
         
-        // FALLBACK: Try multiple sources in priority order
         String fallbackAddress = '';
         
-        // 1. Try subLocality/neighborhood FIRST (most specific)
         if (place.subLocality != null && place.subLocality!.isNotEmpty) {
           final subLocality = place.subLocality!.trim();
           if (subLocality.length > 2) {
             fallbackAddress = subLocality;
             fallbackAddress = _withState(fallbackAddress, state);
-            print('✅ Fallback: Using sub-locality + state: $fallbackAddress');
+            print('Fallback: Using sub-locality + state: $fallbackAddress');
           }
         }
         
-        // 2. If no subLocality, try street name
         if (fallbackAddress.isEmpty && place.thoroughfare != null && place.thoroughfare!.isNotEmpty) {
           final street = place.thoroughfare!.trim();
           if (street.length > 2) {
             fallbackAddress = street;
             fallbackAddress = _withState(fallbackAddress, state);
-            print('✅ Fallback: Using street + state: $fallbackAddress');
+            print('Fallback: Using street + state: $fallbackAddress');
           }
         }
         
-        // 3. If no street, try name field (might be generic but better than coordinates)
         if (fallbackAddress.isEmpty && place.name != null && place.name!.isNotEmpty) {
           final name = place.name!.trim();
           if (name.length > 2 && !name.contains('W.P.')) {
             fallbackAddress = name;
             fallbackAddress = _withState(fallbackAddress, state);
-            print('✅ Fallback: Using name + state: $fallbackAddress');
+            print('Fallback: Using name + state: $fallbackAddress');
           }
         }
         
-        // 4. Try subAdministrativeArea (district level)
         if (fallbackAddress.isEmpty && place.subAdministrativeArea != null && place.subAdministrativeArea!.isNotEmpty) {
           final subAdmin = place.subAdministrativeArea!.trim();
           if (subAdmin.length > 2 && !subAdmin.contains('W.P.')) {
             fallbackAddress = subAdmin;
             fallbackAddress = _withState(fallbackAddress, state);
-            print('✅ Fallback: Using district + state: $fallbackAddress');
+            print('Fallback: Using district + state: $fallbackAddress');
           }
         }
         
-        // 5. Try locality (city name) - accept it even if generic
         if (fallbackAddress.isEmpty && place.locality != null && place.locality!.isNotEmpty) {
           final locality = place.locality!.trim();
           if (locality.length > 2) {
             fallbackAddress = locality;
             fallbackAddress = _withState(fallbackAddress, state);
-            print('✅ Fallback: Using locality + state: $fallbackAddress');
+            print('Fallback: Using locality + state: $fallbackAddress');
           }
         }
         
-        // 6. ONLY use coordinates as absolute last resort
         if (fallbackAddress.isEmpty) {
           final lat = latitude.toStringAsFixed(4);
           final lng = longitude.toStringAsFixed(4);
           fallbackAddress = '$lat, $lng';
-          print('⚠️ No location data found anywhere, using coordinates: $fallbackAddress');
+          print('No location data found anywhere, using coordinates: $fallbackAddress');
         }
-        
-        print('Final Address: $fallbackAddress');
-        print('========================');
+
         return fallbackAddress;
       }
 
       return 'Location Unknown';
     } catch (e) {
-      print('❌ Error getting location address: $e');
+      print('Error getting location address: $e');
       return 'Tracked via GPS';
     }
   }
