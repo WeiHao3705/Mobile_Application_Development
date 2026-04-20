@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,6 +7,7 @@ import 'package:video_player/video_player.dart';
 
 import '../models/exercise.dart';
 import '../repository/exercise_repository.dart';
+import '../services/local_cache_service.dart';
 import '../theme/app_colors.dart';
 import 'edit_exercise_page.dart';
 
@@ -34,16 +36,16 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
   void initState() {
     super.initState();
     _exercise = widget.exercise;
-    _repository = widget.repository ?? ExerciseRepository(supabase: Supabase.instance.client);
+    _repository =
+        widget.repository ??
+        ExerciseRepository(supabase: Supabase.instance.client);
   }
 
   Future<void> _openEditDialog() async {
     final updated = await Navigator.of(context).push<Exercise>(
       MaterialPageRoute<Exercise>(
-        builder: (_) => EditExercisePage(
-          repository: _repository,
-          exercise: _exercise,
-        ),
+        builder: (_) =>
+            EditExercisePage(repository: _repository, exercise: _exercise),
       ),
     );
 
@@ -70,7 +72,9 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
           icon: Icon(Icons.arrow_back, color: theme.colorScheme.primary),
           style: IconButton.styleFrom(
             backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
@@ -91,7 +95,10 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
                     )
                   : const Icon(Icons.edit, color: Colors.white),
               tooltip: 'Edit Exercise',
@@ -104,13 +111,17 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _ExerciseMediaPanel(
+              exerciseId: _exercise.id,
               videoUrl: _exercise.videoUrl,
               imageUrl: _exercise.imageUrl,
             ),
             const SizedBox(height: 20),
             _DetailRow(label: 'Exercise Name', value: _exercise.name),
             _DetailRow(label: 'Primary Muscle', value: _exercise.primaryMuscle),
-            _DetailRow(label: 'Secondary Muscle', value: _exercise.secondaryMuscleText),
+            _DetailRow(
+              label: 'Secondary Muscle',
+              value: _exercise.secondaryMuscleText,
+            ),
             _DetailRow(label: 'Equipment', value: _exercise.equipment),
             _DetailRow(label: 'How To Do', value: _exercise.howTo),
           ],
@@ -121,8 +132,9 @@ class _ExerciseDetailPageState extends State<ExerciseDetailPage> {
 }
 
 class _VideoPanel extends StatefulWidget {
-  const _VideoPanel({required this.videoUrl});
+  const _VideoPanel({required this.exerciseId, required this.videoUrl});
 
+  final String exerciseId;
   final String? videoUrl;
 
   @override
@@ -131,10 +143,12 @@ class _VideoPanel extends StatefulWidget {
 
 class _ExerciseMediaPanel extends StatelessWidget {
   const _ExerciseMediaPanel({
+    required this.exerciseId,
     required this.videoUrl,
     required this.imageUrl,
   });
 
+  final String exerciseId;
   final String? videoUrl;
   final String imageUrl;
 
@@ -142,7 +156,7 @@ class _ExerciseMediaPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasVideo = (videoUrl ?? '').trim().isNotEmpty;
     if (hasVideo) {
-      return _VideoPanel(videoUrl: videoUrl);
+      return _VideoPanel(exerciseId: exerciseId, videoUrl: videoUrl);
     }
 
     final trimmedImageUrl = imageUrl.trim();
@@ -160,7 +174,10 @@ class _ExerciseMediaPanel extends StatelessWidget {
             children: [
               Icon(Icons.image_not_supported, size: 64, color: Colors.white54),
               SizedBox(height: 8),
-              Text('No media available', style: TextStyle(color: Colors.white70)),
+              Text(
+                'No media available',
+                style: TextStyle(color: Colors.white70),
+              ),
             ],
           ),
         ),
@@ -174,17 +191,9 @@ class _ExerciseMediaPanel extends StatelessWidget {
         color: const Color(0xFF111111),
         child: AspectRatio(
           aspectRatio: 16 / 9,
-          child: Image.network(
-            trimmedImageUrl,
-            fit: BoxFit.contain,
-            errorBuilder: (_, error, stackTrace) {
-              return const Center(
-                child: Text(
-                  'Failed to load media',
-                  style: TextStyle(color: Colors.white70),
-                ),
-              );
-            },
+          child: _CachedExerciseImage(
+            exerciseId: exerciseId,
+            imageUrl: trimmedImageUrl,
           ),
         ),
       ),
@@ -192,8 +201,79 @@ class _ExerciseMediaPanel extends StatelessWidget {
   }
 }
 
+class _CachedExerciseImage extends StatefulWidget {
+  const _CachedExerciseImage({
+    required this.exerciseId,
+    required this.imageUrl,
+  });
+
+  final String exerciseId;
+  final String imageUrl;
+
+  @override
+  State<_CachedExerciseImage> createState() => _CachedExerciseImageState();
+}
+
+class _CachedExerciseImageState extends State<_CachedExerciseImage> {
+  final LocalCacheService _cacheService = LocalCacheService();
+  File? _cachedImage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCachedImage();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CachedExerciseImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.exerciseId != widget.exerciseId ||
+        oldWidget.imageUrl != widget.imageUrl) {
+      _loadCachedImage();
+    }
+  }
+
+  Future<void> _loadCachedImage() async {
+    final file = await _cacheService.getOrCacheExerciseMediaFile(
+      exerciseId: widget.exerciseId,
+      mediaUrl: widget.imageUrl,
+      mediaType: ExerciseMediaType.image,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _cachedImage = file;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cachedImage != null) {
+      return Image.file(_cachedImage!, fit: BoxFit.contain);
+    }
+
+    return Image.network(
+      widget.imageUrl,
+      fit: BoxFit.contain,
+      errorBuilder: (_, error, stackTrace) {
+        return const Center(
+          child: Text(
+            'Failed to load media',
+            style: TextStyle(color: Colors.white70),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _VideoPanelState extends State<_VideoPanel> {
+  final LocalCacheService _cacheService = LocalCacheService();
   VideoPlayerController? _controller;
+  File? _cachedGifFile;
   bool _isInitializing = false;
   String? _errorMessage;
   bool _renderAsImageFallback = false;
@@ -214,7 +294,8 @@ class _VideoPanelState extends State<_VideoPanel> {
   @override
   void didUpdateWidget(covariant _VideoPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.videoUrl != widget.videoUrl) {
+    if (oldWidget.videoUrl != widget.videoUrl ||
+        oldWidget.exerciseId != widget.exerciseId) {
       _disposeController();
       _initController();
     }
@@ -223,23 +304,35 @@ class _VideoPanelState extends State<_VideoPanel> {
   Future<void> _initController() async {
     final url = widget.videoUrl?.trim();
     if (url == null || url.isEmpty) return;
-    if (_isGifUrl(url)) {
-      // GIF is rendered by Image.network in build().
-      setState(() {
-        _isInitializing = false;
-        _errorMessage = null;
-      });
-      return;
-    }
 
     final token = ++_loadToken;
-    var stage = 'prepare';
 
     setState(() {
       _isInitializing = true;
       _errorMessage = null;
       _renderAsImageFallback = false;
     });
+
+    if (_isGifUrl(url)) {
+      final cachedGif = await _cacheService.getOrCacheExerciseMediaFile(
+        exerciseId: widget.exerciseId,
+        mediaUrl: url,
+        mediaType: ExerciseMediaType.image,
+      );
+
+      if (!mounted || token != _loadToken) {
+        return;
+      }
+
+      setState(() {
+        _cachedGifFile = cachedGif;
+        _isInitializing = false;
+        _errorMessage = null;
+      });
+      return;
+    }
+
+    var stage = 'prepare';
 
     VideoPlayerController? controller;
     try {
@@ -249,13 +342,20 @@ class _VideoPanelState extends State<_VideoPanel> {
       }
 
       stage = 'create-controller';
-      controller = VideoPlayerController.networkUrl(uri);
+      final cachedVideo = await _cacheService.getCachedExerciseMediaFile(
+        exerciseId: widget.exerciseId,
+        mediaUrl: url,
+        mediaType: ExerciseMediaType.video,
+      );
+      if (cachedVideo != null) {
+        controller = VideoPlayerController.file(cachedVideo);
+      } else {
+        controller = VideoPlayerController.networkUrl(uri);
+      }
 
       // Keep init timeout, but do not block UI on play() completion.
       stage = 'initialize';
-      await controller
-          .initialize()
-          .timeout(const Duration(seconds: 15));
+      await controller.initialize().timeout(const Duration(seconds: 15));
 
       if (!mounted || token != _loadToken) {
         await controller.dispose();
@@ -268,6 +368,16 @@ class _VideoPanelState extends State<_VideoPanel> {
         _controller = controller;
       });
 
+      if (cachedVideo == null) {
+        unawaited(
+          _cacheService.cacheExerciseMediaFromUrl(
+            exerciseId: widget.exerciseId,
+            mediaUrl: url,
+            mediaType: ExerciseMediaType.video,
+          ),
+        );
+      }
+
       stage = 'autoplay';
       unawaited(
         controller.play().catchError((error) {
@@ -275,7 +385,8 @@ class _VideoPanelState extends State<_VideoPanel> {
             return;
           }
           setState(() {
-            _errorMessage = 'Auto-play failed. Tap video to play. Error: $error';
+            _errorMessage =
+                'Auto-play failed. Tap video to play. Error: $error';
           });
         }),
       );
@@ -343,11 +454,7 @@ class _VideoPanelState extends State<_VideoPanel> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [
-              Icon(
-                Icons.videocam_off,
-                size: 64,
-                color: Colors.white54,
-              ),
+              Icon(Icons.videocam_off, size: 64, color: Colors.white54),
               SizedBox(height: 8),
               Text(
                 'No video available',
@@ -370,31 +477,39 @@ class _VideoPanelState extends State<_VideoPanel> {
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, error, stackTrace) {
-                      return const Center(
-                        child: Text(
-                          'Failed to load GIF',
-                          style: TextStyle(color: Colors.white70),
+                  child: _cachedGifFile != null && isGif
+                      ? Image.file(_cachedGifFile!, fit: BoxFit.contain)
+                      : Image.network(
+                          url,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, error, stackTrace) {
+                            return const Center(
+                              child: Text(
+                                'Failed to load GIF',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                 ),
                 Positioned(
                   bottom: 8,
                   right: 12,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.45),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
                       'GIF/IMG',
-                      style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -468,10 +583,7 @@ class _VideoPanelState extends State<_VideoPanel> {
               Positioned(
                 bottom: 40,
                 right: 12,
-                child: Icon(
-                  Icons.loop,
-                  color: theme.colorScheme.primary,
-                ),
+                child: Icon(Icons.loop, color: theme.colorScheme.primary),
               ),
           ],
         ),
@@ -481,10 +593,7 @@ class _VideoPanelState extends State<_VideoPanel> {
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({
-    required this.label,
-    required this.value,
-  });
+  const _DetailRow({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -513,14 +622,10 @@ class _DetailRow extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              value,
-              style: const TextStyle(color: Colors.white),
-            ),
+            Text(value, style: const TextStyle(color: Colors.white)),
           ],
         ),
       ),
     );
   }
 }
-

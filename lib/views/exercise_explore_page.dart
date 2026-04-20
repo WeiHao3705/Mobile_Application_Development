@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/exercise.dart';
 import '../repository/exercise_repository.dart';
+import '../services/local_cache_service.dart';
 import '../theme/app_colors.dart';
 import 'exercise_detail_page.dart';
 
@@ -65,12 +68,15 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
 
   Future<void> _loadRecentSearches() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedSearches = prefs.getStringList(_recentSearchesStorageKey) ?? <String>[];
+    final savedSearches =
+        prefs.getStringList(_recentSearchesStorageKey) ?? <String>[];
     if (!mounted) {
       return;
     }
     setState(() {
-      _recentSearches = savedSearches.where((value) => value.trim().isNotEmpty).toList();
+      _recentSearches = savedSearches
+          .where((value) => value.trim().isNotEmpty)
+          .toList();
     });
   }
 
@@ -118,7 +124,9 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
     final query = _searchController.text.trim().toLowerCase();
     final filtered = query.isEmpty
         ? _recentSearches
-        : _recentSearches.where((item) => item.toLowerCase().contains(query)).toList();
+        : _recentSearches
+              .where((item) => item.toLowerCase().contains(query))
+              .toList();
     return filtered.take(3).toList();
   }
 
@@ -137,6 +145,12 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
         builder: (_) => ExerciseDetailPage(exercise: exercise),
       ),
     );
+  }
+
+  void _reloadExercises() {
+    setState(() {
+      _exercisesFuture = _repository.getAllExercises();
+    });
   }
 
   void _toggleExerciseSelection(String exerciseId) {
@@ -176,14 +190,18 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
           icon: Icon(Icons.arrow_back, color: theme.colorScheme.primary),
           style: IconButton.styleFrom(
             backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           onPressed: () => Navigator.of(context).pop(),
           tooltip: 'Back to Workout',
         ),
         title: Text(
           widget.selectable
-              ? (widget.singleSelection ? 'Choose Exercise' : 'Choose Exercises')
+              ? (widget.singleSelection
+                    ? 'Choose Exercise'
+                    : 'Choose Exercises')
               : 'Exercise',
           style: TextStyle(
             color: theme.colorScheme.primary,
@@ -212,7 +230,9 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(
-                child: CircularProgressIndicator(color: theme.colorScheme.primary),
+                child: CircularProgressIndicator(
+                  color: theme.colorScheme.primary,
+                ),
               );
             }
 
@@ -220,10 +240,20 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'Failed to load exercises: ${snapshot.error}',
-                    style: const TextStyle(color: Colors.white70),
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Failed to load exercises: ${snapshot.error}',
+                        style: const TextStyle(color: Colors.white70),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: _reloadExercises,
+                        child: const Text('Retry'),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -241,7 +271,8 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
               defaultValue: 'All Muscles',
             );
             final recentMatches = _recentSearchMatches();
-            final showSearchDropdown = _searchFocusNode.hasFocus && recentMatches.isNotEmpty;
+            final showSearchDropdown =
+                _searchFocusNode.hasFocus && recentMatches.isNotEmpty;
             return Column(
               children: [
                 Padding(
@@ -266,7 +297,9 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
                                     title: 'Equipment',
                                     options: equipmentOptions,
                                     onSelected: (value) {
-                                      setState(() => _selectedEquipment = value);
+                                      setState(
+                                        () => _selectedEquipment = value,
+                                      );
                                     },
                                   ),
                                 ),
@@ -331,9 +364,12 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
                             final exercise = filteredExercises[index];
                             return _ExerciseListTile(
                               exercise: exercise,
+                              exerciseId: exercise.id,
                               selectable: widget.selectable,
                               singleSelection: widget.singleSelection,
-                              isSelected: _selectedExerciseIds.contains(exercise.id),
+                              isSelected: _selectedExerciseIds.contains(
+                                exercise.id,
+                              ),
                               onTap: () {
                                 if (widget.selectable) {
                                   _toggleExerciseSelection(exercise.id);
@@ -341,7 +377,8 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
                                 }
                                 _openExerciseDetail(exercise);
                               },
-                              onOpenDetails: () => _openExerciseDetail(exercise),
+                              onOpenDetails: () =>
+                                  _openExerciseDetail(exercise),
                             );
                           },
                         ),
@@ -371,11 +408,14 @@ class _ExerciseExplorePageState extends State<ExerciseExplorePage> {
     final query = _searchController.text.trim().toLowerCase();
 
     return source.where((exercise) {
-      final matchEquipment = _selectedEquipment == 'All Equipment' ||
+      final matchEquipment =
+          _selectedEquipment == 'All Equipment' ||
           exercise.hasEquipment(_selectedEquipment);
       final matchMuscle =
-          _selectedMuscle == 'All Muscles' || exercise.primaryMuscle == _selectedMuscle;
-      final matchSearch = query.isEmpty ||
+          _selectedMuscle == 'All Muscles' ||
+          exercise.primaryMuscle == _selectedMuscle;
+      final matchSearch =
+          query.isEmpty ||
           exercise.name.toLowerCase().contains(query) ||
           exercise.primaryMuscle.toLowerCase().contains(query) ||
           exercise.equipment.toLowerCase().contains(query);
@@ -462,7 +502,10 @@ class _SearchField extends StatelessWidget {
         prefixIcon: const Icon(Icons.search, color: Colors.white54),
         filled: true,
         fillColor: const Color(0xFF111111),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
@@ -502,10 +545,7 @@ class _SearchHistoryDropdown extends StatelessWidget {
             return ListTile(
               dense: true,
               contentPadding: const EdgeInsets.only(left: 16, right: 8),
-              title: Text(
-                item,
-                style: const TextStyle(color: Colors.white),
-              ),
+              title: Text(item, style: const TextStyle(color: Colors.white)),
               trailing: SizedBox(
                 width: 24,
                 height: 24,
@@ -529,12 +569,8 @@ class _SearchHistoryDropdown extends StatelessWidget {
   }
 }
 
-
 class _FilterButton extends StatelessWidget {
-  const _FilterButton({
-    required this.title,
-    required this.onTap,
-  });
+  const _FilterButton({required this.title, required this.onTap});
 
   final String title;
   final VoidCallback onTap;
@@ -554,11 +590,7 @@ class _FilterButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
           ),
         ),
-        child: Text(
-          title,
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
+        child: Text(title, overflow: TextOverflow.ellipsis, maxLines: 1),
       ),
     );
   }
@@ -567,6 +599,7 @@ class _FilterButton extends StatelessWidget {
 class _ExerciseListTile extends StatelessWidget {
   const _ExerciseListTile({
     required this.exercise,
+    required this.exerciseId,
     required this.onTap,
     required this.onOpenDetails,
     required this.selectable,
@@ -575,6 +608,7 @@ class _ExerciseListTile extends StatelessWidget {
   });
 
   final Exercise exercise;
+  final String exerciseId;
   final VoidCallback onTap;
   final VoidCallback onOpenDetails;
   final bool selectable;
@@ -597,9 +631,11 @@ class _ExerciseListTile extends StatelessWidget {
               child: Icon(
                 singleSelection
                     ? (isSelected
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked)
-                    : (isSelected ? Icons.check_circle : Icons.radio_button_unchecked),
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked)
+                    : (isSelected
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked),
                 color: isSelected ? theme.colorScheme.primary : Colors.white54,
                 size: 22,
               ),
@@ -607,11 +643,10 @@ class _ExerciseListTile extends StatelessWidget {
           CircleAvatar(
             radius: 30,
             backgroundColor: Colors.white,
-            backgroundImage:
-                exercise.imageUrl.isNotEmpty ? NetworkImage(exercise.imageUrl) : null,
-            child: exercise.imageUrl.isEmpty
-                ? const Icon(Icons.fitness_center, color: Colors.black)
-                : null,
+            child: _CachedExerciseAvatar(
+              exerciseId: exerciseId,
+              imageUrl: exercise.imageUrl,
+            ),
           ),
         ],
       ),
@@ -643,6 +678,113 @@ class _ExerciseListTile extends StatelessWidget {
             size: 18,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CachedExerciseAvatar extends StatefulWidget {
+  const _CachedExerciseAvatar({
+    required this.exerciseId,
+    required this.imageUrl,
+  });
+
+  final String exerciseId;
+  final String imageUrl;
+
+  @override
+  State<_CachedExerciseAvatar> createState() => _CachedExerciseAvatarState();
+}
+
+class _CachedExerciseAvatarState extends State<_CachedExerciseAvatar> {
+  final LocalCacheService _cacheService = LocalCacheService();
+  File? _cachedImage;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCachedImage();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CachedExerciseAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.exerciseId != widget.exerciseId ||
+        oldWidget.imageUrl != widget.imageUrl) {
+      _loadCachedImage();
+    }
+  }
+
+  Future<void> _loadCachedImage() async {
+    final imageUrl = widget.imageUrl.trim();
+    if (imageUrl.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _cachedImage = null;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    final file = await _cacheService.getOrCacheExerciseMediaFile(
+      exerciseId: widget.exerciseId,
+      mediaUrl: imageUrl,
+      mediaType: ExerciseMediaType.image,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _cachedImage = file;
+      _isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = widget.imageUrl.trim();
+    if (imageUrl.isEmpty) {
+      return const Icon(Icons.fitness_center, color: Colors.black);
+    }
+
+    if (_cachedImage != null) {
+      return ClipOval(
+        child: Image.file(
+          _cachedImage!,
+          width: 60,
+          height: 60,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    if (_isLoading) {
+      return const Icon(Icons.fitness_center, color: Colors.black);
+    }
+
+    return ClipOval(
+      child: Image.network(
+        imageUrl,
+        width: 60,
+        height: 60,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) {
+            return child;
+          }
+          return const Center(
+            child: Icon(Icons.fitness_center, color: Colors.black),
+          );
+        },
+        errorBuilder: (_, __, ___) {
+          return const Center(
+            child: Icon(Icons.fitness_center, color: Colors.black),
+          );
+        },
       ),
     );
   }
