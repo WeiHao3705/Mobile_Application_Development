@@ -16,10 +16,10 @@ class TrackingController {
   double lastElevation = 0.0;
 
   bool isSessionActive = false;
+  bool _hasStarted = false; // Track if session has been initialized
   StreamSubscription<Position>? _positionStream;
   Timer? _timer;
 
-  /// Start tracking session - initializes timer and location tracking
   void startTracking(
     Function(int) onElapsedSecondsChanged,
     Function(double) onCurrentPaceChanged,
@@ -27,20 +27,26 @@ class TrackingController {
     int caloriesPerKM,
     LatLng initialLocation,
   ) {
+    if (!_hasStarted) {
+      // First time starting - initialize everything
+      _hasStarted = true;
+      currentLocation = initialLocation;
+      locationHistory.add(initialLocation);
+      sessionStartTime = DateTime.now();
+      elapsedSeconds = 0;
+      totalDistance = 0.0;
+      elevationGain = 0;
+      lastElevation = 0.0;
+    }
+
+    // Resume tracking (can be called multiple times)
     isSessionActive = true;
-    currentLocation = initialLocation;
-    locationHistory.add(initialLocation);
-    sessionStartTime = DateTime.now();
-    elapsedSeconds = 0;
-    totalDistance = 0.0;
-    elevationGain = 0;
-    lastElevation = 0.0;
 
     // Start the elapsed time timer
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (isSessionActive) {
         elapsedSeconds++;
-        onElapsedSecondsChanged(elapsedSeconds); // Call the callback to update UI
+        onElapsedSecondsChanged(elapsedSeconds);
         if (elapsedSeconds > 0 && totalDistance > 0) {
           currentPace = (elapsedSeconds / 60) / totalDistance;
           onCurrentPaceChanged(currentPace);
@@ -54,14 +60,11 @@ class TrackingController {
     );
   }
 
-  /// Stop tracking session
   void stopTracking() {
     isSessionActive = false;
     _timer?.cancel();
-    _positionStream?.cancel();
   }
 
-  /// Internal method to handle location stream
   void _startLocationTracking(
     Function(LatLng, List<LatLng>, double, int, int, int) onLocationUpdated,
     int caloriesPerKM,
@@ -140,10 +143,26 @@ class TrackingController {
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
+  /// Reset session state (call when ending a session)
+  void resetSession() {
+    _hasStarted = false;
+    elapsedSeconds = 0;
+    totalDistance = 0.0;
+    currentPace = 0.0;
+    caloriesBurned = 0;
+    totalSteps = 0;
+    elevationGain = 0;
+    lastElevation = 0.0;
+    sessionStartTime = null;
+    currentLocation = null;
+    locationHistory.clear();
+  }
+
   /// Cleanup resources
   void dispose() {
     _timer?.cancel();
     _positionStream?.cancel();
+    resetSession();
   }
 }
 

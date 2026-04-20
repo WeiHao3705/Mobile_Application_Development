@@ -58,6 +58,10 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
     super.dispose();
   }
 
+  void _resetSessionState() {
+    _trackingController.resetSession();
+  }
+
   void _startTracking() {
     _trackingController.startTracking(
       (elapsedSeconds) {
@@ -81,6 +85,7 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
 
   void _stopTracking() {
     _trackingController.stopTracking();
+    setState(() {}); // Update UI to show play icon
   }
 
   Future<String> _getLocationAddress() async {
@@ -316,6 +321,7 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
                               ),
                               onPressed: () {
                                 _stopTracking();
+                                _resetSessionState();
                                 Navigator.pop(context); // Close dialog
                                 Navigator.pop(context); // Close aerobic_session_run
                               },
