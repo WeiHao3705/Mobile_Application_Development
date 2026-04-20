@@ -5,9 +5,11 @@ import 'dart:io';
 import 'dart:convert';
 import '../models/aerobic.dart';
 import '../config/supabase_config.dart';
+import '../services/local_cache_service.dart';
 
 class AerobicRepository {
   final _supabase = Supabase.instance.client;
+  final _cacheService = LocalCacheService();
 
   Map<String, String> routeImageRequestHeaders() {
     return const {
@@ -126,6 +128,14 @@ class AerobicRepository {
 
   Future<List<Aerobic>> fetchUserRecords(int userId) async {
     try {
+      // Check if cache is still valid
+      final isCacheValid = await _cacheService.isCacheValid(userId);
+      if (isCacheValid) {
+        print('Using cached user records for user $userId');
+        final cachedRecords = await _cacheService.getUserRecords(userId);
+        return cachedRecords;
+      }
+
       final response = await _supabase
           .from('AerobicExercise')
           .select()
@@ -134,21 +144,30 @@ class AerobicRepository {
           .order('start_at', ascending: false);
 
       if (response is List) {
-
         final records = <Aerobic>[];
 
         for (int i = 0; i < response.length; i++) {
           final data = response[i];
           if (data is Map<String, dynamic>) {
             final aerobic = Aerobic.fromJson(data);
-
             records.add(aerobic);
           }
         }
+
+        // Cache the fetched records
+        await _cacheService.saveUserRecords(userId, records);
+        print('Fetched and cached ${records.length} user records for user $userId');
         return records;
       }
 
+      return [];
     } catch (e) {
+      print('Error fetching user records: $e');
+      // Fall back to cache even if it's expired
+      final cachedRecords = await _cacheService.getUserRecords(userId);
+      if (cachedRecords.isNotEmpty) {
+        return cachedRecords;
+      }
       throw Exception('Failed to fetch user records: $e');
     }
   }
@@ -156,6 +175,15 @@ class AerobicRepository {
   // Fetch ARCHIVED records only
   Future<List<Aerobic>> fetchArchivedRecords(int userId) async {
     try {
+      // Check if cache is still valid
+      final isCacheValid = await _cacheService.isCacheValid(userId, isArchived: true);
+      if (isCacheValid) {
+        print('📱 [REPO] Using cached archived records for user $userId');
+        final cachedRecords = await _cacheService.getArchivedRecords(userId);
+        return cachedRecords;
+      }
+
+      print('🌐 [REPO] Fetching archived records from server for user $userId');
       final response = await _supabase
           .from('AerobicExercise')
           .select()
@@ -164,25 +192,29 @@ class AerobicRepository {
           .order('start_at', ascending: false);
 
       if (response is List) {
-
         final records = <Aerobic>[];
 
         for (int i = 0; i < response.length; i++) {
           final data = response[i];
           if (data is Map<String, dynamic>) {
             final aerobic = Aerobic.fromJson(data);
-
             records.add(aerobic);
           }
         }
 
-        print('\n [FETCH-ARCHIVED] Successfully parsed ${records.length} ARCHIVED records');
-        print('[FETCH-ARCHIVED] ========== FETCH COMPLETE ==========\n');
+        // Cache the fetched records
+        await _cacheService.saveArchivedRecords(userId, records);
         return records;
       }
 
+      return [];
     } catch (e) {
-      print('[FETCH-ARCHIVED] Error fetching archived records: $e');
+      print('Error fetching archived records: $e');
+      // Fall back to cache even if it's expired
+      final cachedRecords = await _cacheService.getArchivedRecords(userId);
+      if (cachedRecords.isNotEmpty) {
+        return cachedRecords;
+      }
       throw Exception('Failed to fetch archived records: $e');
     }
   }
@@ -190,13 +222,19 @@ class AerobicRepository {
   Future<Aerobic> createAerobicRecord(Aerobic aerobicRecord) async {
     try {
       final recordData = aerobicRecord.toJson();
-
       recordData.remove('id');
 
       final response = await _supabase.from('AerobicExercise').insert(
           recordData).select().single();
 
       print('Aerobic record created successfully');
+
+      // Invalidate cache for this user so it will be refreshed on next fetch
+      final userId = int.tryParse(aerobicRecord.userId);
+      if (userId != null) {
+        await _cacheService.clearUserRecordsCache(userId);
+      }
+
       return Aerobic.fromJson(response);
     } catch (e) {
       print('Error creating aerobic record: $e');
@@ -393,6 +431,16 @@ class AerobicRepository {
           .eq('aerobic_id', recordId)
           .single();
       
+      // Invalidate cache for the user
+      if (response is Map<String, dynamic>) {
+        final userId = response['user_id'];
+        if (userId != null) {
+          await _cacheService.clearUserRecordsCache(userId);
+          await _cacheService.clearArchivedRecordsCache(userId);
+          print('📱 [CACHE] Invalidated all records cache for user $userId');
+        }
+      }
+      
       return Aerobic.fromJson(response);
     } catch (e) {
       print('[UPDATE-ARCHIVE] Error: $e');
@@ -488,10 +536,20 @@ class AerobicRepository {
 
         final typeList = uniqueTypes.toList();
         print('[FETCH-TYPES] Found ${typeList.length} activity types: $typeList');
+        
+        // Cache the activity types
+        await _cacheService.saveActivityTypes(userId, typeList);
         return typeList;
       }
     } catch (e) {
-      print('[FETCH-TYPES] Error fetching activity types: $e');
+      print('Error fetching activity types: $e');
+
+      // Fall back to cached activity types if network fails
+      final cachedTypes = await _cacheService.getActivityTypes(userId);
+      if (cachedTypes.isNotEmpty) {
+        return cachedTypes;
+      }
+      
       return [];
     }
   }

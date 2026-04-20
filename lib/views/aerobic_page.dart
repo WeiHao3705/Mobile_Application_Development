@@ -342,25 +342,10 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
                   FutureBuilder<List<String>>(
                     future: _activityTypesFuture,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.primary),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: AppColors.primary,
-                              strokeWidth: 2,
-                            ),
-                          ),
-                        );
-                      }
-
+                      final isLoading = snapshot.connectionState == ConnectionState.waiting;
+                      final hasError = snapshot.hasError;
                       final activityTypes = snapshot.data ?? [];
+
                       final dropdownItems = [
                         const DropdownMenuItem<String?>(
                           value: null,
@@ -387,39 +372,48 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.primary),
+                          border: Border.all(color: isLoading || hasError ? Colors.grey : AppColors.primary),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: DropdownButton<String?>(
-                          value: _selectedActivityType,
-                          underline: const SizedBox(),
-                          isDense: true,
-                          hint: const Row(
-                            children: [
-                              Icon(Icons.category, color: AppColors.primary, size: 18),
-                              SizedBox(width: 8),
-                              Text(
-                                'Type',
-                                style: TextStyle(
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
                                   color: AppColors.primary,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : DropdownButton<String?>(
+                                value: _selectedActivityType,
+                                underline: const SizedBox(),
+                                isDense: true,
+                                hint: Row(
+                                  children: [
+                                    Icon(Icons.category, color: hasError ? Colors.grey : AppColors.primary, size: 18),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Type',
+                                      style: TextStyle(
+                                        color: hasError ? Colors.grey : AppColors.primary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                dropdownColor: AppColors.nearBlack,
+                                items: dropdownItems.isEmpty ? [] : dropdownItems,
+                                onChanged: dropdownItems.isEmpty ? null : (value) {
+                                  setState(() {
+                                    _selectedActivityType = value;
+                                  });
+                                },
+                                style: const TextStyle(
+                                  color: AppColors.lime,
                                   fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ],
-                          ),
-                          dropdownColor: AppColors.nearBlack,
-                          items: dropdownItems,
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedActivityType = value;
-                            });
-                          },
-                          style: const TextStyle(
-                            color: AppColors.lime,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                       );
                     },
                   ),
@@ -471,8 +465,34 @@ class _PreviousRecordsWidgetState extends State<_PreviousRecordsWidget> {
               }
               if (snapshot.hasError) {
                 return Center(
-                  child: Text('Error loading records: ${snapshot.error}',
-                      style: const TextStyle(color: Colors.red)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.red, size: 40),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'No Records to Fetch',
+                          style: TextStyle(
+                            color: AppColors.lavender,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Failed to load records: ${snapshot.error}',
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
                 );
               }
 
@@ -840,25 +860,10 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
                   FutureBuilder<List<String>>(
                     future: _activityTypesFuture,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.primary),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(
-                              color: AppColors.primary,
-                              strokeWidth: 2,
-                            ),
-                          ),
-                        );
-                      }
-
+                      final isLoading = snapshot.connectionState == ConnectionState.waiting;
+                      final hasError = snapshot.hasError;
                       final activityTypes = snapshot.data ?? [];
+
                       final dropdownItems = [
                         const DropdownMenuItem<String?>(
                           value: null,
@@ -885,39 +890,48 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.primary),
+                          border: Border.all(color: isLoading || hasError ? Colors.grey : AppColors.primary),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: DropdownButton<String?>(
-                          value: _selectedActivityType,
-                          underline: const SizedBox(),
-                          isDense: true,
-                          hint: const Row(
-                            children: [
-                              Icon(Icons.category, color: AppColors.primary, size: 18),
-                              SizedBox(width: 8),
-                              Text(
-                                'Type',
-                                style: TextStyle(
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
                                   color: AppColors.primary,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : DropdownButton<String?>(
+                                value: _selectedActivityType,
+                                underline: const SizedBox(),
+                                isDense: true,
+                                hint: Row(
+                                  children: [
+                                    Icon(Icons.category, color: hasError ? Colors.grey : AppColors.primary, size: 18),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Type',
+                                      style: TextStyle(
+                                        color: hasError ? Colors.grey : AppColors.primary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                dropdownColor: AppColors.nearBlack,
+                                items: dropdownItems.isEmpty ? [] : dropdownItems,
+                                onChanged: dropdownItems.isEmpty ? null : (value) {
+                                  setState(() {
+                                    _selectedActivityType = value;
+                                  });
+                                },
+                                style: const TextStyle(
+                                  color: AppColors.lime,
                                   fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ],
-                          ),
-                          dropdownColor: AppColors.nearBlack,
-                          items: dropdownItems,
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedActivityType = value;
-                            });
-                          },
-                          style: const TextStyle(
-                            color: AppColors.lime,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                       );
                     },
                   ),
@@ -968,8 +982,34 @@ class _ArchivedRecordsWidgetState extends State<_ArchivedRecordsWidget> {
               }
               if (snapshot.hasError) {
                 return Center(
-                  child: Text('Error loading records: ${snapshot.error}',
-                      style: const TextStyle(color: Colors.red)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.red, size: 40),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'No Records to Fetch',
+                          style: TextStyle(
+                            color: AppColors.lavender,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Failed to load archived records: ${snapshot.error}',
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
                 );
               }
 
