@@ -46,6 +46,7 @@ class NotificationService {
   }
 
   static Future<void> scheduleDailyNotifications(String? userId) async {
+    developer.log('🔵 scheduleDailyNotifications called with userId: $userId');
     try {
       // If no userId provided, user is not logged in - skip notifications
       if (userId == null) {
@@ -53,49 +54,75 @@ class NotificationService {
         return;
       }
 
+      developer.log('✅ userId is not null: $userId');
+
+      // Convert userId string to int for database queries
+      final userIdInt = int.tryParse(userId);
+      developer.log('🔄 Attempting to parse userId: $userId -> $userIdInt');
+      if (userIdInt == null) {
+        developer.log('Invalid userId format: $userId');
+        return;
+      }
+      developer.log('✅ Successfully parsed userId to int: $userIdInt');
+
+      // Add small delay to ensure Supabase is fully initialized
+      await Future.delayed(const Duration(milliseconds: 500));
+      developer.log('⏱️ Delay complete, proceeding with database query');
+
       // Check which meals have NOT been logged today
-      final missingMeals = await _getMissingMeals(userId);
-      developer.log('Missing meals for user $userId: $missingMeals');
+      final missingMeals = await _getMissingMeals(userIdInt);
+      developer.log('Missing meals for user $userIdInt: $missingMeals');
 
       if (missingMeals.isEmpty) {
         // All meals logged
-        developer.log('User $userId has already logged all meals today, skipping notifications');
+        developer.log('User $userIdInt has already logged all meals today, skipping notifications');
         return;
       }
 
       // Send notifications only for missing meals
       if (missingMeals.contains('breakfast')) {
-        await _scheduleDaily(0, 21, 31, 'Breakfast Reminder', '🥣 Good morning! Don\'t forget your breakfast.');
+        await _scheduleDaily(0, 21, 37, 'Breakfast Reminder', '🥣 Good morning! Don\'t forget your breakfast.');
       }
 
       if (missingMeals.contains('lunch')) {
-        await _scheduleDaily(1, 21, 32, 'Lunch Reminder', '🍽️ Lunch time! Have you logged your meal yet?');
+        await _scheduleDaily(1, 21, 38, 'Lunch Reminder', '🍽️ Lunch time! Have you logged your meal yet?');
       }
 
       if (missingMeals.contains('dinner')) {
-        await _scheduleDaily(2, 21, 33, 'Dinner Reminder', '🍖 Dinner time! Don\'t forget to log your meal.');
+        await _scheduleDaily(2, 21, 39, 'Dinner Reminder', '🍖 Dinner time! Don\'t forget to log your meal.');
       }
 
       developer.log('Notifications scheduled for missing meals: $missingMeals');
     } catch (e) {
-      developer.log('Error scheduling notifications: $e');
+      developer.log('❌ Error scheduling notifications: $e');
+      developer.log('Stack trace: ${StackTrace.current}');
     }
   }
 
-  static Future<List<String>> _getMissingMeals(String userId) async {
+  static Future<List<String>> _getMissingMeals(int userId) async {
+    developer.log('🔵 _getMissingMeals called for user $userId');
     try {
+      // Check if Supabase client is available
+      final supabaseClient = Supabase.instance.client;
+      developer.log('✅ Supabase client available');
+
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
       final startOfDayIso = startOfDay.toIso8601String();
       final endOfDayIso = startOfDay.add(const Duration(days: 1)).toIso8601String();
 
+      developer.log('📅 Date range: $startOfDayIso to $endOfDayIso');
+      developer.log('🔄 Querying MealLog table for user $userId...');
+
       // Fetch all meals logged by user today
-      final response = await Supabase.instance.client
+      final response = await supabaseClient
           .from('MealLog')
           .select('meal_type')
           .eq('user_id', userId)
           .gte('meal_date', startOfDayIso)
           .lt('meal_date', endOfDayIso);
+
+      developer.log('✅ Query response received: $response');
 
       // Extract meal types that were logged
       final loggedMealTypes = (response as List)
@@ -114,8 +141,10 @@ class NotificationService {
 
       developer.log('Missing meals for user $userId: $missing');
       return missing;
-    } catch (e) {
-      developer.log('Error checking missing meals: $e');
+    } catch (e, stackTrace) {
+      developer.log('❌ Error checking missing meals: $e');
+      developer.log('Error type: ${e.runtimeType}');
+      developer.log('Stack trace: $stackTrace');
       // Default to all meals if there's an error (pessimistic approach - send all notifications)
       return ['breakfast', 'lunch', 'dinner'];
     }

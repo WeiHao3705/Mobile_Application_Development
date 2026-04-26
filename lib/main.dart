@@ -146,7 +146,7 @@ class _MyAppState extends State<MyApp> {
     _startupFuture = _authController.restoreSession().then((_) {
       // Schedule notifications after session is restored with userId
       final userId = _authController.currentUser?.id?.toString();
-      NotificationService.scheduleDailyNotifications(userId);
+      return NotificationService.scheduleDailyNotifications(userId);
     });
 
     // Reschedule notifications whenever app comes to foreground
@@ -273,7 +273,7 @@ class AppLifecycleObserver extends WidgetsBindingObserver {
       developer.log('App resumed - rescheduling notifications to check meal status');
       final userId = _authController.currentUser?.id?.toString();
       NotificationService.cancelAllNotifications().then((_) {
-        NotificationService.scheduleDailyNotifications(userId);
+        return NotificationService.scheduleDailyNotifications(userId);
       });
     }
   }
