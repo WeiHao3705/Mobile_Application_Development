@@ -95,6 +95,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
                         hint: '100',
                         isNumeric: true,
                         allowDecimal: true,
+                        keyboardType: TextInputType.number,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -133,6 +134,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
                 controller: _caloriesController,
                 hint: '0',
                 isNumeric: true,
+                keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 20),
 
@@ -295,6 +297,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
     required String hint,
     bool isNumeric = false,
     bool allowDecimal = false,
+    TextInputType keyboardType = TextInputType.text,
   }) {
     return TextField(
       controller: controller,
@@ -325,7 +328,7 @@ class _AddNewFoodViewState extends State<AddNewFoodView> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       ),
       style: const TextStyle(color: Colors.white),
-      keyboardType: TextInputType.number,
+      keyboardType: keyboardType,
     );
   }
 

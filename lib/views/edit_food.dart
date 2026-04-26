@@ -99,24 +99,6 @@ class _EditFoodViewState extends State<EditFoodView> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.yellow),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Text(
-              'CUSTOM',
-              style: TextStyle(
-                color: AppColors.yellow,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
