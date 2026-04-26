@@ -55,7 +55,7 @@ class Aerobic {
     }
 
     return Aerobic(
-      id: json['aerobic_id'] ?? '',
+      id: json['id']?.toString() ?? '',
       activity_type: json['activity_type'] ?? 'Unknown',
       location: json['location'] ?? 'Unknown Location',
       total_distance: (json['total_distance'] as num?)?.toDouble() ?? 0.0,

@@ -47,8 +47,11 @@ class TrackingController {
       if (isSessionActive) {
         elapsedSeconds++;
         onElapsedSecondsChanged(elapsedSeconds);
-        if (elapsedSeconds > 0 && totalDistance > 0) {
+        if (elapsedSeconds > 0 && totalDistance >= 0.02) {
           currentPace = (elapsedSeconds / 60) / totalDistance;
+          onCurrentPaceChanged(currentPace);
+        } else {
+          currentPace = 0;
           onCurrentPaceChanged(currentPace);
         }
       }
@@ -132,7 +135,7 @@ class TrackingController {
     if (pace == 0) return "0:00";
 
     // Cap the display at 99:59 so the UI doesn't break if they stand still
-    if (pace > 5999) return "99:59";
+    if (pace >= 100) return "99:59";
 
     int minutes = pace.toInt();
     int seconds = ((pace - minutes) * 60).toInt();

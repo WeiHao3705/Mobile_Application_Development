@@ -30,6 +30,10 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
   void initState() {
     super.initState();
     currentRecord = widget.record;
+    print('🔍 AerobicDetailPage loaded with record ID: "${currentRecord.id}" | Activity: ${currentRecord.activity_type}');
+    if (currentRecord.id.isEmpty) {
+      print('⚠️ WARNING: Record ID is empty! This will cause issues with sharing and database operations.');
+    }
     _descriptionController = TextEditingController(text: currentRecord.description);
     _loadSnapPhotoFromDatabase();
   }
@@ -353,6 +357,7 @@ class _AerobicDetailPageState extends State<AerobicDetailPage> {
   Future<void> _shareWorkout() async {
     try {
       final shareText = _formatShareText();
+      
       print('Preparing to share workout details');
       
       // Try to download and share the route image

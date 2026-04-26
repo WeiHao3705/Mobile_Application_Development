@@ -333,7 +333,7 @@ class LocalCacheService {
           .toList();
 
       print(
-        '📱 [CACHE] Retrieved ${records.length} archived records from local cache for user $userId',
+        'Retrieved ${records.length} archived records from local cache for user $userId',
       );
       return records;
     } catch (e) {
@@ -351,10 +351,10 @@ class LocalCacheService {
 
       await prefs.setString(key, encodedData);
       print(
-        '📱 [CACHE] Saved ${types.length} activity types to local cache for user $userId',
+        'Saved ${types.length} activity types to local cache for user $userId',
       );
     } catch (e) {
-      print('❌ [CACHE] Error saving activity types: $e');
+      print('Error saving activity types: $e');
     }
   }
 
@@ -366,7 +366,7 @@ class LocalCacheService {
       final cachedData = prefs.getString(key);
 
       if (cachedData == null || cachedData.isEmpty) {
-        print('📱 [CACHE] No cached activity types found for user $userId');
+        print('No cached activity types found for user $userId');
         return [];
       }
 
@@ -374,11 +374,11 @@ class LocalCacheService {
       final types = decoded.cast<String>();
 
       print(
-        '📱 [CACHE] Retrieved ${types.length} activity types from local cache for user $userId',
+        'Retrieved ${types.length} activity types from local cache for user $userId',
       );
       return types;
     } catch (e) {
-      print('❌ [CACHE] Error retrieving activity types: $e');
+      print('Error retrieving activity types: $e');
       return [];
     }
   }
@@ -390,9 +390,9 @@ class LocalCacheService {
       final key = '${_userRecordsCacheKey}activity_types_$userId';
       await prefs.remove(key);
 
-      print('📱 [CACHE] Cleared activity types cache for user $userId');
+      print('Cleared activity types cache for user $userId');
     } catch (e) {
-      print('❌ [CACHE] Error clearing activity types cache: $e');
+      print('Error clearing activity types cache: $e');
     }
   }
 

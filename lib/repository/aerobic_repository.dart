@@ -150,6 +150,7 @@ class AerobicRepository {
           final data = response[i];
           if (data is Map<String, dynamic>) {
             final aerobic = Aerobic.fromJson(data);
+            print('📍 Loaded aerobic record - ID: ${aerobic.id}, Activity: ${aerobic.activity_type}');
             records.add(aerobic);
           }
         }
@@ -178,12 +179,12 @@ class AerobicRepository {
       // Check if cache is still valid
       final isCacheValid = await _cacheService.isCacheValid(userId, isArchived: true);
       if (isCacheValid) {
-        print('📱 [REPO] Using cached archived records for user $userId');
+        print('Using cached archived records for user $userId');
         final cachedRecords = await _cacheService.getArchivedRecords(userId);
         return cachedRecords;
       }
 
-      print('🌐 [REPO] Fetching archived records from server for user $userId');
+      print('Fetching archived records from server for user $userId');
       final response = await _supabase
           .from('AerobicExercise')
           .select()
