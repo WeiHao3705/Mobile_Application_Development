@@ -29,12 +29,12 @@ class NotificationService {
       );
 
       // Request permission (Android 13+)
-      final android_plugin = _notifications
+      final androidPlugin = _notifications
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
 
-      if (android_plugin != null) {
-        await android_plugin.requestNotificationsPermission();
+      if (androidPlugin != null) {
+        await androidPlugin.requestNotificationsPermission();
       }
     } catch (e) {
       developer.log('Error initializing notifications: $e');
@@ -151,8 +151,12 @@ class NotificationService {
   }
 
   static Future<void> _scheduleDaily(
-      int id, int hour, int minute, String title, String body,
-      ) async {
+    int id,
+    int hour,
+    int minute,
+    String title,
+    String body,
+  ) async {
     try {
       final scheduledTime = _nextInstanceOfTime(hour, minute);
 
@@ -163,7 +167,8 @@ class NotificationService {
         scheduledTime,
         const NotificationDetails(
           android: AndroidNotificationDetails(
-            'daily_channel', 'Daily Reminders',
+            'daily_channel',
+            'Daily Reminders',
             channelDescription: 'Daily nutrition reminders',
             importance: Importance.high,
             priority: Priority.high,
@@ -173,7 +178,8 @@ class NotificationService {
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
       );
     } catch (e) {
       developer.log('Error scheduling notification $id: $e');
@@ -186,7 +192,8 @@ class NotificationService {
     final now = tz.TZDateTime.now(location);
 
     // Create scheduled time for today
-    var scheduled = tz.TZDateTime(location, now.year, now.month, now.day, hour, minute);
+    var scheduled =
+        tz.TZDateTime(location, now.year, now.month, now.day, hour, minute);
 
     // If this time has already passed today, schedule for tomorrow
     if (scheduled.isBefore(now)) {

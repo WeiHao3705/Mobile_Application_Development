@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/meal_log.dart';
 import '../repository/meal_repository.dart';
@@ -70,6 +71,9 @@ class MealController extends ChangeNotifier {
   bool _isSuccess = false;
   bool get isSuccess => _isSuccess;
 
+  bool _isPickingImage = false;
+  bool get isPickingImage => _isPickingImage;
+
   /// Get calories for a specific meal
   double getMealCalories(int mealId) {
     return _mealCalories[mealId] ?? 0.0;
@@ -79,6 +83,12 @@ class MealController extends ChangeNotifier {
 
   /// Pick image from camera
   Future<bool> pickImageFromCamera() async {
+    if (_isPickingImage) {
+      developer.log('⚠️ Image picker already active, ignoring camera request');
+      return false;
+    }
+
+    _isPickingImage = true;
     _errorMessage = '';
     notifyListeners();
 
@@ -104,16 +114,34 @@ class MealController extends ChangeNotifier {
       developer.log('✅ Image selected from camera: ${imageFile.path}');
       notifyListeners();
       return true;
+    } on PlatformException catch (e) {
+      if (e.code == 'already_active') {
+        developer.log('⚠️ Image picker already active (PlatformException)');
+        return false;
+      }
+      _errorMessage = 'Failed to pick image: ${e.message}';
+      developer.log('❌ $_errorMessage');
+      notifyListeners();
+      return false;
     } catch (e) {
       _errorMessage = 'Failed to pick image: ${e.toString()}';
       developer.log('❌ $_errorMessage');
       notifyListeners();
       return false;
+    } finally {
+      _isPickingImage = false;
+      notifyListeners();
     }
   }
 
   /// Pick image from gallery
   Future<bool> pickImageFromGallery() async {
+    if (_isPickingImage) {
+      developer.log('⚠️ Image picker already active, ignoring gallery request');
+      return false;
+    }
+
+    _isPickingImage = true;
     _errorMessage = '';
     notifyListeners();
 
@@ -139,11 +167,23 @@ class MealController extends ChangeNotifier {
       developer.log('✅ Image selected from gallery: ${imageFile.path}');
       notifyListeners();
       return true;
+    } on PlatformException catch (e) {
+      if (e.code == 'already_active') {
+        developer.log('⚠️ Image picker already active (PlatformException)');
+        return false;
+      }
+      _errorMessage = 'Failed to pick image: ${e.message}';
+      developer.log('❌ $_errorMessage');
+      notifyListeners();
+      return false;
     } catch (e) {
       _errorMessage = 'Failed to pick image: ${e.toString()}';
       developer.log('❌ $_errorMessage');
       notifyListeners();
       return false;
+    } finally {
+      _isPickingImage = false;
+      notifyListeners();
     }
   }
 
@@ -522,4 +562,3 @@ class MealController extends ChangeNotifier {
     notifyListeners();
   }
 }
-
