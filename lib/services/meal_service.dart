@@ -29,11 +29,7 @@ class MealService {
       return provided;
     }
     try {
-      final client = Supabase.instance.client;
-      if (client == null) {
-        throw Exception('Supabase client is not initialized');
-      }
-      return DailyGoalsRepository(supabase: client);
+      return DailyGoalsRepository(supabase: Supabase.instance.client);
     } catch (e) {
       developer.log('⚠️ Error initializing DailyGoalsRepository: $e');
       rethrow;

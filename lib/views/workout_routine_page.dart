@@ -475,6 +475,7 @@ class _WorkoutRoutinePageState extends State<WorkoutRoutinePage> {
         }
 
         _allowProgrammaticPop = true;
+        // ignore: use_build_context_synchronously -- guarded by `mounted` above.
         Navigator.of(context).pop();
       },
       child: Scaffold(

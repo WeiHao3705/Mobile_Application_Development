@@ -27,14 +27,49 @@ Future<void> main() async {
       url: supabaseUrl,
       anonKey: supabaseAnonKey,
     );
+  } catch (e, stackTrace) {
+    developer.log('Supabase initialization failed: $e\nStack trace: $stackTrace');
+    // Without Supabase nothing in the app can work, so show a clear error
+    // screen instead of crashing on the first Supabase.instance access.
+    runApp(const _StartupErrorApp());
+    return;
+  }
 
+  try {
     await NotificationService.init();
     // Don't schedule notifications here - will be done in _MyAppState after auth restore
   } catch (e, stackTrace) {
-    developer.log('Error during initialization: $e\nStack trace: $stackTrace');
+    // Notifications are optional; the app can run without them.
+    developer.log('Notification initialization failed: $e\nStack trace: $stackTrace');
   }
 
   runApp(const MyApp());
+}
+
+class _StartupErrorApp extends StatelessWidget {
+  const _StartupErrorApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.dark,
+      home: const Scaffold(
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Unable to connect to the server.\n'
+              'Please check your internet connection and restart the app.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatefulWidget {

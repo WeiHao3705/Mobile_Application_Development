@@ -596,13 +596,8 @@ class _MacrosSectionState extends State<_MacrosSection> {
   @override
   void initState() {
     super.initState();
-    final client = Supabase.instance.client;
-    if (client == null) {
-      print('❌ Supabase client is null in _MacrosSectionState.initState');
-      return;
-    }
     _dailyGoalsRepository = DailyGoalsRepository(
-      supabase: client,
+      supabase: Supabase.instance.client,
     );
     // Defer loading to next frame when context is fully ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1309,13 +1304,14 @@ class _MealLogSectionState extends State<_MealLogSection> {
                 if (!_isBatchDeleteMode)
                   GestureDetector(
                     onTap: () async {
+                      final mealController = context.read<MealController>();
                       await Navigator.push(context, MaterialPageRoute(
                         builder: (_) => AddNewMealPage(authController: widget.authController),
-                      )).then((_) {
-                        context.read<MealController>().fetchUserMeals(
-                          int.parse(widget.authController.currentUser?.id?.toString() ?? '0'),
-                        );
-                      });
+                      ));
+                      if (!mounted) return;
+                      mealController.fetchUserMeals(
+                        int.parse(widget.authController.currentUser?.id?.toString() ?? '0'),
+                      );
                     },
                     child: _toolbarIconButton(Icons.add, AppColors.lime),
                   ),
@@ -1407,6 +1403,7 @@ class _MealLogSectionState extends State<_MealLogSection> {
                           ),
                         ),
                         onPressed: () async {
+                          final mealController = context.read<MealController>();
                           await Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -1419,7 +1416,7 @@ class _MealLogSectionState extends State<_MealLogSection> {
                           if (mounted) {
                             final userId = widget.authController.currentUser?.id;
                             if (userId != null) {
-                              context.read<MealController>().fetchUserMeals(int.parse(userId.toString()));
+                              mealController.fetchUserMeals(int.parse(userId.toString()));
                             }
                           }
                         },
@@ -1513,6 +1510,7 @@ class _MealLogSectionState extends State<_MealLogSection> {
                           ),
                         ),
                         onPressed: () async {
+                          final mealController = context.read<MealController>();
                           await Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -1525,7 +1523,7 @@ class _MealLogSectionState extends State<_MealLogSection> {
                           if (mounted) {
                             final userId = widget.authController.currentUser?.id;
                             if (userId != null) {
-                              context.read<MealController>().fetchUserMeals(int.parse(userId.toString()));
+                              mealController.fetchUserMeals(int.parse(userId.toString()));
                             }
                           }
                         },
@@ -1645,7 +1643,7 @@ class _MealLogSectionState extends State<_MealLogSection> {
       ),
     ) ?? false;
 
-    if (!shouldDelete) return;
+    if (!shouldDelete || !mounted) return;
 
     // Delete meals
     final mealController = context.read<MealController>();
@@ -1665,7 +1663,7 @@ class _MealLogSectionState extends State<_MealLogSection> {
       }
     }
 
-    if (context.mounted) {
+    if (mounted) {
       _selectedForDeletion.clear();
       _isBatchDeleteMode = false;
 
@@ -1673,6 +1671,7 @@ class _MealLogSectionState extends State<_MealLogSection> {
       final userId = widget.authController.currentUser?.id;
       if (userId != null) {
         await mealController.fetchUserMeals(int.parse(userId.toString()));
+        if (!mounted) return;
       }
 
       // Show result message

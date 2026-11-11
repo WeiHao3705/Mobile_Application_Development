@@ -17,14 +17,15 @@ class MealController extends ChangeNotifier {
   late final ImageUploadService _imageUploadService;
   final ImagePickerService _imagePickerService = ImagePickerService();
 
-  MealController({MealService? service}) {
+  MealController({MealService? service, ImageUploadService? imageUploadService}) {
+    // ImageUploadService fetches a fresh client dynamically, so it is safe to
+    // create regardless of how the meal service is provided.
+    _imageUploadService = imageUploadService ?? ImageUploadService();
+
     if (service != null) {
       _service = service;
     } else {
       final supabaseClient = Supabase.instance.client;
-      if (supabaseClient == null) {
-        throw Exception('Supabase is not initialized. Ensure Supabase.initialize() is called before creating MealController.');
-      }
       final mealRepo = MealLogRepository(supabase: supabaseClient);
       final mealFoodRepo = MealFoodRepository(supabase: supabaseClient);
       final foodRepo = FoodRepository(supabase: supabaseClient);
@@ -36,10 +37,6 @@ class MealController extends ChangeNotifier {
         foodRepository: foodRepo,
         dailyGoalsRepository: dailyGoalsRepo,
       );
-
-      // ImageUploadService now gets fresh client dynamically
-      // This ensures it always has the current session
-      _imageUploadService = ImageUploadService();
     }
   }
 

@@ -55,11 +55,13 @@ class _ProfilePageState extends State<ProfilePage> {
         int.parse(userId.toString()),
       );
 
+      if (!mounted) return;
       setState(() {
         _dailyGoals = goals;
         _isLoadingGoals = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoadingGoals = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading goals: $e')),
@@ -101,6 +103,7 @@ class _ProfilePageState extends State<ProfilePage> {
       if (_dailyGoals == null) {
         // Create new daily goals
         final newGoals = await _dailyGoalsRepository.createDailyGoals(updatedGoals);
+        if (!mounted) return;
         setState(() => _dailyGoals = newGoals);
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -109,6 +112,7 @@ class _ProfilePageState extends State<ProfilePage> {
       } else {
         // Update existing daily goals
         final newGoals = await _dailyGoalsRepository.updateDailyGoals(updatedGoals);
+        if (!mounted) return;
         setState(() => _dailyGoals = newGoals);
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -116,6 +120,7 @@ class _ProfilePageState extends State<ProfilePage> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('❌ Error saving goals: $e')),
       );
@@ -175,7 +180,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     final hasPermission = await _ensurePhotoPermission();
-    if (!hasPermission) {
+    if (!hasPermission || !mounted) {
       return;
     }
 
