@@ -1,8 +1,8 @@
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_application_development/theme/app_colors.dart';
+import '../services/location_service.dart';
 
 class LiveMap extends StatefulWidget {
 
@@ -25,46 +25,22 @@ class _LiveMap extends State<LiveMap> {
     _getUserLocation();
   }
 
+  final LocationService _locationService = LocationService();
+
   Future<void> _getUserLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    try{
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if(!serviceEnabled) {
-        throw Exception('Location Services Are Disable. Please turn on GPS');
-      }
-
-      permission = await Geolocator.checkPermission();
-      if(permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if(permission == LocationPermission.denied) {
-          throw Exception('Location Permissions Are Denied');
-        }
-      }
-
-      if(permission == LocationPermission.deniedForever) {
-        throw Exception('Location Permissions Are Permanently Denied');
-      }
-
-      Position? position;
-
-      try {
-        position = await Geolocator.getLastKnownPosition();
-
-        position ??= await Geolocator.getCurrentPosition();
-      }
-      catch(e) {
-        throw Exception('Could not find GPS signal. Are you indoors?');
-      }
+    try {
+      final location = await _locationService.getUserLocation();
+      if (!mounted) return;
       setState(() {
-        _currentLocation = LatLng(position!.latitude, position.longitude);
+        _currentLocation = location;
         _isLoading = false;
       });
-    } catch(e) {
-      print('Location Error: $e');
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = e is LocationFailure
+            ? e.message
+            : 'Unable to get your location. Please try again.';
         _isLoading = false;
       });
     }

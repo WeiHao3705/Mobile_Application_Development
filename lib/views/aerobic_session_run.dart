@@ -80,6 +80,17 @@ class _AerobicSessionRunState extends State<AerobicSessionRun> {
       },
       widget.caloriesPerKM,
       widget.startLocation,
+      onLocationError: (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'GPS signal lost. Check that location is turned on and allowed.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      },
     );
   }
 
