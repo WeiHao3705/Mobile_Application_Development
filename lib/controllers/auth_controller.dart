@@ -68,6 +68,9 @@ class AuthController extends ChangeNotifier {
     } on PostgrestException catch (e) {
       _errorMessage = 'Database error: ${e.message}';
       return false;
+    } on AuthException catch (e) {
+      _errorMessage = 'Login failed: ${e.message}';
+      return false;
     } catch (_) {
       _errorMessage = 'Unable to login right now. Please retry.';
       return false;

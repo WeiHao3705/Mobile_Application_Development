@@ -143,7 +143,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           })
           .eq('user_id', user.id)
           .select(
-            'user_id, username, full_name, email, height, current_weight, target_weight, is_admin, password, profile_photo, date_of_birth, gender',
+            'user_id, username, full_name, email, height, current_weight, target_weight, is_admin, profile_photo, date_of_birth, gender',
           );
 
       final updatedList = List<Map<String, dynamic>>.from(updatedRows as List);

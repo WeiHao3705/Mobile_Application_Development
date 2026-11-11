@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../controllers/auth_controller.dart';
 import '../models/app_user.dart';
-import '../services/password_hasher.dart';
 import 'login_page.dart';
 
 class ResetPasswordPage extends StatefulWidget {
@@ -24,7 +23,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   AppUser? _recoveredAccount;
   String? _recoveryEmail;
-  String? _oldPasswordHash;
   String? _accountError;
   bool _isLoadingAccount = true;
   bool _isSubmitting = false;
@@ -83,27 +81,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         return;
       }
 
-      String? oldPasswordHash;
-      if (account != null) {
-        try {
-          final response = await Supabase.instance.client
-              .from('User')
-              .select('password')
-              .ilike('email', email)
-              .maybeSingle();
-
-          if (response != null) {
-            oldPasswordHash = response['password']?.toString();
-          }
-        } catch (_) {
-          // Continue without old password hash if fetch fails
-        }
-      }
-
       setState(() {
         _recoveryEmail = email;
         _recoveredAccount = account;
-        _oldPasswordHash = oldPasswordHash;
         _isLoadingAccount = false;
         _accountError = account == null
             ? 'We could not match this reset link to a saved profile. Please request a new reset link.'
@@ -121,15 +101,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
             'Unable to load the account details right now. Please retry.';
       });
     }
-  }
-
-  bool _isSameAsOldPassword(String newPassword) {
-    if (_oldPasswordHash == null || _oldPasswordHash!.isEmpty) {
-      return false;
-    }
-
-    final newPasswordHash = PasswordHasher.hash(newPassword.trim());
-    return newPasswordHash == _oldPasswordHash;
   }
 
   String _friendlyResetError(String rawMessage) {
@@ -163,15 +134,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   Future<void> _submit() async {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) {
-      return;
-    }
-
-    if (_isSameAsOldPassword(_passwordController.text)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('New password must be different from the old password.'),
-        ),
-      );
       return;
     }
 

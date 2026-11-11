@@ -62,7 +62,6 @@ class SignUpProfileData {
       'password': PasswordHasher.hash(password),
       'email': email.trim(),
       'full_name': fullName.trim(),
-      'is_admin': isAdmin,
     };
   }
 }
