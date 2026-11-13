@@ -9,8 +9,13 @@ class UserRepository {
 
   SupabaseClient get client => _client ?? Supabase.instance.client;
 
+  /// Columns safe to load into the app. Never include `password` here.
+  static const String _publicColumns =
+      'user_id, username, full_name, email, height, current_weight, '
+      'target_weight, is_admin, profile_photo, date_of_birth, gender';
+
   Future<List<AppUser>> fetchUsers() async {
-    final response = await client.from('User').select();
+    final response = await client.from('User').select(_publicColumns);
     final rows = List<Map<String, dynamic>>.from(response as List);
     return rows.map(AppUser.fromMap).toList();
   }
@@ -23,7 +28,7 @@ class UserRepository {
 
     final response = await client
         .from('User')
-        .select()
+        .select(_publicColumns)
         .ilike('email', normalizedEmail)
         .maybeSingle();
 

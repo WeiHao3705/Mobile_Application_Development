@@ -8,22 +8,26 @@ class AuthRepository {
 
   final SupabaseClient? _client;
 
-  static const String _loginSelectFields =
-      'user_id, username, full_name, email, height, current_weight, target_weight, is_admin, password, profile_photo, date_of_birth, gender';
+  /// Profile columns only. The legacy `password` column is deliberately not
+  /// part of this list; it is fetched separately, and only when needed.
+  static const String _profileSelectFields =
+      'user_id, username, full_name, email, height, current_weight, target_weight, is_admin, profile_photo, date_of_birth, gender';
 
   SupabaseClient get client => _client ?? Supabase.instance.client;
 
+  /// Logs in with Supabase Auth first. Accounts that predate Supabase Auth
+  /// fall back to the legacy password column and are then given an Auth
+  /// identity. Throws [AuthException] if a session cannot be established.
   Future<LoginUser?> login({
     required String username,
     required String password,
   }) async {
     final normalizedUsername = username.trim();
     final normalizedPassword = password.trim();
-    final hashedPassword = PasswordHasher.hash(normalizedPassword);
 
     final response = await client
         .from('User')
-        .select(_loginSelectFields)
+        .select(_profileSelectFields)
         .eq('username', normalizedUsername)
         .maybeSingle();
 
@@ -32,7 +36,17 @@ class AuthRepository {
     }
 
     final row = Map<String, dynamic>.from(response);
-    final storedPassword = row['password']?.toString() ?? '';
+    final email = row['email']?.toString().trim() ?? '';
+
+    // 1. Preferred path: Supabase Auth owns the password.
+    if (email.isNotEmpty &&
+        await _trySignIn(email: email, password: normalizedPassword)) {
+      return LoginUser.fromMap(row);
+    }
+
+    // 2. Legacy path for accounts that only have a password in the User table.
+    final hashedPassword = PasswordHasher.hash(normalizedPassword);
+    final storedPassword = await _fetchLegacyPassword(row['user_id']);
 
     if (!_passwordMatches(
       storedPassword: storedPassword,
@@ -42,11 +56,8 @@ class AuthRepository {
       return null;
     }
 
-    // Establish Supabase Auth session so RLS-protected updates are allowed.
-    await _ensureAuthSession(
-      email: row['email']?.toString(),
-      password: normalizedPassword,
-    );
+    // Establish a Supabase Auth session so RLS-protected requests are allowed.
+    await _establishAuthSession(email: email, password: normalizedPassword);
 
     if (storedPassword.isNotEmpty && storedPassword != hashedPassword) {
       await _upgradePasswordHash(
@@ -58,47 +69,65 @@ class AuthRepository {
     return LoginUser.fromMap(row);
   }
 
-  Future<void> _ensureAuthSession({
-    required String? email,
+  /// Returns true on success, false when Supabase Auth rejects the
+  /// credentials. Other failures (for example no network) propagate.
+  Future<bool> _trySignIn({
+    required String email,
     required String password,
   }) async {
-    final normalizedEmail = email?.trim() ?? '';
-    if (normalizedEmail.isEmpty) {
-      return;
+    try {
+      await client.auth.signInWithPassword(email: email, password: password);
+      return true;
+    } on AuthException {
+      return false;
+    }
+  }
+
+  /// Returns the legacy password value, or '' when there is none or the
+  /// database does not allow reading it (the recommended setup hides the
+  /// column, in which case only Supabase Auth logins can succeed).
+  Future<String> _fetchLegacyPassword(dynamic userId) async {
+    try {
+      final response = await client
+          .from('User')
+          .select('password')
+          .eq('user_id', userId)
+          .maybeSingle();
+      return response?['password']?.toString() ?? '';
+    } on PostgrestException {
+      return '';
+    }
+  }
+
+  /// Signs in, creating the Auth identity first when the account has none.
+  /// Throws [AuthException] when no session can be established.
+  Future<void> _establishAuthSession({
+    required String email,
+    required String password,
+  }) async {
+    if (email.isEmpty) {
+      throw AuthException(
+        'This account has no email address, so it cannot be signed in securely. Please contact support.',
+      );
     }
 
     try {
-      await client.auth.signInWithPassword(
-        email: normalizedEmail,
-        password: password,
-      );
+      await client.auth.signInWithPassword(email: email, password: password);
       return;
     } on AuthException catch (error) {
       final message = error.message.toLowerCase();
-      final shouldTryCreate = message.contains('invalid login credentials') ||
-          message.contains('email not confirmed') ||
+      final canCreateIdentity = message.contains('invalid login credentials') ||
           message.contains('user not found') ||
           message.contains('invalid credentials');
 
-      if (!shouldTryCreate) {
-        return;
+      if (!canCreateIdentity) {
+        // e.g. "Email not confirmed": tell the user instead of hiding it.
+        rethrow;
       }
-    } catch (_) {
-      return;
     }
 
-    try {
-      await ensureAuthIdentity(
-        email: normalizedEmail,
-        password: password,
-      );
-      await client.auth.signInWithPassword(
-        email: normalizedEmail,
-        password: password,
-      );
-    } catch (_) {
-      // Keep app login compatible even if auth session cannot be established.
-    }
+    await ensureAuthIdentity(email: email, password: password);
+    await client.auth.signInWithPassword(email: email, password: password);
   }
 
   bool _passwordMatches({
